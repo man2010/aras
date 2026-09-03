@@ -63,28 +63,28 @@ export function PersistentVideo() {
 
       {/* FLOATING AUDIO WIDGET - non-home pages only */}
       {!isHome && (
-        <div className="fixed bottom-5 right-5 z-30 flex items-center gap-3 rounded-full border border-white/15 bg-[#241c18]/92 py-2 pl-2.5 pr-4 shadow-[0_10px_30px_rgba(0,0,0,.3)] backdrop-blur-lg">
-          <div className="relative flex h-8 w-8 items-center justify-center overflow-hidden rounded-full bg-[#e9515f]/20">
+        <div className="fixed bottom-3 right-3 z-30 flex items-center gap-2 rounded-full border border-white/15 bg-[#241c18]/92 py-1.5 pl-2 pr-3 shadow-[0_10px_30px_rgba(0,0,0,.3)] backdrop-blur-lg sm:bottom-5 sm:right-5 sm:gap-3 sm:py-2 sm:pl-2.5 sm:pr-4">
+          <div className="relative flex h-6 w-6 items-center justify-center overflow-hidden rounded-full bg-[#e9515f]/20 sm:h-8 sm:w-8">
             {isPlaying ? (
-              <span className="flex h-3 w-3 items-center justify-center">
-                <span className="h-2 w-2 animate-pulse rounded-full bg-[#e9515f]" />
+              <span className="flex h-2 w-2 items-center justify-center sm:h-3 sm:w-3">
+                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#e9515f] sm:h-2 sm:w-2" />
               </span>
             ) : (
-              <Play size={12} className="text-white/40" fill="currentColor" />
+              <Play size={10} className="text-white/40" fill="currentColor" />
             )}
           </div>
           <div className="flex items-center gap-1">
-            <button onClick={togglePlay} className="rounded-full p-1.5 text-white/75 transition hover:text-white" aria-label={isPlaying ? 'Pause' : 'Lecture'}>
-              {isPlaying ? <Pause size={14} /> : <Play size={14} fill="currentColor" />}
+            <button onClick={togglePlay} className="rounded-full p-1 text-white/75 transition hover:text-white sm:p-1.5" aria-label={isPlaying ? 'Pause' : 'Lecture'}>
+              {isPlaying ? <Pause size={12} /> : <Play size={12} fill="currentColor" />}
             </button>
-            <button onClick={toggleMute} className="rounded-full p-1.5 text-white/75 transition hover:text-white" aria-label={isMuted ? 'Activer le son' : 'Couper le son'}>
-              {isMuted ? <VolumeX size={14} /> : <Volume2 size={14} />}
+            <button onClick={toggleMute} className="rounded-full p-1 text-white/75 transition hover:text-white sm:p-1.5" aria-label={isMuted ? 'Activer le son' : 'Couper le son'}>
+              {isMuted ? <VolumeX size={12} /> : <Volume2 size={12} />}
             </button>
-            <button onClick={dismiss} className="rounded-full p-1.5 text-white/40 transition hover:text-white" aria-label="Fermer">
-              <X size={13} />
+            <button onClick={dismiss} className="rounded-full p-1 text-white/40 transition hover:text-white sm:p-1.5" aria-label="Fermer">
+              <X size={11} />
             </button>
           </div>
-          <span className="text-[10px] font-bold uppercase tracking-wider text-white/45">ARAS</span>
+          <span className="hidden text-[10px] font-bold uppercase tracking-wider text-white/45 sm:block">ARAS</span>
         </div>
       )}
     </>

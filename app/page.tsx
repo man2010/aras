@@ -86,22 +86,28 @@ export default function Home() {
                 src="/videos/WhatsApp_Video_2026-09-03_at_03.21.18.mp4"
                 autoPlay
                 loop
-                muted
+                muted={isMuted}
                 playsInline
                 className="h-full w-full object-cover"
+                onPlay={() => setIsPlaying(true)}
+                onPause={() => setIsPlaying(false)}
               />
               <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-transparent" />
               <div className="absolute bottom-3 left-3 flex items-center gap-2">
                 <div className="flex h-8 w-8 items-center justify-center rounded-full bg-white/90 text-[#1e1916] backdrop-blur">
-                  <span className="flex h-2 w-2 items-center justify-center">
-                    <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#e9515f]" />
-                  </span>
+                  {isPlaying ? (
+                    <span className="flex h-2 w-2 items-center justify-center">
+                      <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#e9515f]" />
+                    </span>
+                  ) : (
+                    <Play size={12} fill="currentColor" />
+                  )}
                 </div>
                 <span className="rounded-full bg-white/90 px-3 py-1.5 text-[10px] font-extrabold uppercase tracking-wider text-[#1a6b68] backdrop-blur">
                   Découvrez ARAS
                 </span>
               </div>
-              <div className="absolute bottom-3 right-3 hidden items-center gap-2 lg:flex">
+              <div className="absolute bottom-3 right-3 flex items-center gap-2">
                 <button
                   onClick={() => {
                     const video = videoRef.current;
@@ -111,9 +117,9 @@ export default function Home() {
                     }
                   }}
                   className="flex h-8 w-8 items-center justify-center rounded-full bg-white/90 text-[#1e1916] backdrop-blur transition hover:scale-110 hover:bg-white"
-                  aria-label="Lecture/Pause"
+                  aria-label={isPlaying ? 'Pause' : 'Lecture'}
                 >
-                  <Pause size={14} />
+                  {isPlaying ? <Pause size={14} /> : <Play size={14} fill="currentColor" />}
                 </button>
                 <button
                   onClick={() => {
@@ -124,9 +130,9 @@ export default function Home() {
                     }
                   }}
                   className="flex h-8 w-8 items-center justify-center rounded-full bg-white/90 text-[#1e1916] backdrop-blur transition hover:scale-110 hover:bg-white"
-                  aria-label="Activer/Désactiver le son"
+                  aria-label={isMuted ? 'Activer le son' : 'Couper le son'}
                 >
-                  <VolumeX size={14} />
+                  {isMuted ? <VolumeX size={14} /> : <Volume2 size={14} />}
                 </button>
               </div>
             </div>
