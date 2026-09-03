@@ -28,7 +28,7 @@ export default function TarifsPage() {
 
         <div className="mt-12 grid gap-6 md:grid-cols-3">
           {plans.map((plan) => (
-            <div key={plan.name} className={`rounded-[28px] p-8 ${plan.featured ? 'text-white shadow-[0_20px_50px_rgba(233,81,95,.25)] lg:-translate-y-4' : 'shadow-[0_10px_30px_rgba(83,46,32,.06)]'}`} style={{ background: plan.bg }}>
+            <div key={plan.name} className={`rounded-[28px] p-8 ${plan.featured ? 'text-white shadow-[0_20px_50px_rgba(233,81,95,.25)] lg:-translate-y-4' : plan.name === 'Élite' ? 'text-white shadow-[0_20px_50px_rgba(36,28,24,.25)] lg:-translate-y-4' : 'text-[#241c18] shadow-[0_10px_30px_rgba(83,46,32,.06)]'}`} style={{ background: plan.bg }}>
               {plan.featured && <span className="mb-4 inline-block rounded-full bg-white/20 px-3 py-1 text-[10px] font-extrabold uppercase tracking-wider">Le plus choisi</span>}
               <div className="flex h-12 w-12 items-center justify-center rounded-2xl" style={{ background: plan.featured ? 'rgba(255,255,255,.2)' : `${plan.accent}15`, color: plan.accent }}>
                 <plan.icon size={22} fill={plan.icon === Heart ? 'currentColor' : 'none'} />
@@ -40,7 +40,7 @@ export default function TarifsPage() {
                   <li key={f} className="flex items-start gap-2 text-sm"><Check size={16} className="mt-0.5 shrink-0" style={{ color: plan.accent }} /> {f}</li>
                 ))}
               </ul>
-              <Link href={plan.href} className={`mt-8 block rounded-full py-3.5 text-center text-sm font-extrabold transition hover:-translate-y-0.5 ${plan.featured ? 'bg-white text-[#e9515f]' : 'bg-[#1a6b68] text-white hover:bg-[#125552]'}`}>{plan.cta}</Link>
+              <Link href={plan.href} className={`mt-8 block rounded-full py-3.5 text-center text-sm font-extrabold transition hover:-translate-y-0.5 ${plan.featured ? 'bg-white text-[#e9515f]' : plan.name === 'Élite' ? 'bg-[#f4c27a] text-[#241c18] hover:bg-[#e5b86a]' : 'bg-[#1a6b68] text-white hover:bg-[#125552]'}`}>{plan.cta}</Link>
             </div>
           ))}
         </div>

@@ -320,7 +320,7 @@ export default function Home() {
               { name: 'Premium', price: '5 000 FCFA', period: '/ mois', features: ['Likes illimités', 'Voir qui vous a liké', 'Messagerie illimitée', 'Filtres avancés', 'Priorité aux événements'], bg: '#e9515f', accent: '#fff', cta: 'Passer Premium', href: '/tarifs', featured: true },
               { name: 'Élite', price: '15 000 FCFA', period: '/ mois', features: ['Tout Premium', 'Conciergerie personnelle', 'Accès événements privés', 'Profil mis en avant', 'Coaching rencontre'], bg: '#241c18', accent: '#f4c27a', cta: 'Rejoindre l\'Élite', href: '/tarifs' },
             ].map((plan, index) => (
-              <div key={plan.name} className={`rounded-[28px] p-8 transition duration-300 hover:-translate-y-2 hover:shadow-xl ${plan.featured ? 'text-white shadow-[0_20px_50px_rgba(233,81,95,.25)] lg:-translate-y-4' : 'shadow-[0_10px_30px_rgba(83,46,32,.06)]'} animate-in fade-in slide-in-from-bottom-4 duration-500`} style={{ background: plan.bg, animationDelay: `${index * 150}ms` }}>
+              <div key={plan.name} className={`rounded-[28px] p-8 transition duration-300 hover:-translate-y-2 hover:shadow-xl ${plan.featured ? 'text-white shadow-[0_20px_50px_rgba(233,81,95,.25)] lg:-translate-y-4' : plan.name === 'Élite' ? 'text-white shadow-[0_20px_50px_rgba(36,28,24,.25)] lg:-translate-y-4' : 'text-[#241c18] shadow-[0_10px_30px_rgba(83,46,32,.06)]'} animate-in fade-in slide-in-from-bottom-4 duration-500`} style={{ background: plan.bg, animationDelay: `${index * 150}ms` }}>
                 {plan.featured && <span className="mb-4 inline-block rounded-full bg-white/20 px-3 py-1 text-[10px] font-extrabold uppercase tracking-wider">Le plus choisi</span>}
                 <h3 className="font-display text-2xl">{plan.name}</h3>
                 <p className="mt-3"><span className="font-display text-4xl font-semibold">{plan.price}</span><span className="text-sm opacity-60">{plan.period}</span></p>
@@ -329,7 +329,7 @@ export default function Home() {
                     <li key={f} className="flex items-center gap-2 text-sm"><Check size={16} style={{ color: plan.accent }} /> {f}</li>
                   ))}
                 </ul>
-                <Link href={plan.href} className={`mt-8 block rounded-full py-3.5 text-center text-sm font-extrabold transition hover:-translate-y-0.5 ${plan.featured ? 'bg-white text-[#e9515f]' : 'bg-[#1a6b68] text-white hover:bg-[#125552]'}`}>{plan.cta}</Link>
+                <Link href={plan.href} className={`mt-8 block rounded-full py-3.5 text-center text-sm font-extrabold transition hover:-translate-y-0.5 ${plan.featured ? 'bg-white text-[#e9515f]' : plan.name === 'Élite' ? 'bg-[#f4c27a] text-[#241c18] hover:bg-[#e5b86a]' : 'bg-[#1a6b68] text-white hover:bg-[#125552]'}`}>{plan.cta}</Link>
               </div>
             ))}
           </div>
