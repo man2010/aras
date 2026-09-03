@@ -75,6 +75,29 @@ export default function Home() {
               </p>
             </div>
           </div>
+          <div className="relative hidden lg:block animate-[reveal_1s_ease_both] lg:-mt-32">
+            <div className="relative mx-auto h-[280px] w-[400px] overflow-hidden rounded-[24px] border-[6px] border-[#fbf8f2]/80 shadow-[0_20px_50px_rgba(83,46,32,.15)]">
+              <video
+                src="/videos/WhatsApp_Video_2026-09-03_at_03.21.18.mp4"
+                autoPlay
+                loop
+                muted
+                playsInline
+                className="h-full w-full object-cover"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-transparent" />
+              <div className="absolute bottom-3 left-3 flex items-center gap-2">
+                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-white/90 text-[#1e1916] backdrop-blur">
+                  <span className="flex h-2 w-2 items-center justify-center">
+                    <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#e9515f]" />
+                  </span>
+                </div>
+                <span className="rounded-full bg-white/90 px-3 py-1.5 text-[10px] font-extrabold uppercase tracking-wider text-[#1a6b68] backdrop-blur">
+                  Découvrez ARAS
+                </span>
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 
