@@ -1,11 +1,10 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import {
   ArrowRight, Sparkles, Heart, Users, ShieldCheck,
   Check, CalendarDays, MapPin, Quote, ArrowUpRight, MessageCircle, Search,
-  Volume2, VolumeX, Pause, Play,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import type { Profile, EventItem, Testimonial } from '@/lib/types';
@@ -23,9 +22,6 @@ export default function Home() {
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [events, setEvents] = useState<EventItem[]>(fallbackEvents);
   const [testimonials, setTestimonials] = useState<Testimonial[]>([]);
-  const [isPlaying, setIsPlaying] = useState(true);
-  const [isMuted, setIsMuted] = useState(true);
-  const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
     (async () => {
@@ -43,10 +39,10 @@ export default function Home() {
   return (
     <main className="min-h-screen">
       {/* HERO */}
-      <section className="relative min-h-[500px] bg-gradient-to-b from-[#f3e9dc] to-[#f5efe6] px-5 pb-12 pt-[72px] lg:min-h-[820px] lg:px-8 lg:pt-[160px]">
+      <section className="relative min-h-[240px] bg-gradient-to-b from-[#f3e9dc] to-[#f5efe6] px-5 pb-3 pt-[72px] lg:min-h-[360px] lg:px-8 lg:pt-[85px]">
         <div className="absolute right-[-80px] top-[80px] h-[480px] w-[480px] rounded-full bg-[#e7cfc0]/60 blur-2xl lg:right-[3%] lg:top-[110px] lg:h-[620px] lg:w-[620px]" />
         <div className="absolute bottom-[-100px] left-[-100px] h-[320px] w-[320px] rounded-full bg-[#edc5c2]/40 blur-3xl" />
-        <div className="relative mx-auto grid max-w-[1240px] items-center gap-12 lg:grid-cols-[1fr_0.95fr] lg:gap-8">
+        <div className="relative mx-auto grid max-w-[1240px] items-center gap-8 lg:grid-cols-[1fr_0.8fr]">
           <div className="relative z-10 animate-[reveal_.8s_ease_both]">
             <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-[#d89b52]/40 bg-white/40 px-4 py-2 text-[11px] font-extrabold uppercase tracking-[.18em] text-[#9a682f]">
               <Sparkles size={13} /> Les rencontres qui ont du sens
@@ -79,61 +75,21 @@ export default function Home() {
               </p>
             </div>
           </div>
-          <div className="relative mt-6 animate-[reveal_1s_ease_both] lg:-mt-32 lg:block">
-            <div className="relative mx-auto h-[200px] w-[320px] overflow-hidden rounded-[20px] border-[5px] border-[#fbf8f2]/80 shadow-[0_16px_40px_rgba(83,46,32,.12)] sm:h-[240px] sm:w-[360px] lg:h-[280px] lg:w-[400px] lg:border-[6px] lg:shadow-[0_20px_50px_rgba(83,46,32,.15)]">
-              <video
-                ref={videoRef}
-                src="/videos/WhatsApp_Video_2026-09-03_at_03.21.18.mp4"
-                autoPlay
-                loop
-                muted={isMuted}
-                playsInline
-                className="h-full w-full object-cover"
-                onPlay={() => setIsPlaying(true)}
-                onPause={() => setIsPlaying(false)}
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-transparent" />
-              <div className="absolute bottom-3 left-3 flex items-center gap-2">
-                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-white/90 text-[#1e1916] backdrop-blur">
-                  {isPlaying ? (
-                    <span className="flex h-2 w-2 items-center justify-center">
-                      <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#e9515f]" />
-                    </span>
-                  ) : (
-                    <Play size={12} fill="currentColor" />
-                  )}
+          <div className="relative hidden lg:block animate-[reveal_1s_ease_both]">
+            <div className="relative mx-auto h-[320px] w-[320px]">
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="relative">
+                  <div className="absolute inset-0 bg-gradient-to-br from-[#e9515f] to-[#d89b52] opacity-30 blur-3xl rounded-full"></div>
+                  <div className="relative flex h-[200px] w-[200px] items-center justify-center">
+                    <div className="absolute inset-0 bg-gradient-to-br from-[#e9515f]/10 to-[#d89b52]/10 rounded-full"></div>
+                    <div className="relative flex h-[140px] w-[140px] items-center justify-center rounded-full bg-gradient-to-br from-[#e9515f] to-[#d89b52] shadow-[0_20px_50px_rgba(233,81,95,.3)]">
+                      <Heart size={64} className="text-white fill-white animate-heartbeat" />
+                    </div>
+                    <div className="absolute -top-4 -right-4 h-12 w-12 rounded-full bg-[#d89b52] opacity-60 blur-sm"></div>
+                    <div className="absolute -bottom-6 -left-6 h-16 w-16 rounded-full bg-[#e9515f] opacity-40 blur-md"></div>
+                    <div className="absolute top-1/2 -right-8 h-8 w-8 rounded-full bg-[#1a6b68] opacity-30 blur-lg"></div>
+                  </div>
                 </div>
-                <span className="rounded-full bg-white/90 px-3 py-1.5 text-[10px] font-extrabold uppercase tracking-wider text-[#1a6b68] backdrop-blur">
-                  Découvrez ARAS
-                </span>
-              </div>
-              <div className="absolute bottom-3 right-3 flex items-center gap-2">
-                <button
-                  onClick={() => {
-                    const video = videoRef.current;
-                    if (video) {
-                      if (video.paused) video.play();
-                      else video.pause();
-                    }
-                  }}
-                  className="flex h-8 w-8 items-center justify-center rounded-full bg-white/90 text-[#1e1916] backdrop-blur transition hover:scale-110 hover:bg-white"
-                  aria-label={isPlaying ? 'Pause' : 'Lecture'}
-                >
-                  {isPlaying ? <Pause size={14} /> : <Play size={14} fill="currentColor" />}
-                </button>
-                <button
-                  onClick={() => {
-                    const video = videoRef.current;
-                    if (video) {
-                      video.muted = !video.muted;
-                      setIsMuted(video.muted);
-                    }
-                  }}
-                  className="flex h-8 w-8 items-center justify-center rounded-full bg-white/90 text-[#1e1916] backdrop-blur transition hover:scale-110 hover:bg-white"
-                  aria-label={isMuted ? 'Activer le son' : 'Couper le son'}
-                >
-                  {isMuted ? <VolumeX size={14} /> : <Volume2 size={14} />}
-                </button>
               </div>
             </div>
           </div>
