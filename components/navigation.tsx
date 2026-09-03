@@ -52,21 +52,21 @@ export function Navbar() {
         </button>
       </div>
       {open && (
-        <div className="border-t border-black/5 bg-[#fbf8f2] px-5 pb-5 pt-3 md:hidden">
+        <div className="border-t border-black/5 bg-[#fbf8f2] px-5 pb-5 pt-3 md:hidden animate-in slide-in-from-top-2 duration-300">
           <div className="flex flex-col gap-4 text-sm font-bold">
-            <Link href="/decouverte" onClick={() => setOpen(false)}>Découverte</Link>
-            <Link href="/evenements" onClick={() => setOpen(false)}>Événements</Link>
-            <Link href="/#values" onClick={() => setOpen(false)}>Nos valeurs</Link>
-            <Link href="/tarifs" onClick={() => setOpen(false)}>Tarifs</Link>
+            <Link href="/decouverte" onClick={() => setOpen(false)} className="hover:text-[#e9515f] transition-colors">Découverte</Link>
+            <Link href="/evenements" onClick={() => setOpen(false)} className="hover:text-[#e9515f] transition-colors">Événements</Link>
+            <Link href="/#values" onClick={() => setOpen(false)} className="hover:text-[#e9515f] transition-colors">Nos valeurs</Link>
+            <Link href="/tarifs" onClick={() => setOpen(false)} className="hover:text-[#e9515f] transition-colors">Tarifs</Link>
             {user ? (
               <>
-                <Link href="/espace" onClick={() => setOpen(false)} className="flex items-center gap-2"><LayoutDashboard size={16} /> Mon espace</Link>
-                <button onClick={handleSignOut} className="flex items-center gap-2 text-left"><LogOut size={16} /> Déconnexion</button>
+                <Link href="/espace" onClick={() => setOpen(false)} className="flex items-center gap-2 hover:text-[#e9515f] transition-colors"><LayoutDashboard size={16} /> Mon espace</Link>
+                <button onClick={handleSignOut} className="flex items-center gap-2 text-left hover:text-[#e9515f] transition-colors"><LogOut size={16} /> Déconnexion</button>
               </>
             ) : (
               <>
-                <Link href="/connexion" onClick={() => setOpen(false)}>Se connecter</Link>
-                <Link href="/inscription" onClick={() => setOpen(false)} className="rounded-full bg-[#e9515f] px-5 py-3 text-center text-white">Créer mon compte</Link>
+                <Link href="/connexion" onClick={() => setOpen(false)} className="hover:text-[#e9515f] transition-colors">Se connecter</Link>
+                <Link href="/inscription" onClick={() => setOpen(false)} className="rounded-full bg-[#e9515f] px-5 py-3 text-center text-white hover:bg-[#c83d50] transition-colors">Créer mon compte</Link>
               </>
             )}
           </div>
