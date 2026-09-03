@@ -1,10 +1,11 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import Link from 'next/link';
 import {
   ArrowRight, Sparkles, Heart, Users, ShieldCheck,
   Check, CalendarDays, MapPin, Quote, ArrowUpRight, MessageCircle, Search,
+  Volume2, VolumeX, Pause, Play,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import type { Profile, EventItem, Testimonial } from '@/lib/types';
@@ -22,6 +23,9 @@ export default function Home() {
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [events, setEvents] = useState<EventItem[]>(fallbackEvents);
   const [testimonials, setTestimonials] = useState<Testimonial[]>([]);
+  const [isPlaying, setIsPlaying] = useState(true);
+  const [isMuted, setIsMuted] = useState(true);
+  const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
     (async () => {
@@ -78,23 +82,58 @@ export default function Home() {
           <div className="relative mt-8 animate-[reveal_1s_ease_both] lg:-mt-32 lg:block">
             <div className="relative mx-auto h-[200px] w-[320px] overflow-hidden rounded-[20px] border-[5px] border-[#fbf8f2]/80 shadow-[0_16px_40px_rgba(83,46,32,.12)] sm:h-[240px] sm:w-[360px] lg:h-[280px] lg:w-[400px] lg:border-[6px] lg:shadow-[0_20px_50px_rgba(83,46,32,.15)]">
               <video
+                ref={videoRef}
                 src="/videos/WhatsApp_Video_2026-09-03_at_03.21.18.mp4"
                 autoPlay
                 loop
-                muted
+                muted={isMuted}
                 playsInline
                 className="h-full w-full object-cover"
+                onPlay={() => setIsPlaying(true)}
+                onPause={() => setIsPlaying(false)}
               />
               <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-transparent" />
               <div className="absolute bottom-3 left-3 flex items-center gap-2">
                 <div className="flex h-8 w-8 items-center justify-center rounded-full bg-white/90 text-[#1e1916] backdrop-blur">
-                  <span className="flex h-2 w-2 items-center justify-center">
-                    <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#e9515f]" />
-                  </span>
+                  {isPlaying ? (
+                    <span className="flex h-2 w-2 items-center justify-center">
+                      <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#e9515f]" />
+                    </span>
+                  ) : (
+                    <Play size={12} fill="currentColor" />
+                  )}
                 </div>
                 <span className="rounded-full bg-white/90 px-3 py-1.5 text-[10px] font-extrabold uppercase tracking-wider text-[#1a6b68] backdrop-blur">
                   Découvrez ARAS
                 </span>
+              </div>
+              <div className="absolute bottom-3 right-3 flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    const video = videoRef.current;
+                    if (video) {
+                      if (video.paused) video.play();
+                      else video.pause();
+                    }
+                  }}
+                  className="flex h-8 w-8 items-center justify-center rounded-full bg-white/90 text-[#1e1916] backdrop-blur transition hover:scale-110 hover:bg-white"
+                  aria-label={isPlaying ? 'Pause' : 'Lecture'}
+                >
+                  {isPlaying ? <Pause size={14} /> : <Play size={14} fill="currentColor" />}
+                </button>
+                <button
+                  onClick={() => {
+                    const video = videoRef.current;
+                    if (video) {
+                      video.muted = !video.muted;
+                      setIsMuted(video.muted);
+                    }
+                  }}
+                  className="flex h-8 w-8 items-center justify-center rounded-full bg-white/90 text-[#1e1916] backdrop-blur transition hover:scale-110 hover:bg-white"
+                  aria-label={isMuted ? 'Activer le son' : 'Couper le son'}
+                >
+                  {isMuted ? <VolumeX size={14} /> : <Volume2 size={14} />}
+                </button>
               </div>
             </div>
           </div>
