@@ -41,9 +41,9 @@ export default function Home() {
   }, []);
 
   return (
-    <main>
+    <main className="min-h-screen">
       {/* HERO */}
-      <section className="relative min-h-[500px] bg-gradient-to-b from-[#f3e9dc] to-[#f5efe6] px-5 pb-12 pt-[80px] lg:min-h-[820px] lg:px-8 lg:pt-[160px]">
+      <section className="relative min-h-[500px] bg-gradient-to-b from-[#f3e9dc] to-[#f5efe6] px-5 pb-12 pt-[72px] lg:min-h-[820px] lg:px-8 lg:pt-[160px]">
         <div className="absolute right-[-80px] top-[80px] h-[480px] w-[480px] rounded-full bg-[#e7cfc0]/60 blur-2xl lg:right-[3%] lg:top-[110px] lg:h-[620px] lg:w-[620px]" />
         <div className="absolute bottom-[-100px] left-[-100px] h-[320px] w-[320px] rounded-full bg-[#edc5c2]/40 blur-3xl" />
         <div className="relative mx-auto grid max-w-[1240px] items-center gap-12 lg:grid-cols-[1fr_0.95fr] lg:gap-8">
