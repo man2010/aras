@@ -75,8 +75,8 @@ export default function Home() {
               </p>
             </div>
           </div>
-          <div className="relative hidden lg:block animate-[reveal_1s_ease_both] lg:-mt-32">
-            <div className="relative mx-auto h-[280px] w-[400px] overflow-hidden rounded-[24px] border-[6px] border-[#fbf8f2]/80 shadow-[0_20px_50px_rgba(83,46,32,.15)]">
+          <div className="relative mt-8 animate-[reveal_1s_ease_both] lg:-mt-32 lg:block">
+            <div className="relative mx-auto h-[200px] w-[320px] overflow-hidden rounded-[20px] border-[5px] border-[#fbf8f2]/80 shadow-[0_16px_40px_rgba(83,46,32,.12)] sm:h-[240px] sm:w-[360px] lg:h-[280px] lg:w-[400px] lg:border-[6px] lg:shadow-[0_20px_50px_rgba(83,46,32,.15)]">
               <video
                 src="/videos/WhatsApp_Video_2026-09-03_at_03.21.18.mp4"
                 autoPlay
