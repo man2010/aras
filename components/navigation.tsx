@@ -18,7 +18,7 @@ export function Navbar() {
 
   return (
     <nav className="fixed left-0 right-0 top-0 z-40 border-b border-black/5 bg-[#fbf8f2]/90 backdrop-blur-xl">
-      <div className="mx-auto flex h-[72px] max-w-[1240px] items-center justify-between px-5 lg:px-8">
+      <div className="mx-auto flex h-[60px] max-w-[1240px] items-center justify-between px-5 lg:px-8">
         <Link href="/" className="font-display text-[30px] font-bold tracking-[-0.06em] text-[#e9515f]">
           ARAS<span className="text-[#d89b52]">.</span>
         </Link>

@@ -43,7 +43,7 @@ export default function Home() {
   return (
     <main>
       {/* HERO */}
-      <section className="relative min-h-[600px] bg-gradient-to-b from-[#f3e9dc] to-[#f5efe6] px-5 pb-16 pt-[100px] lg:min-h-[820px] lg:px-8 lg:pt-[160px]">
+      <section className="relative min-h-[500px] bg-gradient-to-b from-[#f3e9dc] to-[#f5efe6] px-5 pb-12 pt-[80px] lg:min-h-[820px] lg:px-8 lg:pt-[160px]">
         <div className="absolute right-[-80px] top-[80px] h-[480px] w-[480px] rounded-full bg-[#e7cfc0]/60 blur-2xl lg:right-[3%] lg:top-[110px] lg:h-[620px] lg:w-[620px]" />
         <div className="absolute bottom-[-100px] left-[-100px] h-[320px] w-[320px] rounded-full bg-[#edc5c2]/40 blur-3xl" />
         <div className="relative mx-auto grid max-w-[1240px] items-center gap-12 lg:grid-cols-[1fr_0.95fr] lg:gap-8">
@@ -79,7 +79,7 @@ export default function Home() {
               </p>
             </div>
           </div>
-          <div className="relative mt-8 animate-[reveal_1s_ease_both] lg:-mt-32 lg:block">
+          <div className="relative mt-6 animate-[reveal_1s_ease_both] lg:-mt-32 lg:block">
             <div className="relative mx-auto h-[200px] w-[320px] overflow-hidden rounded-[20px] border-[5px] border-[#fbf8f2]/80 shadow-[0_16px_40px_rgba(83,46,32,.12)] sm:h-[240px] sm:w-[360px] lg:h-[280px] lg:w-[400px] lg:border-[6px] lg:shadow-[0_20px_50px_rgba(83,46,32,.15)]">
               <video
                 ref={videoRef}
