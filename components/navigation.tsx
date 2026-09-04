@@ -34,6 +34,11 @@ export function Navbar() {
               <Link href="/espace" className="flex items-center gap-2 px-4 py-2.5 text-[13px] font-bold text-[#625852] transition hover:text-[#e9515f]">
                 <LayoutDashboard size={16} /> Mon espace
               </Link>
+              {(user.email?.includes('admin') || user.email?.includes('test')) && (
+                <Link href="/admin" className="flex items-center gap-2 px-4 py-2.5 text-[13px] font-bold text-[#756960] transition hover:text-[#e9515f]">
+                  Admin
+                </Link>
+              )}
               <button onClick={handleSignOut} className="flex items-center gap-2 rounded-full border border-[#dfd2c6] px-4 py-2.5 text-[13px] font-bold text-[#625852] transition hover:border-[#e9515f] hover:text-[#e9515f]">
                 <LogOut size={15} /> Déconnexion
               </button>

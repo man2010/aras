@@ -1,7 +1,7 @@
 'use client';
 
 import { FormEvent, useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { User, MessageCircle, Heart, CalendarDays, ArrowRight, ShieldCheck, Send, Plus, Check } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
@@ -13,6 +13,7 @@ type Tab = 'profile' | 'messages' | 'events' | 'likes';
 export default function EspacePage() {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [tab, setTab] = useState<Tab>('profile');
   const [profile, setProfile] = useState<Profile | null>(null);
   const [profileForm, setProfileForm] = useState({ display_name: '', age: '', city: 'Dakar', bio: '', profession: '', photo_url: '', interests: '' });
@@ -20,6 +21,7 @@ export default function EspacePage() {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeConv, setActiveConv] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
+  const [conversationProfiles, setConversationProfiles] = useState<Record<string, Profile>>({});
   const [newMessage, setNewMessage] = useState('');
   const [likedProfiles, setLikedProfiles] = useState<Profile[]>([]);
   const [events, setEvents] = useState<{ id: string; title: string; event_date: string; location: string }[]>([]);
@@ -27,6 +29,18 @@ export default function EspacePage() {
   useEffect(() => {
     if (!authLoading && !user) router.push('/connexion');
   }, [authLoading, user, router]);
+
+  useEffect(() => {
+    // Handle URL parameters for tab and conversation
+    const tabParam = searchParams.get('tab');
+    const convParam = searchParams.get('conv');
+    if (tabParam && ['profile', 'messages', 'events', 'likes'].includes(tabParam)) {
+      setTab(tabParam as Tab);
+    }
+    if (convParam) {
+      setActiveConv(convParam);
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     if (!user) return;
@@ -38,7 +52,19 @@ export default function EspacePage() {
         setProfileForm({ display_name: p.display_name, age: String(p.age), city: p.city, bio: p.bio, profession: p.profession, photo_url: p.photo_url, interests: p.interests.join(', ') });
       }
       const { data: convs } = await supabase.from('aras_conversations').select('*').or(`user_a.eq.${user.id},user_b.eq.${user.id}`).order('created_at', { ascending: false });
-      if (convs) setConversations(convs as Conversation[]);
+      if (convs) {
+        setConversations(convs as Conversation[]);
+        // Fetch profiles for conversation partners
+        const partnerIds = convs.map((c: Conversation) => c.user_a === user.id ? c.user_b : c.user_a);
+        const { data: partnerProfiles } = await supabase.from('aras_profiles').select('*').in('user_id', partnerIds);
+        if (partnerProfiles) {
+          const profileMap: Record<string, Profile> = {};
+          partnerProfiles.forEach((p: Profile) => {
+            profileMap[p.user_id] = p;
+          });
+          setConversationProfiles(profileMap);
+        }
+      }
       const { data: likes } = await supabase.from('aras_likes').select('liked_profile_id').eq('liker_id', user.id);
       if (likes && likes.length > 0) {
         const ids = likes.map((l: { liked_profile_id: string }) => l.liked_profile_id);
@@ -85,7 +111,11 @@ export default function EspacePage() {
   const sendMessage = async (e: FormEvent) => {
     e.preventDefault();
     if (!user || !activeConv || !newMessage.trim()) return;
-    const { data } = await supabase.from('aras_messages').insert({ conversation_id: activeConv, sender_id: user.id, content: newMessage.trim() }).select().single();
+    const { data, error } = await supabase.from('aras_messages').insert({ conversation_id: activeConv, sender_id: user.id, content: newMessage.trim() }).select().single();
+    if (error) {
+      alert('Erreur lors de l\'envoi du message. Veuillez réessayer.');
+      return;
+    }
     if (data) { setMessages((prev) => [...prev, data as Message]); setNewMessage(''); }
   };
 
@@ -168,10 +198,11 @@ export default function EspacePage() {
                 <div className="space-y-1">
                   {conversations.map((c) => {
                     const otherId = c.user_a === user.id ? c.user_b : c.user_a;
+                    const otherProfile = conversationProfiles[otherId];
                     return (
                       <button key={c.id} onClick={() => setActiveConv(c.id)} className={`w-full rounded-xl px-3 py-3 text-left transition ${activeConv === c.id ? 'bg-[#fae4e2]' : 'hover:bg-[#f3e9dc]'}`}>
-                        <p className="text-sm font-bold text-[#241c18]">Conversation avec...</p>
-                        <p className="text-xs text-[#9a8b82]">{otherId.slice(0, 8)}...</p>
+                        <p className="text-sm font-bold text-[#241c18]">{otherProfile?.display_name || 'Utilisateur'}</p>
+                        <p className="text-xs text-[#9a8b82]">{otherProfile?.city || 'Ville inconnue'}</p>
                       </button>
                     );
                   })}

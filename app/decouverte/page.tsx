@@ -2,18 +2,21 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { ShieldCheck, Heart, MapPin, Sparkles, Search, Frown } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { ShieldCheck, Heart, MapPin, Sparkles, Search, Frown, MessageCircle, Flag } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
 import type { Profile } from '@/lib/types';
 
 export default function DecouvertePage() {
+  const router = useRouter();
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterCity, setFilterCity] = useState('all');
   const [search, setSearch] = useState('');
   const [likedIds, setLikedIds] = useState<Set<string>>(new Set());
   const [likeMessage, setLikeMessage] = useState('');
+  const [reportModal, setReportModal] = useState<{ open: boolean; profileId: string | null }>({ open: false, profileId: null });
   const { user } = useAuth();
 
   useEffect(() => {
@@ -34,11 +37,95 @@ export default function DecouvertePage() {
 
   const handleLike = async (profileId: string) => {
     if (!user) { setLikeMessage('Connectez-vous pour liker un profil.'); return; }
+
+    // Check if the other user already liked us
+    const { data: existingLike } = await supabase
+      .from('aras_likes')
+      .select('*')
+      .eq('liker_id', profileId)
+      .eq('liked_profile_id', user.id)
+      .maybeSingle();
+
+    // Insert our like
     const { error } = await supabase.from('aras_likes').insert({ liker_id: user.id, liked_profile_id: profileId });
     if (!error) {
       setLikedIds((prev) => new Set(prev).add(profileId));
-      setLikeMessage('Vous avez liké ce profil. Si le feeling est réciproque, c\'est un match !');
-      setTimeout(() => setLikeMessage(''), 3000);
+
+      // If it's a match (reciprocal like), create conversation
+      if (existingLike) {
+        // Get the profile's user_id
+        const { data: profile } = await supabase.from('aras_profiles').select('user_id').eq('id', profileId).single();
+        if (profile) {
+          // Check if conversation already exists
+          const { data: existingConv } = await supabase
+            .from('aras_conversations')
+            .select('*')
+            .or(`and(user_a.eq.${user.id},user_b.eq.${profile.user_id}),and(user_a.eq.${profile.user_id},user_b.eq.${user.id})`)
+            .maybeSingle();
+
+          if (!existingConv) {
+            // Create new conversation for the match
+            await supabase
+              .from('aras_conversations')
+              .insert({ user_a: user.id, user_b: profile.user_id });
+          }
+
+          setLikeMessage('🎉 C\'est un match ! Vous pouvez maintenant discuter ensemble !');
+          setTimeout(() => setLikeMessage(''), 5000);
+        }
+      } else {
+        setLikeMessage('Vous avez liké ce profil. Si le feeling est réciproque, c\'est un match !');
+        setTimeout(() => setLikeMessage(''), 3000);
+      }
+    }
+  };
+
+  const startConversation = async (profileId: string) => {
+    if (!user) { setLikeMessage('Connectez-vous pour discuter.'); return; }
+    // Get the profile's user_id
+    const { data: profile } = await supabase.from('aras_profiles').select('user_id').eq('id', profileId).single();
+    if (!profile) return;
+
+    // Check if conversation already exists
+    const { data: existingConv } = await supabase
+      .from('aras_conversations')
+      .select('*')
+      .or(`and(user_a.eq.${user.id},user_b.eq.${profile.user_id}),and(user_a.eq.${profile.user_id},user_b.eq.${user.id})`)
+      .maybeSingle();
+
+    let conversationId;
+    if (existingConv) {
+      conversationId = existingConv.id;
+    } else {
+      // Create new conversation
+      const { data: newConv, error } = await supabase
+        .from('aras_conversations')
+        .insert({ user_a: user.id, user_b: profile.user_id })
+        .select()
+        .single();
+      if (error) {
+        setLikeMessage('Erreur lors de la création de la conversation.');
+        return;
+      }
+      conversationId = newConv.id;
+    }
+
+    // Redirect to messages with the conversation
+    router.push(`/espace?tab=messages&conv=${conversationId}`);
+  };
+
+  const handleReport = async (profileId: string, reason: string) => {
+    if (!user) { setLikeMessage('Connectez-vous pour signaler un profil.'); return; }
+    const { error } = await supabase.from('aras_reports').insert({
+      reporter_id: user.id,
+      reported_profile_id: profileId,
+      type: 'inappropriate',
+      reason: reason
+    });
+    if (!error) {
+      setLikeMessage('Profil signalé avec succès. Nos modérateurs vont examiner ce signalement.');
+      setReportModal({ open: false, profileId: null });
+      setTimeout(() => setLikeMessage(''), 5000);
     }
   };
 
@@ -111,6 +198,18 @@ export default function DecouvertePage() {
                       <span key={tag} className="rounded-full bg-[#f3e9dc] px-2.5 py-1 text-[10px] font-bold text-[#9a682f]">{tag}</span>
                     ))}
                   </div>
+                  <button
+                    onClick={() => startConversation(p.id)}
+                    className="mt-4 w-full flex items-center justify-center gap-2 rounded-full bg-[#1a6b68] py-2.5 text-xs font-extrabold text-white transition hover:bg-[#125552]"
+                  >
+                    <MessageCircle size={14} /> Discuter
+                  </button>
+                  <button
+                    onClick={() => setReportModal({ open: true, profileId: p.id })}
+                    className="mt-2 w-full flex items-center justify-center gap-2 rounded-full border border-[#dfd2c6] py-2 text-xs font-extrabold text-[#756960] transition hover:bg-[#fae4e2] hover:text-[#c83d50]"
+                  >
+                    <Flag size={12} /> Signaler
+                  </button>
                 </div>
               </div>
             ))}
@@ -126,6 +225,33 @@ export default function DecouvertePage() {
           </div>
         )}
       </div>
+
+      {/* REPORT MODAL */}
+      {reportModal.open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-md rounded-[28px] bg-white p-6 shadow-[0_20px_60px_rgba(0,0,0,.3)]">
+            <h3 className="font-display text-xl">Signaler ce profil</h3>
+            <p className="mt-2 text-sm text-[#756960]">Pourquoi signalez-vous ce profil ?</p>
+            <div className="mt-4 space-y-2">
+              {['Profil faux', 'Comportement inapproprié', 'Photo frauduleuse', 'Spam', 'Autre'].map((reason) => (
+                <button
+                  key={reason}
+                  onClick={() => handleReport(reportModal.profileId!, reason)}
+                  className="w-full rounded-xl border border-[#dfd2c6] px-4 py-3 text-left text-sm font-bold text-[#241c18] transition hover:bg-[#fae4e2] hover:border-[#e9515f]"
+                >
+                  {reason}
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={() => setReportModal({ open: false, profileId: null })}
+              className="mt-4 w-full rounded-full bg-[#f3e9dc] py-3 text-sm font-extrabold text-[#756960] transition hover:bg-[#e7cfc0]"
+            >
+              Annuler
+            </button>
+          </div>
+        </div>
+      )}
     </main>
   );
 }

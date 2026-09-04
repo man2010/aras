@@ -39,38 +39,38 @@ export default function Home() {
   return (
     <main className="min-h-screen">
       {/* HERO */}
-      <section className="relative min-h-[240px] bg-gradient-to-b from-[#f3e9dc] to-[#f5efe6] px-5 pb-3 pt-[72px] lg:min-h-[360px] lg:px-8 lg:pt-[85px]">
-        <div className="absolute right-[-80px] top-[80px] h-[480px] w-[480px] rounded-full bg-[#e7cfc0]/60 blur-2xl lg:right-[3%] lg:top-[110px] lg:h-[620px] lg:w-[620px]" />
-        <div className="absolute bottom-[-100px] left-[-100px] h-[320px] w-[320px] rounded-full bg-[#edc5c2]/40 blur-3xl" />
-        <div className="relative mx-auto grid max-w-[1240px] items-center gap-8 lg:grid-cols-[1fr_0.8fr]">
+      <section className="relative min-h-[200px] bg-gradient-to-b from-[#f3e9dc] to-[#f5efe6] px-4 pb-2 pt-[72px] lg:min-h-[360px] lg:px-8 lg:pt-[85px]">
+        <div className="absolute right-[-80px] top-[80px] hidden h-[480px] w-[480px] rounded-full bg-[#e7cfc0]/60 blur-2xl lg:right-[3%] lg:top-[110px] lg:block lg:h-[620px] lg:w-[620px]" />
+        <div className="absolute bottom-[-100px] left-[-100px] hidden h-[320px] w-[320px] rounded-full bg-[#edc5c2]/40 blur-3xl lg:block" />
+        <div className="relative mx-auto grid max-w-[1240px] items-center gap-6 lg:grid-cols-[1fr_0.8fr]">
           <div className="relative z-10 animate-[reveal_.8s_ease_both]">
-            <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-[#d89b52]/40 bg-white/40 px-4 py-2 text-[11px] font-extrabold uppercase tracking-[.18em] text-[#9a682f]">
-              <Sparkles size={13} /> Les rencontres qui ont du sens
+            <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-[#d89b52]/40 bg-white/40 px-3 py-1.5 text-[10px] font-extrabold uppercase tracking-[.18em] text-[#9a682f]">
+              <Sparkles size={11} /> Les rencontres qui ont du sens
             </div>
-            <h1 className="font-display max-w-[640px] text-[52px] font-semibold leading-[.98] tracking-[-.055em] text-[#241c18] sm:text-[70px] lg:text-[88px]">
+            <h1 className="font-display max-w-[640px] text-[36px] font-semibold leading-[1.1] tracking-[-.055em] text-[#241c18] sm:text-[52px] lg:text-[88px]">
               Et si la belle histoire <span className="italic text-[#e9515f]">commençait</span> ici ?
             </h1>
-            <p className="mt-6 max-w-[460px] text-[16px] leading-7 text-[#756960]">
+            <p className="mt-4 max-w-[460px] text-[14px] leading-6 text-[#756960] sm:text-[16px]">
               ARAS est un espace de rencontres sérieuses, authentiques et respectueuses, inspiré par les valeurs de la Téranga sénégalaise.
             </p>
-            <div className="mt-8 flex flex-col items-start gap-4 sm:flex-row">
-              <Link href="/inscription" className="group flex items-center gap-3 rounded-full bg-[#e9515f] px-7 py-4 text-sm font-extrabold text-white shadow-[0_14px_30px_rgba(233,81,95,.25)] transition hover:-translate-y-1 hover:bg-[#c83d50]">
-                Commencer l'aventure <ArrowRight size={17} className="transition group-hover:translate-x-1" />
+            <div className="mt-6 flex flex-col items-start gap-3 sm:flex-row sm:gap-4">
+              <Link href="/inscription" className="group flex items-center gap-2 rounded-full bg-[#e9515f] px-5 py-3 text-xs font-extrabold text-white shadow-[0_14px_30px_rgba(233,81,95,.25)] transition hover:-translate-y-1 hover:bg-[#c83d50] sm:px-7 sm:py-4 sm:text-sm">
+                Commencer l'aventure <ArrowRight size={14} className="transition group-hover:translate-x-1 sm:size-[17px]" />
               </Link>
-              <Link href="/decouverte" className="flex items-center gap-2 px-4 py-4 text-sm font-bold text-[#625852] transition hover:text-[#e9515f]">
-                <Search size={16} /> Découvrir les profils
+              <Link href="/decouverte" className="flex items-center gap-2 px-3 py-3 text-xs font-bold text-[#625852] transition hover:text-[#e9515f] sm:px-4 sm:py-4 sm:text-sm">
+                <Search size={14} /> Découvrir les profils
               </Link>
             </div>
-            <div className="mt-12 flex items-center gap-5">
-              <div className="flex -space-x-3">
+            <div className="mt-8 flex items-center gap-4 sm:mt-12 sm:gap-5">
+              <div className="flex -space-x-2 sm:-space-x-3">
                 {profiles.slice(0, 3).map((p) => (
-                  <img key={p.id} src={p.photo_url} alt={p.display_name} className="h-9 w-9 rounded-full border-2 border-[#f3e9dc] object-cover" />
+                  <img key={p.id} src={p.photo_url} alt={p.display_name} className="h-7 w-7 rounded-full border-2 border-[#f3e9dc] object-cover sm:h-9 sm:w-9" />
                 ))}
                 {profiles.length === 0 && ['https://images.pexels.com/photos/733872/pexels-photo-733872.jpeg?auto=compress&cs=tinysrgb&w=120&h=120&fit=crop','https://images.pexels.com/photos/1181686/pexels-photo-1181686.jpeg?auto=compress&cs=tinysrgb&w=120&h=120&fit=crop','https://images.pexels.com/photos/1239291/pexels-photo-1239291.jpeg?auto=compress&cs=tinysrgb&w=120&h=120&fit=crop'].map((s) => (
-                  <img key={s} src={s} alt="Membre" className="h-9 w-9 rounded-full border-2 border-[#f3e9dc] object-cover" />
+                  <img key={s} src={s} alt="Membre" className="h-7 w-7 rounded-full border-2 border-[#f3e9dc] object-cover sm:h-9 sm:w-9" />
                 ))}
               </div>
-              <p className="text-xs leading-5 text-[#756960]">
+              <p className="text-[11px] leading-4 text-[#756960] sm:text-xs sm:leading-5">
                 Rejoignez une communauté de<br /><strong className="text-[#241c18]">1 200+ personnes</strong> en quête de vrai.
               </p>
             </div>
