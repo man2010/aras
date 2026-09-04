@@ -175,7 +175,7 @@ export default function EspacePage() {
           if (authorProfiles) {
             authorProfiles.map((row) => toProfile(row as ProfileRow)).forEach((p: Profile) => {
               if (p.user_id) {
-                setConversationProfiles((prev) => ({ ...prev, [p.user_id]: p }));
+                setConversationProfiles((prev) => ({ ...prev, [p.user_id as string]: p }));
               }
             });
           }
