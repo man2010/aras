@@ -62,7 +62,7 @@ export default function DecouvertePage() {
         .eq('is_active', true);
       
       if (data) {
-        const cities = [...new Set(data.map((p: any) => p.city).filter(Boolean))];
+        const cities = Array.from(new Set(data.map((p: any) => p.city).filter(Boolean)));
         setAllCities(cities);
       }
     })();
