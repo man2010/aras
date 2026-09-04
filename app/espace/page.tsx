@@ -169,7 +169,7 @@ export default function EspacePage() {
       if (allStoriesData) {
         setAllStories((allStoriesData as StoryRow[]).map(toStory));
         // Charger les profils des auteurs de stories
-        const authorIds = [...new Set(allStoriesData.map((s: any) => s.user_id))];
+        const authorIds = Array.from(new Set(allStoriesData.map((s: any) => s.user_id)));
         if (authorIds.length > 0) {
           const { data: authorProfiles } = await supabase.from('profiles').select('*').in('id', authorIds);
           if (authorProfiles) {
