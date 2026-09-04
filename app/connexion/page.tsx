@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowRight, LockKeyhole, X, Check } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import { toProfile, type ProfileRow } from '@/lib/adapters';
 
 export default function ConnexionPage() {
   const router = useRouter();
@@ -18,13 +19,55 @@ export default function ConnexionPage() {
     const form = new FormData(e.currentTarget);
     const email = String(form.get('email') ?? '');
     const password = String(form.get('password') ?? '');
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    setLoading(false);
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    
     if (error) {
       setMessage(error.message);
-    } else {
+      setLoading(false);
+      return;
+    }
+    
+    if (data.user) {
+      // Check if user has a profile entry
+      const { data: profile, error: profileError } = await supabase.from('profiles').select('*').eq('id', data.user.id).maybeSingle();
+      
+      if (profileError) {
+        console.error('Profile check error:', profileError);
+        setMessage('Erreur lors de la vérification du profil: ' + profileError.message);
+        setLoading(false);
+        return;
+      }
+      
+      if (!profile) {
+        // Create profile if it doesn't exist
+        const { error: createError } = await supabase.from('profiles').insert({
+          id: data.user.id,
+          full_name: email.split('@')[0],
+          is_active: true,
+          is_online: true,
+          avatar_urls: ['https://images.pexels.com/photos/733872/pexels-photo-733872.jpeg?auto=compress&cs=tinysrgb&w=600'],
+          interests: [],
+          languages: [],
+          notif_messages: true,
+          notif_likes: true,
+          notif_matches: true,
+          show_age: true,
+          show_online_status: true,
+          show_distance: true,
+          notif_events: true,
+        });
+        
+        if (createError) {
+          console.error('Profile creation error:', createError);
+          setMessage('Connexion réussie mais erreur lors de la création du profil: ' + createError.message);
+          setLoading(false);
+          return;
+        }
+      }
+      
       router.push('/espace');
     }
+    setLoading(false);
   };
 
   return (

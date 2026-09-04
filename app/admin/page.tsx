@@ -6,6 +6,8 @@ import { Users, ShieldCheck, AlertTriangle, MessageCircle, Calendar, TrendingUp,
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
 import type { Profile } from '@/lib/types';
+import { toProfile, type ProfileRow } from '@/lib/adapters';
+import Pagination from '@/components/pagination';
 
 type AdminTab = 'dashboard' | 'users' | 'reports' | 'events';
 
@@ -17,43 +19,52 @@ export default function AdminPage() {
   const [stats, setStats] = useState({ users: 0, profiles: 0, conversations: 0, events: 0, reports: 0 });
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [reports, setReports] = useState<any[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(10);
+  const [totalProfiles, setTotalProfiles] = useState(0);
 
   useEffect(() => {
     if (!authLoading && !user) router.push('/connexion');
-    // Check if user is admin (you can add an admin field to profiles or use a separate admin table)
     checkAdminStatus();
   }, [authLoading, user, router]);
 
   useEffect(() => {
     if (isAdmin) {
       loadStats();
-      if (tab === 'users') loadProfiles();
+      if (tab === 'users') {
+        loadProfiles().then(count => setTotalProfiles(count));
+      }
       if (tab === 'reports') loadReports();
     }
-  }, [isAdmin, tab]);
+  }, [isAdmin, tab, currentPage]);
 
   const checkAdminStatus = async () => {
     if (!user) return;
-    // For demo purposes, we'll check if user email contains 'admin'
-    // In production, you should have a proper admin role system
-    const { data: profile } = await supabase.from('aras_profiles').select('*').eq('user_id', user.id).single();
-    if (profile && (profile.display_name.includes('admin') || user.email?.includes('admin'))) {
+    
+    // Sécurité : La vérification se fait par UUID (auth.uid()), PAS par email
+    // Même si quelqu'un crée un compte avec admin@gmail.com, il aura un UUID différent
+    // et ne sera pas dans la table admin_roles
+    
+    const { data: canAccessAdmin } = await supabase.rpc('is_admin');
+
+    if (canAccessAdmin) {
+      console.log('Accès admin autorisé pour UUID:', user.id);
       setIsAdmin(true);
     } else {
+      console.log('Accès admin refusé pour UUID:', user.id);
       router.push('/espace');
     }
   };
 
   const loadStats = async () => {
-    const [usersCount, profilesCount, convsCount, eventsCount, reportsCount] = await Promise.all([
-      supabase.from('auth.users').select('*', { count: 'exact', head: true }),
-      supabase.from('aras_profiles').select('*', { count: 'exact', head: true }),
-      supabase.from('aras_conversations').select('*', { count: 'exact', head: true }),
-      supabase.from('aras_events').select('*', { count: 'exact', head: true }),
-      supabase.from('aras_reports').select('*', { count: 'exact', head: true }),
+    const [profilesCount, convsCount, eventsCount, reportsCount] = await Promise.all([
+      supabase.from('profiles').select('*', { count: 'exact', head: true }),
+      supabase.from('matches').select('*', { count: 'exact', head: true }),
+      supabase.from('events').select('*', { count: 'exact', head: true }),
+      supabase.from('reports').select('*', { count: 'exact', head: true }),
     ]);
     setStats({
-      users: usersCount.count || 0,
+      users: profilesCount.count || 0,
       profiles: profilesCount.count || 0,
       conversations: convsCount.count || 0,
       events: eventsCount.count || 0,
@@ -62,17 +73,18 @@ export default function AdminPage() {
   };
 
   const loadProfiles = async () => {
-    const { data } = await supabase.from('aras_profiles').select('*').order('created_at', { ascending: false }).limit(50);
-    if (data) setProfiles(data as Profile[]);
+    const { data, count } = await supabase.from('profiles').select('*', { count: 'exact' }).order('created_at', { ascending: false }).range((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage - 1);
+    if (data) setProfiles((data as ProfileRow[]).map(toProfile));
+    return count || 0;
   };
 
   const loadReports = async () => {
-    const { data } = await supabase.from('aras_reports').select('*').order('created_at', { ascending: false }).limit(50);
+    const { data } = await supabase.from('reports').select('*').order('created_at', { ascending: false }).limit(50);
     if (data) setReports(data || []);
   };
 
   const toggleVerification = async (profileId: string, currentStatus: boolean) => {
-    const { error } = await supabase.from('aras_profiles').update({ is_verified: !currentStatus }).eq('id', profileId);
+    const { error } = await supabase.from('profiles').update({ is_verified: !currentStatus }).eq('id', profileId);
     if (!error) {
       loadProfiles();
     }
@@ -80,7 +92,7 @@ export default function AdminPage() {
 
   const deleteProfile = async (profileId: string) => {
     if (!confirm('Êtes-vous sûr de vouloir supprimer ce profil ?')) return;
-    const { error } = await supabase.from('aras_profiles').delete().eq('id', profileId);
+    const { error } = await supabase.from('profiles').delete().eq('id', profileId);
     if (!error) {
       loadProfiles();
     }
@@ -188,6 +200,17 @@ export default function AdminPage() {
                 </tbody>
               </table>
             </div>
+            {totalProfiles > itemsPerPage && (
+              <div className="mt-6">
+                <Pagination
+                  currentPage={currentPage}
+                  totalPages={Math.ceil(totalProfiles / itemsPerPage)}
+                  onPageChange={setCurrentPage}
+                  itemsPerPage={itemsPerPage}
+                  totalItems={totalProfiles}
+                />
+              </div>
+            )}
           </div>
         )}
 

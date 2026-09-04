@@ -4,6 +4,8 @@ import { FormEvent, useEffect, useState } from 'react';
 import { CalendarDays, MapPin, Clock3, Users, Check, X } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import type { EventItem } from '@/lib/types';
+import { toEvent, type EventRow } from '@/lib/adapters';
+import { useAuth } from '@/lib/auth-context';
 
 const fallbackEvents: EventItem[] = [
   { id: '1', title: 'Dîner sous les étoiles', description: 'Une soirée intime pour prendre le temps de se découvrir autour d’une table généreuse.', location: 'Dakar · Almadies', event_date: '2026-09-18T19:30:00+00', price_fcfa: 15000, capacity: 24, image_url: 'https://images.pexels.com/photos/18823960/pexels-photo-18823960.jpeg?auto=compress&cs=tinysrgb&w=1200', category: 'Dîner', is_featured: true },
@@ -21,11 +23,12 @@ export default function EvenementsPage() {
   const [modalEvent, setModalEvent] = useState<EventItem | null>(null);
   const [resMessage, setResMessage] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const { user } = useAuth();
 
   useEffect(() => {
     (async () => {
-      const { data } = await supabase.from('aras_events').select('*').order('event_date', { ascending: true });
-      if (data && data.length > 0) setEvents(data as EventItem[]);
+      const { data } = await supabase.from('events').select('*').order('date', { ascending: true });
+      if (data && data.length > 0) setEvents((data as EventRow[]).map(toEvent));
       setLoading(false);
     })();
   }, []);
@@ -36,13 +39,16 @@ export default function EvenementsPage() {
   const submitReservation = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!modalEvent) return;
+    if (!user) {
+      setResMessage('Connectez-vous pour réserver votre place.');
+      return;
+    }
     setSubmitting(true);
     setResMessage('');
     const form = new FormData(e.currentTarget);
-    const { error } = await supabase.from('aras_event_reservations').insert({
+    const { error } = await supabase.from('event_registrations').insert({
       event_id: modalEvent.id,
-      full_name: String(form.get('name') ?? ''),
-      contact: String(form.get('contact') ?? ''),
+      user_id: user.id,
     });
     setSubmitting(false);
     setResMessage(error ? 'La réservation n\'a pas pu être envoyée. Réessayez.' : 'C\'est noté ! Nous revenons vers vous très vite pour confirmer votre place.');

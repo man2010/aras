@@ -3,12 +3,12 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
-import { Menu, X, Heart, LogOut, LayoutDashboard } from 'lucide-react';
+import { Menu, X, Heart, LogOut, LayoutDashboard, Bell } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
 
 export function Navbar() {
   const [open, setOpen] = useState(false);
-  const { user, signOut } = useAuth();
+  const { user, signOut, unreadCount } = useAuth();
   const router = useRouter();
 
   const handleSignOut = async () => {
@@ -31,10 +31,18 @@ export function Navbar() {
         <div className="hidden items-center gap-3 md:flex">
           {user ? (
             <>
+              <Link href="/espace?tab=messages" className="relative flex items-center gap-2 px-4 py-2.5 text-[13px] font-bold text-[#625852] transition hover:text-[#e9515f]">
+                <Bell size={16} />
+                {unreadCount > 0 && (
+                  <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-[#e9515f] text-[10px] font-extrabold text-white">
+                    {unreadCount > 9 ? '9+' : unreadCount}
+                  </span>
+                )}
+              </Link>
               <Link href="/espace" className="flex items-center gap-2 px-4 py-2.5 text-[13px] font-bold text-[#625852] transition hover:text-[#e9515f]">
                 <LayoutDashboard size={16} /> Mon espace
               </Link>
-              {(user.email?.includes('admin') || user.email?.includes('test')) && (
+              {user && (user.email === 'admin@gmail.com' || user.email?.includes('admin')) && (
                 <Link href="/admin" className="flex items-center gap-2 px-4 py-2.5 text-[13px] font-bold text-[#756960] transition hover:text-[#e9515f]">
                   Admin
                 </Link>

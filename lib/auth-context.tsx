@@ -9,6 +9,8 @@ type AuthContextType = {
   user: User | null;
   loading: boolean;
   signOut: () => Promise<void>;
+  unreadCount: number;
+  setUnreadCount: (count: number) => void;
 };
 
 const AuthContext = createContext<AuthContextType>({
@@ -16,11 +18,14 @@ const AuthContext = createContext<AuthContextType>({
   user: null,
   loading: true,
   signOut: async () => {},
+  unreadCount: 0,
+  setUnreadCount: () => {},
 });
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -40,7 +45,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ session, user: session?.user ?? null, loading, signOut }}>
+    <AuthContext.Provider value={{ session, user: session?.user ?? null, loading, signOut, unreadCount, setUnreadCount }}>
       {children}
     </AuthContext.Provider>
   );

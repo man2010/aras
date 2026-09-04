@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import type { Profile, EventItem, Testimonial } from '@/lib/types';
+import { toEvent, toProfile, type EventRow, type ProfileRow } from '@/lib/adapters';
 
 const fallbackEvents: EventItem[] = [
   { id: '1', title: 'Dîner sous les étoiles', description: 'Une soirée intime pour prendre le temps de se découvrir autour d’une table généreuse.', location: 'Dakar · Almadies', event_date: '2026-09-18T19:30:00+00', price_fcfa: 15000, capacity: 24, image_url: 'https://images.pexels.com/photos/18823960/pexels-photo-18823960.jpeg?auto=compress&cs=tinysrgb&w=1200', category: 'Dîner', is_featured: true },
@@ -25,14 +26,12 @@ export default function Home() {
 
   useEffect(() => {
     (async () => {
-      const [{ data: p }, { data: e }, { data: t }] = await Promise.all([
-        supabase.from('aras_profiles').select('*').eq('is_featured', true).limit(8),
-        supabase.from('aras_events').select('*').order('event_date', { ascending: true }).limit(3),
-        supabase.from('aras_testimonials').select('*').limit(3),
+      const [{ data: p }, { data: e }] = await Promise.all([
+        supabase.from('profiles').select('*').eq('is_active', true).eq('is_premium', true).limit(8),
+        supabase.from('events').select('*').order('date', { ascending: true }).limit(3),
       ]);
-      if (p && p.length > 0) setProfiles(p as Profile[]);
-      if (e && e.length > 0) setEvents(e as EventItem[]);
-      if (t && t.length > 0) setTestimonials(t as Testimonial[]);
+      if (p && p.length > 0) setProfiles((p as ProfileRow[]).map(toProfile));
+      if (e && e.length > 0) setEvents((e as EventRow[]).map(toEvent));
     })();
   }, []);
 

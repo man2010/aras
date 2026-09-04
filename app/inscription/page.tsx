@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowRight, LockKeyhole, Check, X, Sparkles, Eye, EyeOff } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import { toProfile, type ProfileRow } from '@/lib/adapters';
 
 function assessStrength(pw: string) {
   let score = 0;
@@ -43,14 +44,182 @@ export default function InscriptionPage() {
     const form = new FormData(e.currentTarget);
     const email = String(form.get('email') ?? '');
     const pw = String(form.get('password') ?? '');
-    const { data, error } = await supabase.auth.signUp({ email, password: pw });
-    setLoading(false);
-    if (error) {
-      setMessage(error.message);
-    } else if (data.user) {
-      setSuccess(true);
-      setMessage('Votre compte est prêt. Bienvenue chez ARAS.');
-      setTimeout(() => router.push('/espace'), 1200);
+    
+    try {
+      console.log('=== DÉBUT INSCRIPTION ===');
+      console.log('Email:', email);
+      console.log('URL Supabase:', process.env.NEXT_PUBLIC_SUPABASE_URL);
+      
+      const { data, error } = await supabase.auth.signUp({ 
+        email, 
+        password: pw
+      });
+      
+      if (error) {
+        console.error('=== ERREUR AUTHENTIFICATION ===');
+        console.error('Code:', error.status);
+        console.error('Message:', error.message);
+        console.error('Détails:', error);
+        
+        // Cas spécial : compte existe déjà mais pas de profil
+        if (error.message?.includes('already registered') || error.status === 400) {
+          console.log('Compte existe déjà, tentative de connexion...');
+          const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({ email, password: pw });
+          
+          if (!signInError && signInData.user) {
+            console.log('Connexion réussie, vérification profil...');
+            const { data: profile } = await supabase.from('profiles').select('*').eq('id', signInData.user.id).maybeSingle();
+            
+            if (!profile) {
+              console.log('Profil manquant, création...');
+              const { error: createError } = await supabase.from('profiles').insert({
+                id: signInData.user.id,
+                full_name: email.split('@')[0],
+                is_active: true,
+                is_online: true,
+                avatar_urls: ['https://images.pexels.com/photos/733872/pexels-photo-733872.jpeg?auto=compress&cs=tinysrgb&w=600'],
+                interests: [],
+                languages: [],
+                notif_messages: true,
+                notif_likes: true,
+                notif_matches: true,
+                show_age: true,
+                show_online_status: true,
+                show_distance: true,
+                notif_events: true,
+              });
+              
+              if (createError) {
+                console.error('Erreur création profil:', createError);
+                setMessage('Compte existe mais erreur profil: ' + createError.message);
+                setLoading(false);
+                return;
+              }
+            }
+            
+            setSuccess(true);
+            setMessage('Connexion réussie ! Bienvenue chez ARAS.');
+            setTimeout(() => router.push('/espace'), 1200);
+            return;
+          }
+        }
+        
+        setMessage(error.message || 'Erreur lors de l\'inscription');
+        setLoading(false);
+        return;
+      }
+      
+      if (data.user) {
+        console.log('=== UTILISATEUR CRÉÉ ===');
+        console.log('User ID:', data.user.id);
+        console.log('Email:', data.user.email);
+        console.log('Confirmé:', data.user.confirmed_at);
+        
+        // Avec confirmation email désactivée, l'utilisateur est déjà connecté
+        if (data.user.confirmed_at) {
+          console.log('Utilisateur déjà confirmé, vérification profil...');
+          
+          // Create profile entry for the new user
+          try {
+            console.log('=== CRÉATION PROFIL ===');
+            const { error: profileError } = await supabase.from('profiles').insert({
+              id: data.user.id,
+              full_name: email.split('@')[0],
+              is_active: true,
+              is_online: true,
+              avatar_urls: ['https://images.pexels.com/photos/733872/pexels-photo-733872.jpeg?auto=compress&cs=tinysrgb&w=600'],
+              interests: [],
+              languages: [],
+              notif_messages: true,
+              notif_likes: true,
+              notif_matches: true,
+              show_age: true,
+              show_online_status: true,
+              show_distance: true,
+              notif_events: true,
+            });
+            
+            if (profileError) {
+              console.error('=== ERREUR CRÉATION PROFIL ===');
+              console.error('Code:', profileError.code);
+              console.error('Message:', profileError.message);
+              console.error('Détails:', profileError);
+              console.error('Hint:', profileError.hint);
+              throw new Error(`Erreur création profil: ${profileError.message}`);
+            }
+            
+            console.log('=== SUCCÈS ===');
+            console.log('Profil créé avec succès');
+            setSuccess(true);
+            setMessage('Votre compte est prêt. Bienvenue chez ARAS.');
+            setTimeout(() => router.push('/espace'), 1200);
+            
+          } catch (profileError) {
+            console.error('=== EXCEPTION CRÉATION PROFIL ===');
+            console.error('Exception:', profileError);
+            throw new Error(`Échec création profil: ${profileError instanceof Error ? profileError.message : 'Erreur inconnue'}`);
+          }
+        } else {
+          console.log('Utilisateur créé mais non confirmé - tentative de connexion automatique...');
+          // Tenter de connecter l'utilisateur immédiatement après création
+          const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({ email, password: pw });
+          
+          if (!signInError && signInData.user) {
+            console.log('Connexion automatique réussie !');
+            
+            // Créer le profil
+            try {
+              const { error: profileError } = await supabase.from('profiles').insert({
+                id: signInData.user.id,
+                full_name: email.split('@')[0],
+                is_active: true,
+                is_online: true,
+                avatar_urls: ['https://images.pexels.com/photos/733872/pexels-photo-733872.jpeg?auto=compress&cs=tinysrgb&w=600'],
+                interests: [],
+                languages: [],
+                notif_messages: true,
+                notif_likes: true,
+                notif_matches: true,
+                show_age: true,
+                show_online_status: true,
+                show_distance: true,
+                notif_events: true,
+              });
+              
+              if (profileError) {
+                console.error('Erreur création profil après connexion auto:', profileError);
+                setSuccess(true);
+                setMessage('Compte créé et connecté ! (profil: erreur)');
+                setTimeout(() => router.push('/espace'), 1500);
+                return;
+              }
+              
+              setSuccess(true);
+              setMessage('Compte créé avec succès ! Bienvenue chez ARAS.');
+              setTimeout(() => router.push('/espace'), 1200);
+              
+            } catch (profileError) {
+              console.error('Exception création profil:', profileError);
+              setSuccess(true);
+              setMessage('Compte créé et connecté ! (profil: erreur)');
+              setTimeout(() => router.push('/espace'), 1500);
+            }
+          } else {
+            console.error('Échec connexion automatique:', signInError);
+            setMessage('Compte créé. Veuillez vous connecter avec vos identifiants.');
+            setSuccess(true);
+            setTimeout(() => router.push('/connexion'), 2000);
+          }
+        }
+      }
+    } catch (exception) {
+      console.error('=== EXCEPTION NON GÉRÉE ===');
+      console.error('Exception:', exception);
+      const errorMessage = exception instanceof Error ? exception.message : 'Erreur inconnue lors de l\'inscription';
+      setMessage(errorMessage);
+    } finally {
+      console.log('=== FIN INSCRIPTION ===');
+      setLoading(false);
     }
   };
 
