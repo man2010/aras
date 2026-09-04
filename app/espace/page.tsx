@@ -60,7 +60,9 @@ export default function EspacePage() {
         if (partnerProfiles) {
           const profileMap: Record<string, Profile> = {};
           partnerProfiles.forEach((p: Profile) => {
-            profileMap[p.user_id] = p;
+            if (p.user_id) {
+              profileMap[p.user_id] = p;
+            }
           });
           setConversationProfiles(profileMap);
         }
