@@ -8,7 +8,6 @@ interface AdminSettingsProps {
     maintenanceMode: boolean;
     allowRegistration: boolean;
     maxUploadSize: number;
-    storyExpirationHours: number;
     notificationEmail: string;
   };
   onSaveSettings: (settings: any) => void;
@@ -67,16 +66,6 @@ export function AdminSettings({ settings, onSaveSettings }: AdminSettingsProps) 
               type="number"
               value={localSettings.maxUploadSize}
               onChange={(e) => setLocalSettings({ ...localSettings, maxUploadSize: parseInt(e.target.value) })}
-              className="w-full rounded-xl border border-[#dfd2c6] bg-[#fbf8f2] px-4 py-2.5 text-sm outline-none focus:border-[#ec3b78]"
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-extrabold text-[#625852] mb-2">Expiration des stories (heures)</label>
-            <input
-              type="number"
-              value={localSettings.storyExpirationHours}
-              onChange={(e) => setLocalSettings({ ...localSettings, storyExpirationHours: parseInt(e.target.value) })}
               className="w-full rounded-xl border border-[#dfd2c6] bg-[#fbf8f2] px-4 py-2.5 text-sm outline-none focus:border-[#ec3b78]"
             />
           </div>
