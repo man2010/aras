@@ -116,7 +116,7 @@ export function toProfile(row: ProfileRow): Profile {
     last_seen_at: row.last_seen_at,
     height: row.height,
     profile_status: row.profile_status as 'pending' | 'verified' | 'completed' | null,
-    onboarding_completed: row.onboarding_completed as boolean | null,
+    onboarding_completed: row.onboarding_completed,
   };
 }
 
