@@ -235,7 +235,7 @@ export function AdminUsers({ profiles, currentPage, totalPages, onPageChange, on
         isOpen={showModal}
         onClose={() => { setShowModal(false); setEditingProfile(null); }}
         onSubmit={handleEditSubmit}
-        editProfile={editingProfile}
+        editProfile={editingProfile || undefined}
       />
     </>
   );
