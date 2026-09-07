@@ -20,7 +20,7 @@ export type Profile = {
   last_seen_at?: string | null;
   height?: number | null;
   profile_status?: 'pending' | 'verified' | 'completed' | null;
-  onboarding_completed?: boolean;
+  onboarding_completed?: boolean | undefined;
 };
 
 export type EventItem = {
