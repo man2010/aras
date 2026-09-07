@@ -13,7 +13,7 @@ interface AdminUserModalProps {
 
 export function AdminUserModal({ isOpen, onClose, onSubmit, editProfile }: AdminUserModalProps) {
   const [formData, setFormData] = useState({
-    full_name: editProfile?.full_name || '',
+    display_name: editProfile?.display_name || '',
     profession: editProfile?.profession || '',
     city: editProfile?.city || '',
     age: editProfile?.age || '',
@@ -29,6 +29,25 @@ export function AdminUserModal({ isOpen, onClose, onSubmit, editProfile }: Admin
       age: formData.age ? parseInt(formData.age) : null,
     });
     onClose();
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onSubmit({
+      ...formData,
+      age: formData.age ? parseInt(formData.age) : null,
+    });
+    onClose();
+    // Reset form
+    setFormData({
+      display_name: '',
+      profession: '',
+      city: '',
+      age: '',
+      bio: '',
+      is_verified: false,
+      is_premium: false,
+    });
   };
 
   if (!isOpen) return null;
@@ -50,8 +69,8 @@ export function AdminUserModal({ isOpen, onClose, onSubmit, editProfile }: Admin
               <User size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#9a8b82]" />
               <input
                 type="text"
-                value={formData.full_name}
-                onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
+                value={formData.display_name}
+                onChange={(e) => setFormData({ ...formData, display_name: e.target.value })}
                 placeholder="Nom complet"
                 className="w-full rounded-xl border border-[#dfd2c6] bg-[#fbf8f2] pl-10 pr-4 py-3 text-sm outline-none focus:border-[#ec3b78]"
               />
