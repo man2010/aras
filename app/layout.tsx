@@ -3,6 +3,7 @@ import type { Metadata } from 'next';
 import { Manrope, Playfair_Display } from 'next/font/google';
 import { AuthProvider } from '@/lib/auth-context';
 import { Navbar, Footer } from '@/components/navigation';
+import { SarahAssistant } from '@/components/sarah-assistant';
 
 const manrope = Manrope({ subsets: ['latin'], variable: '--font-manrope' });
 const playfair = Playfair_Display({ subsets: ['latin'], variable: '--font-playfair' });
@@ -22,6 +23,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <Navbar />
           {children}
           <Footer />
+          <SarahAssistant />
         </AuthProvider>
       </body>
     </html>

@@ -67,6 +67,7 @@ export default function DecouvertePage() {
   const [message, setMessage] = useState('');
   const [selectedProfile, setSelectedProfile] = useState<Profile | null>(null);
   const [modalMessage, setModalMessage] = useState('');
+  const [toggleBusyId, setToggleBusyId] = useState<string | null>(null);
 
   const [showFilters, setShowFilters] = useState(true);
   const [cityFilter, setCityFilter] = useState('all');
@@ -97,12 +98,7 @@ export default function DecouvertePage() {
 
   useEffect(() => {
     if (!user) return;
-    (async () => {
-      const { data } = await supabase.from('swipes').select('swiped_id').eq('swiper_id', user.id).eq('type', 'like');
-      if (data) {
-        setLikedIds(new Set(data.map((row: { swiped_id: string }) => row.swiped_id)));
-      }
-    })();
+    void refreshLikedProfiles();
   }, [user]);
 
   useEffect(() => {
@@ -112,6 +108,14 @@ export default function DecouvertePage() {
   useEffect(() => {
     setModalMessage('');
   }, [selectedProfile]);
+
+  const refreshLikedProfiles = async () => {
+    if (!user) return;
+    const { data } = await supabase.from('swipes').select('swiped_id').eq('swiper_id', user.id).eq('type', 'like');
+    if (data) {
+      setLikedIds(new Set(data.map((row: { swiped_id: string }) => row.swiped_id)));
+    }
+  };
 
   const visibleProfiles = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -139,49 +143,65 @@ export default function DecouvertePage() {
     return ['all', ...list];
   }, [profiles]);
 
-  const handleLike = async (profileId: string) => {
+  const toggleLike = async (profileId: string) => {
     if (!user) {
       setMessage('Connectez-vous pour liker un profil.');
       router.push('/connexion');
       return;
     }
 
-    const { error } = await supabase.from('swipes').upsert({
-      swiper_id: user.id,
-      swiped_id: profileId,
-      type: 'like',
+    if (toggleBusyId === profileId) return;
+    setToggleBusyId(profileId);
+
+    const wasLiked = likedIds.has(profileId);
+
+    setLikedIds((prev) => {
+      const next = new Set(prev);
+      if (wasLiked) {
+        next.delete(profileId);
+      } else {
+        next.add(profileId);
+      }
+      return next;
     });
 
-    if (!error) {
-      setLikedIds((prev) => new Set(prev).add(profileId));
-      setMessage('Profil liké avec succès.');
-      setTimeout(() => setMessage(''), 3000);
-    }
-  };
+    const result = wasLiked
+      ? await supabase
+          .from('swipes')
+          .delete()
+          .eq('swiper_id', user.id)
+          .eq('swiped_id', profileId)
+          .eq('type', 'like')
+      : await supabase.from('swipes').upsert(
+          {
+            swiper_id: user.id,
+            swiped_id: profileId,
+            type: 'like',
+          },
+          { onConflict: 'swiper_id,swiped_id,type' }
+        );
 
-  const handleUnlike = async (profileId: string) => {
-    if (!user) {
-      router.push('/connexion');
-      return;
-    }
-
-    const { error } = await supabase
-      .from('swipes')
-      .delete()
-      .eq('swiper_id', user.id)
-      .eq('swiped_id', profileId)
-      .eq('type', 'like');
-
-    if (!error) {
+    if (result.error) {
       setLikedIds((prev) => {
         const next = new Set(prev);
-        next.delete(profileId);
+        if (wasLiked) {
+          next.add(profileId);
+        } else {
+          next.delete(profileId);
+        }
         return next;
       });
-      setMessage('Like retiré.');
-      setTimeout(() => setMessage(''), 2500);
+      setMessage(wasLiked ? 'Impossible de retirer ce like pour le moment.' : 'Impossible de liker ce profil pour le moment.');
+    } else {
+      setMessage(wasLiked ? 'Like retir?.' : 'Profil lik? avec succ?s.');
+      setTimeout(() => setMessage(''), wasLiked ? 2500 : 3000);
     }
+
+    setToggleBusyId(null);
   };
+
+  const handleLike = (profileId: string) => void toggleLike(profileId);
+  const handleUnlike = (profileId: string) => void toggleLike(profileId);
 
   const handleMessages = async (profileId: string) => {
     if (!user) {
@@ -299,7 +319,9 @@ export default function DecouvertePage() {
                   </div>
                   <div className="mt-4 flex items-center gap-3">
                     <button
-                      onClick={() => handleLike(profile.id)}
+                      onClick={() =>
+                        likedIds.has(profile.id) ? handleUnlike(profile.id) : handleLike(profile.id)
+                      }
                       className={`flex h-11 w-11 items-center justify-center rounded-full border transition ${
                         likedIds.has(profile.id)
                           ? 'border-[#ec3b78] bg-[#ec3b78] text-white'
@@ -415,7 +437,9 @@ export default function DecouvertePage() {
 
                     <div className="mt-auto flex items-center gap-3">
                       <button
-                        onClick={() => handleLike(profile.id)}
+                        onClick={() =>
+                          likedIds.has(profile.id) ? handleUnlike(profile.id) : handleLike(profile.id)
+                        }
                         className={`flex h-12 w-12 items-center justify-center rounded-full border transition ${
                           likedIds.has(profile.id)
                             ? 'border-[#ec3b78] bg-[#ec3b78] text-white'
