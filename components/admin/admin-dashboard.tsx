@@ -11,7 +11,6 @@ interface AdminDashboardProps {
     reports: number;
     likes: number;
     matches: number;
-    stories: number;
     messages: number;
     views: number;
   };
@@ -27,7 +26,6 @@ export function AdminDashboard({ stats, recentActivity }: AdminDashboardProps) {
     { label: 'Événements', value: stats.events, icon: Calendar, color: '#1a6b68', change: '+5%' },
     { label: 'Signalements', value: stats.reports, icon: AlertTriangle, color: '#c92e63', change: '-3%' },
     { label: 'Likes', value: stats.likes, icon: Heart, color: '#ec3b78', change: '+25%' },
-    { label: 'Stories', value: stats.stories, icon: ShieldCheck, color: '#d89b52', change: '+30%' },
     { label: 'Messages', value: stats.messages, icon: MessageCircle, color: '#1a6b68', change: '+18%' },
     { label: 'Vues profils', value: stats.views, icon: Eye, color: '#ec3b78', change: '+22%' },
   ];
