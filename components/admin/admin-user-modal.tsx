@@ -29,15 +29,6 @@ export function AdminUserModal({ isOpen, onClose, onSubmit, editProfile }: Admin
       age: formData.age ? parseInt(formData.age) : null,
     });
     onClose();
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    onSubmit({
-      ...formData,
-      age: formData.age ? parseInt(formData.age) : null,
-    });
-    onClose();
     // Reset form
     setFormData({
       display_name: '',
