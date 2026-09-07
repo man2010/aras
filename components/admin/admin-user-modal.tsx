@@ -26,7 +26,7 @@ export function AdminUserModal({ isOpen, onClose, onSubmit, editProfile }: Admin
     e.preventDefault();
     onSubmit({
       ...formData,
-      age: formData.age ? parseInt(formData.age) : null,
+      age: formData.age ? formData.age.toString() : null,
     });
     onClose();
     // Reset form
