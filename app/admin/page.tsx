@@ -2,23 +2,60 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Users, ShieldCheck, AlertTriangle, MessageCircle, Calendar, TrendingUp, Ban, CheckCircle, XCircle } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
 import type { Profile } from '@/lib/types';
 import { toProfile, type ProfileRow } from '@/lib/adapters';
-import Pagination from '@/components/pagination';
+import { AdminLayout } from '@/components/admin/admin-layout';
+import { AdminDashboard } from '@/components/admin/admin-dashboard';
+import { AdminUsers } from '@/components/admin/admin-users';
+import { AdminReports } from '@/components/admin/admin-reports';
+import { AdminEvents } from '@/components/admin/admin-events';
+import { AdminMessages } from '@/components/admin/admin-messages';
+import { AdminAnalytics } from '@/components/admin/admin-analytics';
+import { AdminSettings } from '@/components/admin/admin-settings';
 
-type AdminTab = 'dashboard' | 'users' | 'reports' | 'events';
+type AdminTab = 'dashboard' | 'users' | 'reports' | 'events' | 'messages'  | 'analytics' | 'settings';
 
 export default function AdminPage() {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
   const [tab, setTab] = useState<AdminTab>('dashboard');
   const [isAdmin, setIsAdmin] = useState(false);
-  const [stats, setStats] = useState({ users: 0, profiles: 0, conversations: 0, events: 0, reports: 0 });
+  
+  // Stats & Data
+  const [stats, setStats] = useState({
+    users: 0,
+    profiles: 0,
+    conversations: 0,
+    events: 0,
+    reports: 0,
+    likes: 0,
+    matches: 0,
+    messages: 0,
+    views: 0,
+  });
+  
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [reports, setReports] = useState<any[]>([]);
+  const [events, setEvents] = useState<any[]>([]);
+  const [messages, setMessages] = useState<any[]>([]);
+  const [conversationProfiles, setConversationProfiles] = useState<Record<string, any>>({});
+  const [analytics, setAnalytics] = useState({
+    dailySignups: [] as { date: string; count: number }[],
+    dailyMessages: [] as { date: string; count: number }[],
+    dailyMatches: [] as { date: string; count: number }[],
+    userDemographics: [] as { city: string; count: number }[],
+    topProfiles: [] as { profileId: string; views: number; likes: number }[],
+  });
+  const [settings, setSettings] = useState({
+    maintenanceMode: false,
+    allowRegistration: true,
+    maxUploadSize: 10,
+    notificationEmail: 'admin@aras.com',
+  });
+  
+  // Pagination
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
   const [totalProfiles, setTotalProfiles] = useState(0);
@@ -31,45 +68,59 @@ export default function AdminPage() {
   useEffect(() => {
     if (isAdmin) {
       loadStats();
+      loadRecentActivity();
+      
       if (tab === 'users') {
         loadProfiles().then(count => setTotalProfiles(count));
       }
       if (tab === 'reports') loadReports();
+      if (tab === 'events') loadEvents();
+      if (tab === 'messages') loadMessages();
+      if (tab === 'analytics') {
+        loadAnalytics().then((data) => setAnalytics(data));
+      }
+      if (tab === 'settings') {
+        loadSettings();
+      }
     }
   }, [isAdmin, tab, currentPage]);
 
   const checkAdminStatus = async () => {
     if (!user) return;
-    
-    // Sécurité : La vérification se fait par UUID (auth.uid()), PAS par email
-    // Même si quelqu'un crée un compte avec admin@gmail.com, il aura un UUID différent
-    // et ne sera pas dans la table admin_roles
-    
     const { data: canAccessAdmin } = await supabase.rpc('is_admin');
-
     if (canAccessAdmin) {
-      console.log('Accès admin autorisé pour UUID:', user.id);
       setIsAdmin(true);
     } else {
-      console.log('Accès admin refusé pour UUID:', user.id);
       router.push('/espace');
     }
   };
 
   const loadStats = async () => {
-    const [profilesCount, convsCount, eventsCount, reportsCount] = await Promise.all([
+    const [profilesCount, convsCount, eventsCount, reportsCount, likesCount, matchesCount, messagesCount] = await Promise.all([
       supabase.from('profiles').select('*', { count: 'exact', head: true }),
       supabase.from('matches').select('*', { count: 'exact', head: true }),
       supabase.from('events').select('*', { count: 'exact', head: true }),
       supabase.from('reports').select('*', { count: 'exact', head: true }),
+      supabase.from('swipes').select('*', { count: 'exact', head: true }),
+      supabase.from('matches').select('*', { count: 'exact', head: true }),
+      supabase.from('messages').select('*', { count: 'exact', head: true }),
     ]);
+    
     setStats({
       users: profilesCount.count || 0,
       profiles: profilesCount.count || 0,
       conversations: convsCount.count || 0,
       events: eventsCount.count || 0,
       reports: reportsCount.count || 0,
+      likes: likesCount.count || 0,
+      matches: matchesCount.count || 0,
+      messages: messagesCount.count || 0,
+      views: 0, // À implémenter avec une vue table
     });
+  };
+
+  const loadRecentActivity = async () => {
+    // Charger l'activité récente pour le dashboard
   };
 
   const loadProfiles = async () => {
@@ -81,6 +132,155 @@ export default function AdminPage() {
   const loadReports = async () => {
     const { data } = await supabase.from('reports').select('*').order('created_at', { ascending: false }).limit(50);
     if (data) setReports(data || []);
+    
+    // Charger les profils des personnes impliquées
+    const reporterIds = data?.map((r: any) => r.reporter_id) || [];
+    const reportedIds = data?.map((r: any) => r.reported_id) || [];
+    const allIds = Array.from(new Set([...reporterIds, ...reportedIds]));
+    
+    if (allIds.length > 0) {
+      const { data: profileData } = await supabase.from('profiles').select('*').in('id', allIds);
+      if (profileData) {
+        const profileMap: Record<string, any> = {};
+        profileData.forEach((p: any) => {
+          profileMap[p.id] = p;
+        });
+        setConversationProfiles(profileMap);
+      }
+    }
+  };
+
+  const loadEvents = async () => {
+    const { data } = await supabase.from('events').select('*').order('date', { ascending: false });
+    if (data) setEvents(data || []);
+  };
+
+  const loadMessages = async () => {
+    const { data } = await supabase.from('messages').select('*').order('created_at', { ascending: false }).limit(100);
+    if (data) setMessages(data || []);
+    
+    // Charger les profils des expéditeurs
+    const senderIds = data?.map((m: any) => m.sender_id) || [];
+    if (senderIds.length > 0) {
+      const { data: profileData } = await supabase.from('profiles').select('*').in('id', senderIds);
+      if (profileData) {
+        const profileMap: Record<string, any> = {};
+        profileData.forEach((p: any) => {
+          profileMap[p.id] = p;
+        });
+        setConversationProfiles(profileMap);
+      }
+    }
+  };
+
+  const loadAnalytics = async () => {
+    console.log('Loading analytics...');
+    // Charger les inscriptions des 7 derniers jours
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    console.log('Seven days ago:', sevenDaysAgo.toISOString());
+    
+    const [profilesResult, messagesResult, matchesResult] = await Promise.all([
+      supabase.from('profiles').select('created_at').gte('created_at', sevenDaysAgo.toISOString()),
+      supabase.from('messages').select('created_at').gte('created_at', sevenDaysAgo.toISOString()),
+      supabase.from('matches').select('created_at').gte('created_at', sevenDaysAgo.toISOString()),
+    ]);
+
+    const profilesData = profilesResult.data;
+    const messagesData = messagesResult.data;
+    const matchesData = matchesResult.data;
+
+    console.log('Profiles data:', profilesData);
+    console.log('Messages data:', messagesData);
+    console.log('Matches data:', matchesData);
+
+    // Grouper par date
+    const groupByDate = (data: any[] | null) => {
+      if (!data || !Array.isArray(data)) {
+        console.log('Data is null or not an array');
+        return [];
+      }
+      const grouped: Record<string, number> = {};
+      data.forEach((item) => {
+        const date = new Date(item.created_at).toISOString().split('T')[0];
+        grouped[date] = (grouped[date] || 0) + 1;
+      });
+      console.log('Grouped data:', grouped);
+      return Object.entries(grouped).map(([date, count]) => ({ date, count }));
+    };
+
+    const dailySignups = groupByDate(profilesData);
+    const dailyMessages = groupByDate(messagesData);
+    const dailyMatches = groupByDate(matchesData);
+
+    console.log('Daily signups:', dailySignups);
+    console.log('Daily messages:', dailyMessages);
+    console.log('Daily matches:', dailyMatches);
+
+    // Démographie par ville
+    const { data: allProfiles } = await supabase.from('profiles').select('city');
+    const cityCounts: Record<string, number> = {};
+    if (allProfiles && Array.isArray(allProfiles)) {
+      allProfiles.forEach((p: any) => {
+        if (p.city) {
+          cityCounts[p.city] = (cityCounts[p.city] || 0) + 1;
+        }
+      });
+    }
+    const userDemographics = Object.entries(cityCounts)
+      .map(([city, count]) => ({ city, count }))
+      .sort((a, b) => b.count - a.count);
+
+    console.log('User demographics:', userDemographics);
+
+    const analyticsData = {
+      dailySignups,
+      dailyMessages,
+      dailyMatches,
+      userDemographics,
+      topProfiles: [], // À implémenter avec des vues de comptage
+    };
+    
+    console.log('Final analytics data:', analyticsData);
+    setAnalytics(analyticsData);
+    return analyticsData;
+  };
+  const loadSettings = async () => {
+    const { data } = await supabase.from('settings').select('*');
+    if (data) {
+      const settingsMap: Record<string, string> = {};
+      data.forEach((s: any) => {
+        settingsMap[s.key] = s.value;
+      });
+      
+      setSettings({
+        maintenanceMode: settingsMap.maintenance_mode === 'true',
+        allowRegistration: settingsMap.allow_registration !== 'false',
+        maxUploadSize: parseInt(settingsMap.max_upload_size_mb || '10'),
+        notificationEmail: settingsMap.notification_email || 'admin@aras.com',
+      });
+    }
+  };
+
+  const saveSettings = async (newSettings: any) => {
+    // Sauvegarder chaque paramètre individuellement
+    const updates = [
+      { key: 'maintenance_mode', value: newSettings.maintenanceMode.toString() },
+      { key: 'allow_registration', value: newSettings.allowRegistration.toString() },
+      { key: 'max_upload_size_mb', value: newSettings.maxUploadSize.toString() },
+      { key: 'notification_email', value: newSettings.notificationEmail },
+    ];
+
+    for (const update of updates) {
+      await supabase.from('settings').upsert(update);
+    }
+
+    setSettings(newSettings);
+    alert('Paramètres enregistrés avec succès !');
+    
+    if (newSettings.maintenanceMode) {
+      alert('Mode maintenance activé. Les utilisateurs verront une page de maintenance.');
+    }
   };
 
   const toggleVerification = async (profileId: string, currentStatus: boolean) => {
@@ -98,6 +298,28 @@ export default function AdminPage() {
     }
   };
 
+  const editProfile = (profileId: string, userData: any) => {
+    supabase.from('profiles').update(userData).eq('id', profileId).then(() => {
+      loadProfiles();
+    });
+  };
+
+  const resolveReport = async (reportId: string) => {
+    if (!confirm('Marquer ce signalement comme résolu ?')) return;
+    const { error } = await supabase.from('reports').update({ resolved: true, resolved_at: new Date().toISOString() }).eq('id', reportId);
+    if (!error) {
+      loadReports();
+    }
+  };
+
+  const dismissReport = async (reportId: string) => {
+    if (!confirm('Supprimer ce signalement ?')) return;
+    const { error } = await supabase.from('reports').delete().eq('id', reportId);
+    if (!error) {
+      loadReports();
+    }
+  };
+
   if (authLoading || !user) {
     return <main className="flex min-h-screen items-center justify-center bg-[#fbf8f2] pt-[72px]"><p className="text-sm font-bold text-[#9a8b82]">Chargement...</p></main>;
   }
@@ -106,150 +328,80 @@ export default function AdminPage() {
     return <main className="flex min-h-screen items-center justify-center bg-[#fbf8f2] pt-[72px]"><p className="text-sm font-bold text-[#9a8b82]">Accès non autorisé</p></main>;
   }
 
-  const tabs: { id: AdminTab; label: string; icon: typeof Users }[] = [
-    { id: 'dashboard', label: 'Dashboard', icon: TrendingUp },
-    { id: 'users', label: 'Utilisateurs', icon: Users },
-    { id: 'reports', label: 'Signalements', icon: AlertTriangle },
-    { id: 'events', label: 'Événements', icon: Calendar },
-  ];
-
   return (
-    <main className="min-h-screen bg-[#fbf8f2] px-5 pb-24 pt-[100px] lg:px-8 lg:pt-[120px]">
-      <div className="mx-auto max-w-[1400px]">
-        <div className="mb-8">
-          <p className="text-xs font-extrabold uppercase tracking-[.2em] text-[#e9515f]">Administration</p>
-          <h1 className="font-display mt-3 text-4xl tracking-[-.04em] sm:text-5xl">Backoffice <span className="italic text-[#1a6b68]">ARAS</span></h1>
-        </div>
+    <AdminLayout tab={tab} onTabChange={setTab}>
+      {tab === 'dashboard' && (
+        <AdminDashboard
+          stats={stats}
+          recentActivity={[]}
+        />
+      )}
 
-        {/* TABS */}
-        <div className="flex gap-2 overflow-x-auto rounded-2xl bg-white p-2 shadow-[0_6px_20px_rgba(83,46,32,.04)]">
-          {tabs.map((t) => (
-            <button key={t.id} onClick={() => setTab(t.id)} className={`flex items-center gap-2 whitespace-nowrap rounded-xl px-5 py-3 text-sm font-extrabold transition ${tab === t.id ? 'bg-[#e9515f] text-white' : 'text-[#756960] hover:bg-[#f3e9dc]'}`}>
-              <t.icon size={16} /> {t.label}
-            </button>
-          ))}
-        </div>
+      {tab === 'users' && (
+        <AdminUsers
+          profiles={profiles}
+          currentPage={currentPage}
+          totalPages={Math.ceil(totalProfiles / itemsPerPage)}
+          onPageChange={setCurrentPage}
+          onToggleVerification={toggleVerification}
+          onDeleteProfile={deleteProfile}
+          onEditProfile={editProfile}
+        />
+      )}
 
-        {/* DASHBOARD TAB */}
-        {tab === 'dashboard' && (
-          <div className="mt-8">
-            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-5">
-              {[
-                { label: 'Utilisateurs', value: stats.users, icon: Users, color: '#e9515f' },
-                { label: 'Profils', value: stats.profiles, icon: ShieldCheck, color: '#1a6b68' },
-                { label: 'Conversations', value: stats.conversations, icon: MessageCircle, color: '#d89b52' },
-                { label: 'Événements', value: stats.events, icon: Calendar, color: '#e9515f' },
-                { label: 'Signalements', value: stats.reports, icon: AlertTriangle, color: '#c83d50' },
-              ].map((stat) => (
-                <div key={stat.label} className="rounded-[22px] bg-white p-6 shadow-[0_8px_30px_rgba(83,46,32,.05)]">
-                  <stat.icon size={24} className="text-[#756960]" style={{ color: stat.color }} />
-                  <p className="mt-4 font-display text-3xl font-semibold">{stat.value}</p>
-                  <p className="mt-1 text-xs font-bold uppercase tracking-wider text-[#9a8b82]">{stat.label}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
+      {tab === 'reports' && (
+        <AdminReports
+          reports={reports}
+          profiles={conversationProfiles}
+          onResolveReport={resolveReport}
+          onDismissReport={dismissReport}
+        />
+      )}
 
-        {/* USERS TAB */}
-        {tab === 'users' && (
-          <div className="mt-8 rounded-[26px] bg-white p-6 shadow-[0_8px_30px_rgba(83,46,32,.05)]">
-            <h2 className="font-display text-2xl">Gestion des profils</h2>
-            <div className="mt-6 overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-[#dfd2c6]">
-                    <th className="px-4 py-3 text-left text-xs font-extrabold uppercase text-[#625852]">Profil</th>
-                    <th className="px-4 py-3 text-left text-xs font-extrabold uppercase text-[#625852]">Ville</th>
-                    <th className="px-4 py-3 text-left text-xs font-extrabold uppercase text-[#625852]">Vérifié</th>
-                    <th className="px-4 py-3 text-left text-xs font-extrabold uppercase text-[#625852]">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {profiles.map((p) => (
-                    <tr key={p.id} className="border-b border-[#f3e9dc]">
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-3">
-                          <img src={p.photo_url} alt={p.display_name} className="h-10 w-10 rounded-full object-cover" />
-                          <div>
-                            <p className="text-sm font-bold text-[#241c18]">{p.display_name}</p>
-                            <p className="text-xs text-[#9a8b82]">{p.profession}</p>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 text-sm text-[#756960]">{p.city}</td>
-                      <td className="px-4 py-3">
-                        {p.is_verified ? (
-                          <span className="flex items-center gap-1 text-xs font-bold text-[#1a6b68]"><CheckCircle size={14} /> Vérifié</span>
-                        ) : (
-                          <span className="flex items-center gap-1 text-xs font-bold text-[#9a8b82]"><XCircle size={14} /> Non vérifié</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex gap-2">
-                          <button onClick={() => toggleVerification(p.id, p.is_verified)} className="rounded-full bg-[#e5f0ed] px-3 py-1.5 text-xs font-extrabold text-[#1a6b68] transition hover:bg-[#d0e8e5]">
-                            {p.is_verified ? 'Révoquer' : 'Vérifier'}
-                          </button>
-                          <button onClick={() => deleteProfile(p.id)} className="rounded-full bg-[#fae4e2] px-3 py-1.5 text-xs font-extrabold text-[#c83d50] transition hover:bg-[#f5d5d5]">
-                            <Ban size={12} />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            {totalProfiles > itemsPerPage && (
-              <div className="mt-6">
-                <Pagination
-                  currentPage={currentPage}
-                  totalPages={Math.ceil(totalProfiles / itemsPerPage)}
-                  onPageChange={setCurrentPage}
-                  itemsPerPage={itemsPerPage}
-                  totalItems={totalProfiles}
-                />
-              </div>
-            )}
-          </div>
-        )}
+      {tab === 'events' && (
+        <AdminEvents
+          events={events}
+          onCreateEvent={(eventData) => {
+            supabase.from('events').insert(eventData).then(() => loadEvents());
+          }}
+          onEditEvent={(id, eventData) => {
+            supabase.from('events').update(eventData).eq('id', id).then(() => loadEvents());
+          }}
+          onDeleteEvent={(id) => {
+            if (!confirm('Supprimer cet événement ?')) return;
+            supabase.from('events').delete().eq('id', id).then(() => loadEvents());
+          }}
+          onToggleStatus={(id, status) => {
+            supabase.from('events').update({ is_active: !status }).eq('id', id).then(() => loadEvents());
+          }}
+        />
+      )}
 
-        {/* REPORTS TAB */}
-        {tab === 'reports' && (
-          <div className="mt-8 rounded-[26px] bg-white p-6 shadow-[0_8px_30px_rgba(83,46,32,.05)]">
-            <h2 className="font-display text-2xl">Signalements</h2>
-            {reports.length === 0 ? (
-              <div className="mt-8 text-center">
-                <AlertTriangle size={40} className="mx-auto text-[#dfd2c6]" />
-                <p className="mt-4 text-sm text-[#756960]">Aucun signalement pour le moment.</p>
-              </div>
-            ) : (
-              <div className="mt-6 space-y-4">
-                {reports.map((report) => (
-                  <div key={report.id} className="rounded-xl border border-[#dfd2c6] p-4">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm font-bold text-[#241c18]">Signalement #{report.id.slice(0, 8)}</p>
-                        <p className="text-xs text-[#9a8b82]">{new Date(report.created_at).toLocaleDateString('fr-FR')}</p>
-                      </div>
-                      <span className="rounded-full bg-[#fae4e2] px-3 py-1 text-xs font-extrabold text-[#c83d50]">{report.type || 'Autre'}</span>
-                    </div>
-                    <p className="mt-3 text-sm text-[#756960]">{report.reason || 'Raison non spécifiée'}</p>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
+      {tab === 'messages' && (
+        <AdminMessages
+          messages={messages}
+          profiles={conversationProfiles}
+          onDeleteMessage={(id) => {
+            if (!confirm('Supprimer ce message ?')) return;
+            supabase.from('messages').delete().eq('id', id).then(() => loadMessages());
+          }}
+        />
+      )}
 
-        {/* EVENTS TAB */}
-        {tab === 'events' && (
-          <div className="mt-8 rounded-[26px] bg-white p-6 shadow-[0_8px_30px rgba(83,46,32,.05)]">
-            <h2 className="font-display text-2xl">Gestion des événements</h2>
-            <p className="mt-2 text-sm text-[#756960]">Fonctionnalité à venir : gestion complète des événements.</p>
-          </div>
-        )}
-      </div>
-    </main>
+      {tab === 'analytics' && (
+        <AdminAnalytics
+          analytics={analytics}
+        />
+      )}
+
+      {tab === 'settings' && (
+        <AdminSettings
+          settings={settings}
+          onSaveSettings={saveSettings}
+        />
+      )}
+    </AdminLayout>
   );
 }
+
+

@@ -46,13 +46,13 @@ export function StoriesCarousel({ matches, stories, profileMap }: StoriesCarouse
               className="shrink-0 flex flex-col items-center gap-2"
             >
               <div className="relative">
-                <div className="h-16 w-16 overflow-hidden rounded-full border-3 border-[#e9515f] bg-gradient-to-br from-[#e9515f] to-[#d89b52] p-0.5">
+                <div className="h-16 w-16 overflow-hidden rounded-full border-3 border-[#ec3b78] bg-gradient-to-br from-[#ec3b78] to-[#d89b52] p-0.5">
                   <div className="h-full w-full overflow-hidden rounded-full border-2 border-white">
                     <img src={user.photo_url} alt={user.display_name} className="h-full w-full object-cover" />
                   </div>
                 </div>
                 {userStories.length > 1 && (
-                  <div className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-[#e9515f] text-[10px] font-extrabold text-white">
+                  <div className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-[#ec3b78] text-[10px] font-extrabold text-white">
                     {userStories.length}
                   </div>
                 )}
@@ -149,3 +149,4 @@ export function StoriesCarousel({ matches, stories, profileMap }: StoriesCarouse
     </>
   );
 }
+

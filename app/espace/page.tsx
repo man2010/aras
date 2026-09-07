@@ -8,10 +8,8 @@ import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
 import type { Profile, Conversation, Message, Story } from '@/lib/types';
 import { toConversation, toEvent, toMessage, toProfile, toStory, type EventRow, type MatchRow, type MessageRow, type ProfileRow, type StoryRow } from '@/lib/adapters';
-import { StoryManager } from '@/components/story-manager';
-import { StoriesCarousel } from '@/components/stories-carousel';
 
-type Tab = 'profile' | 'messages' | 'likes' | 'matches' | 'stories' | 'events';
+type Tab = 'profile' | 'messages' | 'likes' | 'matches'  | 'events';
 
 export default function EspacePage() {
   const { user, loading: authLoading, setUnreadCount } = useAuth();
@@ -30,8 +28,6 @@ export default function EspacePage() {
   const [lastMessages, setLastMessages] = useState<Record<string, { content: string; time: string }>>({});
   const [totalUnread, setTotalUnread] = useState(0);
   const [likedProfiles, setLikedProfiles] = useState<Profile[]>([]);
-  const [stories, setStories] = useState<Story[]>([]);
-  const [allStories, setAllStories] = useState<Story[]>([]);
   const [receivedLikes, setReceivedLikes] = useState<Profile[]>([]);
   const [matches, setMatches] = useState<Profile[]>([]);
   const [selectedLikedProfile, setSelectedLikedProfile] = useState<Profile | null>(null);
@@ -64,6 +60,10 @@ export default function EspacePage() {
       const { data: existing } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle();
       if (existing) {
         const p = toProfile(existing as ProfileRow);
+        if (!p.onboarding_completed || p.profile_status !== 'completed') {
+          router.push('/onboarding');
+          return;
+        }
         setProfile(p);
         setProfileForm({ display_name: p.display_name, age: String(p.age), city: p.city, bio: p.bio, profession: p.profession, photo_url: p.photo_url, interests: p.interests.join(', ') });
       }
@@ -151,35 +151,6 @@ export default function EspacePage() {
         setUnreadCounts(counts);
         setTotalUnread(total);
         setUnreadCount(total);
-      }
-      // Charger les stories de l'utilisateur
-      const { data: storiesData } = await supabase
-        .from('stories')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
-      if (storiesData) {
-        setStories((storiesData as StoryRow[]).map(toStory));
-      }
-      // Charger toutes les stories pour le carrousel
-      const { data: allStoriesData } = await supabase
-        .from('stories')
-        .select('*')
-        .order('created_at', { ascending: false });
-      if (allStoriesData) {
-        setAllStories((allStoriesData as StoryRow[]).map(toStory));
-        // Charger les profils des auteurs de stories
-        const authorIds = Array.from(new Set(allStoriesData.map((s: any) => s.user_id)));
-        if (authorIds.length > 0) {
-          const { data: authorProfiles } = await supabase.from('profiles').select('*').in('id', authorIds);
-          if (authorProfiles) {
-            authorProfiles.map((row) => toProfile(row as ProfileRow)).forEach((p: Profile) => {
-              if (p.user_id) {
-                setConversationProfiles((prev) => ({ ...prev, [p.user_id as string]: p }));
-              }
-            });
-          }
-        }
       }
       const { data: evts } = await supabase.from('events').select('*').order('date', { ascending: true }).limit(5);
       if (evts) setEvents((evts as EventRow[]).map(toEvent).map((event) => ({ id: event.id, title: event.title, event_date: event.event_date, location: event.location })));
@@ -298,7 +269,6 @@ export default function EspacePage() {
     { id: 'messages', label: 'Messages', icon: MessageCircle },
     { id: 'likes', label: 'Likes', icon: Heart },
     { id: 'matches', label: 'Matches', icon: Heart },
-    { id: 'stories', label: 'Stories', icon: Heart },
     { id: 'events', label: 'Événements', icon: CalendarDays },
   ];
 
@@ -306,14 +276,14 @@ export default function EspacePage() {
     <main className="min-h-screen bg-[#fbf8f2] px-5 pb-24 pt-[100px] lg:px-8 lg:pt-[120px]">
       <div className="mx-auto max-w-[1120px]">
         <div className="mb-8">
-          <p className="text-xs font-extrabold uppercase tracking-[.2em] text-[#e9515f]">Bienvenue dans votre espace</p>
+          <p className="text-xs font-extrabold uppercase tracking-[.2em] text-[#ec3b78]">Bienvenue dans votre espace</p>
           <h1 className="font-display mt-3 text-4xl tracking-[-.04em] sm:text-5xl">Bonjour{profile ? `, ${profile.display_name}` : ''} <span className="italic text-[#1a6b68]">!</span></h1>
         </div>
 
         {/* TABS */}
         <div className="flex gap-2 overflow-x-auto rounded-2xl bg-white p-2 shadow-[0_6px_20px_rgba(83,46,32,.04)]">
           {tabs.map((t) => (
-            <button key={t.id} onClick={() => setTab(t.id)} className={`flex items-center gap-2 whitespace-nowrap rounded-xl px-5 py-3 text-sm font-extrabold transition ${tab === t.id ? 'bg-[#e9515f] text-white' : 'text-[#756960] hover:bg-[#f3e9dc]'}`}>
+            <button key={t.id} onClick={() => setTab(t.id)} className={`flex items-center gap-2 whitespace-nowrap rounded-xl px-5 py-3 text-sm font-extrabold transition ${tab === t.id ? 'bg-[#ec3b78] text-white' : 'text-[#756960] hover:bg-[#f3e9dc]'}`}>
               <t.icon size={16} /> {t.label}
             </button>
           ))}
@@ -400,19 +370,19 @@ export default function EspacePage() {
               <h2 className="font-display text-2xl">Mes informations</h2>
               <p className="mt-1 text-sm text-[#756960]">Renseignez votre profil pour augmenter vos chances de match.</p>
               <div className="mt-6 grid gap-4 sm:grid-cols-2">
-                <label className="block text-xs font-extrabold text-[#625852]">Nom affiché<input value={profileForm.display_name} onChange={(e) => setProfileForm({ ...profileForm, display_name: e.target.value })} required placeholder="Votre nom" className="mt-2 w-full rounded-xl border border-[#dfd2c6] bg-[#fbf8f2] px-4 py-3 text-sm outline-none focus:border-[#e9515f]" /></label>
-                <label className="block text-xs font-extrabold text-[#625852]">Âge<input value={profileForm.age} onChange={(e) => setProfileForm({ ...profileForm, age: e.target.value })} type="number" min="18" max="99" required className="mt-2 w-full rounded-xl border border-[#dfd2c6] bg-[#fbf8f2] px-4 py-3 text-sm outline-none focus:border-[#e9515f]" /></label>
-                <label className="block text-xs font-extrabold text-[#625852]">Ville<input value={profileForm.city} onChange={(e) => setProfileForm({ ...profileForm, city: e.target.value })} required className="mt-2 w-full rounded-xl border border-[#dfd2c6] bg-[#fbf8f2] px-4 py-3 text-sm outline-none focus:border-[#e9515f]" /></label>
-                <label className="block text-xs font-extrabold text-[#625852]">Profession<input value={profileForm.profession} onChange={(e) => setProfileForm({ ...profileForm, profession: e.target.value })} className="mt-2 w-full rounded-xl border border-[#dfd2c6] bg-[#fbf8f2] px-4 py-3 text-sm outline-none focus:border-[#e9515f]" /></label>
+                <label className="block text-xs font-extrabold text-[#625852]">Nom affiché<input value={profileForm.display_name} onChange={(e) => setProfileForm({ ...profileForm, display_name: e.target.value })} required placeholder="Votre nom" className="mt-2 w-full rounded-xl border border-[#dfd2c6] bg-[#fbf8f2] px-4 py-3 text-sm outline-none focus:border-[#ec3b78]" /></label>
+                <label className="block text-xs font-extrabold text-[#625852]">Âge<input value={profileForm.age} onChange={(e) => setProfileForm({ ...profileForm, age: e.target.value })} type="number" min="18" max="99" required className="mt-2 w-full rounded-xl border border-[#dfd2c6] bg-[#fbf8f2] px-4 py-3 text-sm outline-none focus:border-[#ec3b78]" /></label>
+                <label className="block text-xs font-extrabold text-[#625852]">Ville<input value={profileForm.city} onChange={(e) => setProfileForm({ ...profileForm, city: e.target.value })} required className="mt-2 w-full rounded-xl border border-[#dfd2c6] bg-[#fbf8f2] px-4 py-3 text-sm outline-none focus:border-[#ec3b78]" /></label>
+                <label className="block text-xs font-extrabold text-[#625852]">Profession<input value={profileForm.profession} onChange={(e) => setProfileForm({ ...profileForm, profession: e.target.value })} className="mt-2 w-full rounded-xl border border-[#dfd2c6] bg-[#fbf8f2] px-4 py-3 text-sm outline-none focus:border-[#ec3b78]" /></label>
                 <div className="sm:col-span-2">
                   <p className="text-xs font-extrabold text-[#625852]">Photo de profil</p>
                   <p className="mt-1 text-xs text-[#9a8b82]">Cliquez sur l'image pour changer (PNG, JPG, max 5MB)</p>
                 </div>
-                <label className="block text-xs font-extrabold text-[#625852] sm:col-span-2">Centres d'intérêt (séparés par des virgules)<input value={profileForm.interests} onChange={(e) => setProfileForm({ ...profileForm, interests: e.target.value })} placeholder="Voyage, Cuisine, Musique..." className="mt-2 w-full rounded-xl border border-[#dfd2c6] bg-[#fbf8f2] px-4 py-3 text-sm outline-none focus:border-[#e9515f]" /></label>
-                <label className="block text-xs font-extrabold text-[#625852] sm:col-span-2">Bio<textarea value={profileForm.bio} onChange={(e) => setProfileForm({ ...profileForm, bio: e.target.value })} rows={4} placeholder="Parlez de vous..." className="mt-2 w-full rounded-xl border border-[#dfd2c6] bg-[#fbf8f2] px-4 py-3 text-sm outline-none focus:border-[#e9515f]" /></label>
+                <label className="block text-xs font-extrabold text-[#625852] sm:col-span-2">Centres d'intérêt (séparés par des virgules)<input value={profileForm.interests} onChange={(e) => setProfileForm({ ...profileForm, interests: e.target.value })} placeholder="Voyage, Cuisine, Musique..." className="mt-2 w-full rounded-xl border border-[#dfd2c6] bg-[#fbf8f2] px-4 py-3 text-sm outline-none focus:border-[#ec3b78]" /></label>
+                <label className="block text-xs font-extrabold text-[#625852] sm:col-span-2">Bio<textarea value={profileForm.bio} onChange={(e) => setProfileForm({ ...profileForm, bio: e.target.value })} rows={4} placeholder="Parlez de vous..." className="mt-2 w-full rounded-xl border border-[#dfd2c6] bg-[#fbf8f2] px-4 py-3 text-sm outline-none focus:border-[#ec3b78]" /></label>
               </div>
               <div className="mt-6 flex items-center gap-4">
-                <button type="submit" className="rounded-full bg-[#e9515f] px-6 py-3.5 text-sm font-extrabold text-white transition hover:bg-[#c83d50]">Enregistrer</button>
+                <button type="submit" className="rounded-full bg-[#ec3b78] px-6 py-3.5 text-sm font-extrabold text-white transition hover:bg-[#c92e63]">Enregistrer</button>
                 {profileSaved && <span className="flex items-center gap-2 text-sm font-bold text-[#1a6b68]"><Check size={16} /> Profil mis à jour !</span>}
               </div>
             </form>
@@ -422,7 +392,6 @@ export default function EspacePage() {
         {/* MESSAGES TAB */}
         {tab === 'messages' && (
           <div className="mt-8">
-            <StoriesCarousel matches={matches} stories={allStories} profileMap={conversationProfiles} />
             <div className="grid gap-6 lg:grid-cols-[340px_1fr]">
             <div className="rounded-[26px] bg-white p-4 shadow-[0_8px_30pxrgba(83,46,32,.05)]">
               <p className="px-2 pb-3 font-display text-xl">Conversations</p>
@@ -431,7 +400,7 @@ export default function EspacePage() {
                   <MessageCircle size={28} className="mx-auto text-[#dfd2c6]" />
                   <p className="mt-3 text-sm text-[#756960]">Aucune conversation pour l'instant.</p>
                   <p className="mt-1 text-xs text-[#9a8b82]">Quand vous ferez un match, vos conversations apparaîtront ici.</p>
-                  <Link href="/decouverte" className="mt-4 inline-block rounded-full bg-[#e9515f] px-5 py-2.5 text-xs font-extrabold text-white">Découvrir des profils</Link>
+                  <Link href="/decouverte" className="mt-4 inline-block rounded-full bg-[#ec3b78] px-5 py-2.5 text-xs font-extrabold text-white">Découvrir des profils</Link>
                 </div>
               ) : (
                 <div className="space-y-1">
@@ -459,7 +428,7 @@ export default function EspacePage() {
                             <img src={otherProfile?.photo_url} alt={otherProfile?.display_name} className="h-full w-full object-cover" />
                           </div>
                           {unreadCount > 0 && (
-                            <span className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-[#e9515f] text-[10px] font-extrabold text-white">
+                            <span className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-[#ec3b78] text-[10px] font-extrabold text-white">
                               {unreadCount > 9 ? '9+' : unreadCount}
                             </span>
                           )}
@@ -485,7 +454,7 @@ export default function EspacePage() {
                   <div className="flex-1 space-y-3 overflow-y-auto rounded-xl bg-[#fbf8f2] p-4">
                     {messages.map((m) => (
                       <div key={m.id} className={`flex ${m.sender_id === user.id ? 'justify-end' : 'justify-start'}`}>
-                        <div className={`max-w-[75%] rounded-2xl px-4 py-2.5 text-sm ${m.sender_id === user.id ? 'bg-[#e9515f] text-white' : 'bg-white text-[#241c18] shadow-sm'}`}>
+                        <div className={`max-w-[75%] rounded-2xl px-4 py-2.5 text-sm ${m.sender_id === user.id ? 'bg-[#ec3b78] text-white' : 'bg-white text-[#241c18] shadow-sm'}`}>
                           <p>{m.content}</p>
                           {m.sender_id === user.id && (
                             <div className="mt-1 flex items-center justify-end gap-1">
@@ -505,8 +474,8 @@ export default function EspacePage() {
                     {messages.length === 0 && <p className="py-8 text-center text-sm text-[#9a8b82]">Démarrez la conversation.</p>}
                   </div>
                   <form onSubmit={sendMessage} className="mt-3 flex gap-2">
-                    <input value={newMessage} onChange={(e) => setNewMessage(e.target.value)} placeholder="Votre message..." className="flex-1 rounded-full border border-[#dfd2c6] bg-[#fbf8f2] px-4 py-3 text-sm outline-none focus:border-[#e9515f]" />
-                    <button type="submit" className="flex h-12 w-12 items-center justify-center rounded-full bg-[#e9515f] text-white transition hover:bg-[#c83d50]"><Send size={18} /></button>
+                    <input value={newMessage} onChange={(e) => setNewMessage(e.target.value)} placeholder="Votre message..." className="flex-1 rounded-full border border-[#dfd2c6] bg-[#fbf8f2] px-4 py-3 text-sm outline-none focus:border-[#ec3b78]" />
+                    <button type="submit" className="flex h-12 w-12 items-center justify-center rounded-full bg-[#ec3b78] text-white transition hover:bg-[#c92e63]"><Send size={18} /></button>
                   </form>
                 </>
               ) : (
@@ -527,13 +496,13 @@ export default function EspacePage() {
             <div className="mb-6 flex items-center gap-4">
               <button
                 onClick={() => setLikesView('received')}
-                className={`rounded-full px-4 py-2 text-xs font-extrabold transition ${likesView === 'received' ? 'bg-[#e9515f] text-white' : 'bg-[#f3e9dc] text-[#756960] hover:bg-[#e7cfc0]'}`}
+                className={`rounded-full px-4 py-2 text-xs font-extrabold transition ${likesView === 'received' ? 'bg-[#ec3b78] text-white' : 'bg-[#f3e9dc] text-[#756960] hover:bg-[#e7cfc0]'}`}
               >
                 Qui m'a liké ({receivedLikes.length})
               </button>
               <button
                 onClick={() => setLikesView('sent')}
-                className={`rounded-full px-4 py-2 text-xs font-extrabold transition ${likesView === 'sent' ? 'bg-[#e9515f] text-white' : 'bg-[#f3e9dc] text-[#756960] hover:bg-[#e7cfc0]'}`}
+                className={`rounded-full px-4 py-2 text-xs font-extrabold transition ${likesView === 'sent' ? 'bg-[#ec3b78] text-white' : 'bg-[#f3e9dc] text-[#756960] hover:bg-[#e7cfc0]'}`}
               >
                 Ce que j'ai liké ({likedProfiles.length})
               </button>
@@ -555,7 +524,7 @@ export default function EspacePage() {
                           <div className="h-14 w-14 overflow-hidden rounded-full border-3 border-[#f3e9dc]">
                             <img src={p.photo_url} alt={p.display_name} className="h-full w-full object-cover" />
                           </div>
-                          <span className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-[#e9515f]"><Heart size={10} fill="currentColor" className="text-white" /></span>
+                          <span className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-[#ec3b78]"><Heart size={10} fill="currentColor" className="text-white" /></span>
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="font-display text-base font-semibold truncate">{p.display_name}, <span className="text-[#9a8b82]">{p.age}</span></p>
@@ -582,7 +551,7 @@ export default function EspacePage() {
                     <Heart size={28} className="mx-auto text-[#dfd2c6]" />
                     <p className="mt-3 font-display text-xl">Vous n'avez liké personne pour l'instant</p>
                     <p className="mt-1 text-sm text-[#756960]">Explorez la découverte et likez les profils qui vous inspirent.</p>
-                    <Link href="/decouverte" className="mt-4 inline-flex items-center gap-2 rounded-full bg-[#e9515f] px-6 py-3 text-sm font-extrabold text-white transition hover:bg-[#c83d50]">Aller à la découverte <ArrowRight size={16} /></Link>
+                    <Link href="/decouverte" className="mt-4 inline-flex items-center gap-2 rounded-full bg-[#ec3b78] px-6 py-3 text-sm font-extrabold text-white transition hover:bg-[#c92e63]">Aller à la découverte <ArrowRight size={16} /></Link>
                   </div>
                 ) : (
                   <div className="space-y-3">
@@ -592,7 +561,7 @@ export default function EspacePage() {
                           <div className="h-14 w-14 overflow-hidden rounded-full border-3 border-[#f3e9dc]">
                             <img src={p.photo_url} alt={p.display_name} className="h-full w-full object-cover" />
                           </div>
-                          <span className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-[#e9515f]"><Heart size={10} fill="currentColor" className="text-white" /></span>
+                          <span className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-[#ec3b78]"><Heart size={10} fill="currentColor" className="text-white" /></span>
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="font-display text-base font-semibold truncate">{p.display_name}, <span className="text-[#9a8b82]">{p.age}</span></p>
@@ -639,7 +608,7 @@ export default function EspacePage() {
                       </div>
                       <button
                         onClick={() => { setTab('messages'); }}
-                        className="shrink-0 rounded-full bg-[#e9515f] px-4 py-2 text-xs font-extrabold text-white transition hover:bg-[#c83d50]"
+                        className="shrink-0 rounded-full bg-[#ec3b78] px-4 py-2 text-xs font-extrabold text-white transition hover:bg-[#c92e63]"
                       >
                         Discuter
                       </button>
@@ -655,11 +624,6 @@ export default function EspacePage() {
         )}
 
         {/* STORIES TAB */}
-        {tab === 'stories' && (
-          <div className="mt-8">
-            <StoryManager userId={user.id} stories={stories} onStoriesChange={setStories} />
-          </div>
-        )}
 
         {/* EVENTS TAB */}
         {tab === 'events' && (
@@ -674,7 +638,7 @@ export default function EspacePage() {
               events.map((e) => (
                 <div key={e.id} className="flex items-center justify-between rounded-2xl bg-white p-5 shadow-[0_6px_20px_rgba(83,46,32,.04)]">
                   <div className="flex items-center gap-4">
-                    <div className="flex h-14 w-14 flex-col items-center justify-center rounded-2xl bg-[#fae4e2] text-[#e9515f]"><CalendarDays size={18} /></div>
+                    <div className="flex h-14 w-14 flex-col items-center justify-center rounded-2xl bg-[#fae4e2] text-[#ec3b78]"><CalendarDays size={18} /></div>
                     <div><p className="font-display text-lg">{e.title}</p><p className="text-sm text-[#756960]">{formatDate(e.event_date)} · {e.location}</p></div>
                   </div>
                   <Link href="/evenements" className="rounded-full bg-[#1a6b68] px-5 py-2.5 text-xs font-extrabold text-white transition hover:bg-[#125552]">Détails</Link>
@@ -763,7 +727,7 @@ export default function EspacePage() {
             </div>
             <button
               onClick={() => { setSelectedMatch(null); setTab('messages'); }}
-              className="mt-6 w-full rounded-full bg-[#e9515f] py-3 text-sm font-extrabold text-white transition hover:bg-[#c83d50]"
+              className="mt-6 w-full rounded-full bg-[#ec3b78] py-3 text-sm font-extrabold text-white transition hover:bg-[#c92e63]"
             >
               Aller aux messages
             </button>
@@ -773,3 +737,5 @@ export default function EspacePage() {
     </main>
   );
 }
+
+

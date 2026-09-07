@@ -58,14 +58,14 @@ export default function EvenementsPage() {
     <main className="min-h-screen bg-[#fbf8f2] px-5 pb-24 pt-[100px] lg:px-8 lg:pt-[120px]">
       <div className="mx-auto max-w-[1120px]">
         <div className="text-center">
-          <p className="text-xs font-extrabold uppercase tracking-[.2em] text-[#e9515f]">Vivre la rencontre en vrai</p>
+          <p className="text-xs font-extrabold uppercase tracking-[.2em] text-[#ec3b78]">Vivre la rencontre en vrai</p>
           <h1 className="font-display mt-4 text-5xl tracking-[-.045em] sm:text-6xl">Les <span className="italic text-[#1a6b68]">événements</span></h1>
           <p className="mx-auto mt-4 max-w-[480px] text-sm leading-6 text-[#756960]">Dîners, apéros, brunchs et expériences pensées pour créer de vraies connexions, dans un cadre chaleureux.</p>
         </div>
 
         <div className="mt-10 flex flex-wrap justify-center gap-2">
           {categories.map((c) => (
-            <button key={c} onClick={() => setFilterCat(c)} className={`rounded-full px-5 py-2.5 text-xs font-extrabold transition ${filterCat === c ? 'bg-[#e9515f] text-white' : 'bg-white text-[#756960] shadow-[0_4px_15px_rgba(83,46,32,.04)] hover:bg-[#f3e9dc]'}`}>
+            <button key={c} onClick={() => setFilterCat(c)} className={`rounded-full px-5 py-2.5 text-xs font-extrabold transition ${filterCat === c ? 'bg-[#ec3b78] text-white' : 'bg-white text-[#756960] shadow-[0_4px_15px_rgba(83,46,32,.04)] hover:bg-[#f3e9dc]'}`}>
               {c === 'all' ? 'Tous' : c}
             </button>
           ))}
@@ -83,7 +83,7 @@ export default function EvenementsPage() {
                   {item.price_fcfa === 0 && <span className="absolute right-4 top-4 rounded-full bg-[#1a6b68] px-3 py-1.5 text-[10px] font-extrabold uppercase text-white">Gratuit</span>}
                 </div>
                 <div className="p-6">
-                  <div className="flex items-center gap-2 text-[11px] font-extrabold uppercase tracking-wider text-[#e9515f]"><CalendarDays size={14} /> {formatDate(item.event_date)}</div>
+                  <div className="flex items-center gap-2 text-[11px] font-extrabold uppercase tracking-wider text-[#ec3b78]"><CalendarDays size={14} /> {formatDate(item.event_date)}</div>
                   <h3 className="mt-3 font-display text-[26px] leading-tight">{item.title}</h3>
                   <p className="mt-3 text-sm leading-6 text-[#756960]">{item.description}</p>
                   <div className="mt-5 space-y-2 text-xs font-bold text-[#756960]">
@@ -92,7 +92,7 @@ export default function EvenementsPage() {
                   </div>
                   <div className="mt-6 flex items-center justify-between border-t border-[#eadfd5] pt-5">
                     <span className="text-sm font-extrabold text-[#241c18]">{formatPrice(item.price_fcfa)}</span>
-                    <button onClick={() => { setModalEvent(item); setResMessage(''); }} className="rounded-full bg-[#e9515f] px-5 py-2.5 text-xs font-extrabold text-white transition hover:bg-[#c83d50]">S'inscrire</button>
+                    <button onClick={() => { setModalEvent(item); setResMessage(''); }} className="rounded-full bg-[#ec3b78] px-5 py-2.5 text-xs font-extrabold text-white transition hover:bg-[#c92e63]">S'inscrire</button>
                   </div>
                 </div>
               </article>
@@ -118,7 +118,7 @@ export default function EvenementsPage() {
                 <div className="flex items-center justify-between"><span className="text-[#756960]">Participation</span><strong>{formatPrice(modalEvent.price_fcfa)}</strong></div>
                 <div className="mt-2 flex items-center gap-2 text-xs text-[#756960]"><Clock3 size={13} /> Confirmation par message</div>
               </div>
-              {resMessage && <div className={`rounded-xl px-4 py-3 text-sm leading-5 ${resMessage.startsWith('C') ? 'bg-[#e5f0ed] text-[#1a6b68]' : 'bg-[#fae4e2] text-[#c83d50]'}`}>{resMessage}</div>}
+              {resMessage && <div className={`rounded-xl px-4 py-3 text-sm leading-5 ${resMessage.startsWith('C') ? 'bg-[#e5f0ed] text-[#1a6b68]' : 'bg-[#fae4e2] text-[#c92e63]'}`}>{resMessage}</div>}
               <button disabled={submitting || (resMessage.startsWith('C') && !resMessage.includes('pas'))} className="w-full rounded-full bg-[#1a6b68] py-4 text-sm font-extrabold text-white transition hover:bg-[#125552] disabled:opacity-60">{submitting ? 'Envoi...' : 'Confirmer ma réservation'}</button>
             </form>
           </div>
@@ -127,3 +127,4 @@ export default function EvenementsPage() {
     </main>
   );
 }
+

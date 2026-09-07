@@ -30,6 +30,8 @@ export type ProfileRow = {
   created_at: string;
   height: number | null;
   profession: string | null;
+  profile_status: string | null;
+  onboarding_completed: boolean | null;
 };
 
 export type EventRow = {
@@ -113,6 +115,8 @@ export function toProfile(row: ProfileRow): Profile {
     is_premium: Boolean(row.is_premium),
     last_seen_at: row.last_seen_at,
     height: row.height,
+    profile_status: row.profile_status,
+    onboarding_completed: row.onboarding_completed,
   };
 }
 

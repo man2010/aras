@@ -19,6 +19,8 @@ export type Profile = {
   is_premium?: boolean;
   last_seen_at?: string | null;
   height?: number | null;
+  profile_status?: 'pending' | 'verified' | 'completed' | null;
+  onboarding_completed?: boolean;
 };
 
 export type EventItem = {

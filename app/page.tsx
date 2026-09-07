@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import {
   ArrowRight, Sparkles, Heart, Users, ShieldCheck,
   Check, CalendarDays, MapPin, Quote, ArrowUpRight, MessageCircle, Search,
@@ -39,57 +40,37 @@ export default function Home() {
     <main className="min-h-screen">
       {/* HERO */}
       <section className="relative min-h-[200px] bg-gradient-to-b from-[#f3e9dc] to-[#f5efe6] px-4 pb-2 pt-[72px] lg:min-h-[360px] lg:px-8 lg:pt-[85px]">
-        <div className="absolute right-[-80px] top-[80px] hidden h-[480px] w-[480px] rounded-full bg-[#e7cfc0]/60 blur-2xl lg:right-[3%] lg:top-[110px] lg:block lg:h-[620px] lg:w-[620px]" />
-        <div className="absolute bottom-[-100px] left-[-100px] hidden h-[320px] w-[320px] rounded-full bg-[#edc5c2]/40 blur-3xl lg:block" />
         <div className="relative mx-auto grid max-w-[1240px] items-center gap-6 lg:grid-cols-[1fr_0.8fr]">
           <div className="relative z-10 animate-[reveal_.8s_ease_both]">
             <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-[#d89b52]/40 bg-white/40 px-3 py-1.5 text-[10px] font-extrabold uppercase tracking-[.18em] text-[#9a682f]">
-              <Sparkles size={11} /> Les rencontres qui ont du sens
+              <Sparkles size={11} /> Là où les âmes se rencontrent
             </div>
             <h1 className="font-display max-w-[640px] text-[36px] font-semibold leading-[1.1] tracking-[-.055em] text-[#241c18] sm:text-[52px] lg:text-[88px]">
-              Et si la belle histoire <span className="italic text-[#e9515f]">commençait</span> ici ?
+              Et si la belle histoire <span className="italic text-[#ec3b78]">commençait</span> ici ?
             </h1>
             <p className="mt-4 max-w-[460px] text-[14px] leading-6 text-[#756960] sm:text-[16px]">
               ARAS est un espace de rencontres sérieuses, authentiques et respectueuses, inspiré par les valeurs de la Téranga sénégalaise.
             </p>
             <div className="mt-6 flex flex-col items-start gap-3 sm:flex-row sm:gap-4">
-              <Link href="/inscription" className="group flex items-center gap-2 rounded-full bg-[#e9515f] px-5 py-3 text-xs font-extrabold text-white shadow-[0_14px_30px_rgba(233,81,95,.25)] transition hover:-translate-y-1 hover:bg-[#c83d50] sm:px-7 sm:py-4 sm:text-sm">
+              <Link href="/inscription" className="group flex items-center gap-2 rounded-full bg-[#ec3b78] px-5 py-3 text-xs font-extrabold text-white shadow-[0_14px_30px_rgba(233,81,95,.25)] transition hover:-translate-y-1 hover:bg-[#c92e63] sm:px-7 sm:py-4 sm:text-sm">
                 Commencer l'aventure <ArrowRight size={14} className="transition group-hover:translate-x-1 sm:size-[17px]" />
               </Link>
-              <Link href="/decouverte" className="flex items-center gap-2 px-3 py-3 text-xs font-bold text-[#625852] transition hover:text-[#e9515f] sm:px-4 sm:py-4 sm:text-sm">
+              <Link href="/decouverte" className="flex items-center gap-2 px-3 py-3 text-xs font-bold text-[#625852] transition hover:text-[#ec3b78] sm:px-4 sm:py-4 sm:text-sm">
                 <Search size={14} /> Découvrir les profils
               </Link>
             </div>
-            <div className="mt-8 flex items-center gap-4 sm:mt-12 sm:gap-5">
-              <div className="flex -space-x-2 sm:-space-x-3">
-                {profiles.slice(0, 3).map((p) => (
-                  <img key={p.id} src={p.photo_url} alt={p.display_name} className="h-7 w-7 rounded-full border-2 border-[#f3e9dc] object-cover sm:h-9 sm:w-9" />
-                ))}
-                {profiles.length === 0 && ['https://images.pexels.com/photos/733872/pexels-photo-733872.jpeg?auto=compress&cs=tinysrgb&w=120&h=120&fit=crop','https://images.pexels.com/photos/1181686/pexels-photo-1181686.jpeg?auto=compress&cs=tinysrgb&w=120&h=120&fit=crop','https://images.pexels.com/photos/1239291/pexels-photo-1239291.jpeg?auto=compress&cs=tinysrgb&w=120&h=120&fit=crop'].map((s) => (
-                  <img key={s} src={s} alt="Membre" className="h-7 w-7 rounded-full border-2 border-[#f3e9dc] object-cover sm:h-9 sm:w-9" />
-                ))}
-              </div>
-              <p className="text-[11px] leading-4 text-[#756960] sm:text-xs sm:leading-5">
-                Rejoignez une communauté de<br /><strong className="text-[#241c18]">1 200+ personnes</strong> en quête de vrai.
-              </p>
-            </div>
           </div>
-          <div className="relative hidden lg:block animate-[reveal_1s_ease_both]">
-            <div className="relative mx-auto h-[320px] w-[320px]">
-              <div className="absolute inset-0 flex items-center justify-center">
-                <div className="relative">
-                  <div className="absolute inset-0 bg-gradient-to-br from-[#e9515f] to-[#d89b52] opacity-30 blur-3xl rounded-full"></div>
-                  <div className="relative flex h-[200px] w-[200px] items-center justify-center">
-                    <div className="absolute inset-0 bg-gradient-to-br from-[#e9515f]/10 to-[#d89b52]/10 rounded-full"></div>
-                    <div className="relative flex h-[140px] w-[140px] items-center justify-center rounded-full bg-gradient-to-br from-[#e9515f] to-[#d89b52] shadow-[0_20px_50px_rgba(233,81,95,.3)]">
-                      <Heart size={64} className="text-white fill-white animate-heartbeat" />
-                    </div>
-                    <div className="absolute -top-4 -right-4 h-12 w-12 rounded-full bg-[#d89b52] opacity-60 blur-sm"></div>
-                    <div className="absolute -bottom-6 -left-6 h-16 w-16 rounded-full bg-[#e9515f] opacity-40 blur-md"></div>
-                    <div className="absolute top-1/2 -right-8 h-8 w-8 rounded-full bg-[#1a6b68] opacity-30 blur-lg"></div>
-                  </div>
-                </div>
-              </div>
+          <div className="relative hidden lg:block">
+            <div className="relative ml-auto aspect-[4/5] w-full max-w-[390px] overflow-hidden rounded-[28px] border border-white/70 bg-white shadow-[0_18px_50px_rgba(83,46,32,.12)] ring-1 ring-[#ec3b78]/10">
+              <div className="absolute inset-0 bg-gradient-to-t from-black/10 via-transparent to-white/10" />
+              <Image
+                src="/aras-hero.jpeg"
+                alt="Événement ARAS"
+                fill
+                sizes="(max-width: 1024px) 0px, 390px"
+                className="object-cover object-[center_20%] transition duration-700 hover:scale-[1.02]"
+                priority
+              />
             </div>
           </div>
         </div>
@@ -99,10 +80,10 @@ export default function Home() {
       <section className="border-y border-[#e4d8cc] bg-[#fbf8f2] px-5 py-8 lg:px-8">
         <div className="mx-auto grid max-w-[1080px] grid-cols-2 gap-8 text-center sm:grid-cols-4">
           {[
-            { v: '1 200+', l: 'Membres actifs', c: '#e9515f' },
+            { v: '1 200+', l: 'Membres actifs', c: '#ec3b78' },
             { v: '87%', l: 'De profils vérifiés', c: '#1a6b68' },
             { v: '340+', l: 'Belles connexions', c: '#d89b52' },
-            { v: '4.9/5', l: 'Expérience membre', c: '#e9515f' },
+            { v: '4.9/5', l: 'Expérience membre', c: '#ec3b78' },
           ].map((s, index) => (
             <div key={s.l} className="animate-in fade-in slide-in-from-bottom-2 duration-500" style={{ animationDelay: `${index * 100}ms` }}>
               <p className="font-display text-3xl font-semibold transition hover:scale-110 duration-300" style={{ color: s.c }}>{s.v}</p>
@@ -112,16 +93,90 @@ export default function Home() {
         </div>
       </section>
 
+      {/* CONCEPT */}
+      <section id="concept" className="bg-[#f3e9dc] px-5 py-24 lg:px-8 lg:py-32">
+        <div className="mx-auto grid max-w-[1120px] items-center gap-16 lg:grid-cols-[.85fr_1fr] lg:gap-24">
+          <div className="animate-in slide-in-from-left-4 duration-700">
+            <p className="text-xs font-extrabold uppercase tracking-[.2em] text-[#ec3b78]">Une autre façon de se rencontrer</p>
+            <h2 className="font-display mt-5 text-5xl leading-[1.02] tracking-[-.045em] sm:text-6xl">Ici, on prend<br /><span className="italic text-[#1a6b68]">le temps.</span></h2>
+            <p className="mt-7 max-w-[430px] text-[15px] leading-7 text-[#756960]">Pas de swipe frénétique. Pas de conversations qui s'éteignent. ARAS vous accompagne vers des relations sincères, dans un cadre pensé pour l'humain.</p>
+            <Link href="#how-it-works" className="mt-8 inline-flex items-center gap-2 text-sm font-extrabold text-[#ec3b78]">Comment ça marche <ArrowUpRight size={16} /></Link>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            {[
+              { icon: ShieldCheck, bg: '#ec3b78', title: 'Profils vérifiés', text: 'ARAS met en place des mesures de vérification pour favoriser des échanges plus fiables et authentiques.', cardBg: '#fbf8f2' },
+              { icon: MessageCircle, bg: '#1a6b68', title: 'Confidentialité', text: 'Nous accordons une attention particulière à la confidentialité de vos échanges et de vos informations personnelles.', cardBg: '#e5f0ed' },
+              { icon: MapPin, bg: '#d89b52', title: 'Ancrée localement', text: 'Villes, langues et codes sociaux du Sénégal, au cœur du fonctionnement de l\'app.', cardBg: '#fae4e2' },
+              { icon: Heart, bg: '#b93a63', title: 'Ouverte à toutes et tous', text: 'Chrétiens, musulmans, ou sans confession particulière — ARAS accueille toutes les personnes en recherche de mariage.', cardBg: '#fff1df' },
+            ].map((c, index) => (
+              <div key={c.title} className="rounded-[28px] p-7 transition duration-300 hover:-translate-y-1 hover:shadow-lg animate-in fade-in slide-in-from-bottom-4 duration-500" style={{ background: c.cardBg, animationDelay: `${index * 150}ms` }}>
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl text-white" style={{ background: c.bg }}>
+                  <c.icon size={21} fill={c.icon === Heart ? 'currentColor' : 'none'} />
+                </div>
+                <h3 className="mt-6 font-display text-2xl">{c.title}</h3>
+                <p className="mt-3 text-sm leading-6 text-[#756960]">{c.text}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* HOW IT WORKS */}
+      <section id="how-it-works" className="bg-[#f6ede3] px-5 py-20 lg:px-8 lg:py-24">
+        <div className="mx-auto grid max-w-[1240px] gap-12 lg:grid-cols-[.9fr_1.1fr] lg:items-start lg:gap-20">
+          <div className="animate-in slide-in-from-left-4 duration-700">
+            <p className="text-[11px] font-extrabold uppercase tracking-[.28em] text-[#ec3b78]">Comment ça marche</p>
+            <h2 className="mt-4 max-w-[520px] font-display text-[34px] leading-[1.06] tracking-[-.04em] text-[#241c18] sm:text-[46px] lg:text-[56px]">
+              Cinq étapes pour rencontrer son âme sœur.
+            </h2>
+            <p className="mt-5 max-w-[480px] text-[14px] leading-7 text-[#625852] sm:text-[16px]">
+              ARAS vous guide à chaque étape avec simplicité, clarté et douceur, pour avancer sereinement vers une vraie rencontre.
+            </p>
+            <div className="mt-8 flex items-center gap-3 text-sm font-bold text-[#625852]">
+              <span className="flex h-10 w-10 items-center justify-center rounded-full bg-white text-[#ec3b78] shadow-[0_8px_20px_rgba(83,46,32,.08)]">
+                <ArrowUpRight size={18} />
+              </span>
+              Des étapes simples, pensées pour vous accompagner
+            </div>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            {[
+              { number: '01', icon: Users, title: 'Créez votre profil', text: 'Présentez-vous, vos valeurs, vos attentes et votre projet de vie.', bg: '#fbf8f2', span: false },
+              { number: '02', icon: Search, title: 'Dites ce que vous cherchez', text: 'Définissez vos préférences et les critères importants pour vous.', bg: '#fff7eb', span: false },
+              { number: '03', icon: ShieldCheck, title: 'Découvrez des profils compatibles', text: 'Explorez des célibataires qui correspondent à vos affinités.', bg: '#eef6f3', span: false },
+              { number: '04', icon: MessageCircle, title: 'Échangez', text: 'Prenez le temps de discuter et de découvrir l’autre avant la rencontre.', bg: '#fff4f6', span: false },
+              { number: '05', icon: Heart, title: 'Rencontrez-vous', text: 'Passez de la connexion en ligne à la vraie rencontre en douceur.', bg: '#fff1df', span: true },
+            ].map((step, index) => (
+              <article
+                key={step.number}
+                className={`group relative overflow-hidden rounded-[24px] border border-black/5 p-5 shadow-[0_10px_28px_rgba(83,46,32,.06)] transition duration-300 hover:-translate-y-1 hover:shadow-[0_18px_40px_rgba(83,46,32,.1)] animate-in fade-in slide-in-from-bottom-4 ${step.span ? 'sm:col-span-2' : ''}`}
+                style={{ background: step.bg, animationDelay: `${index * 120}ms` }}
+              >
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#ec3b78] text-white shadow-[0_10px_20px_rgba(236,59,120,.18)]">
+                    <step.icon size={20} />
+                  </div>
+                  <span className="font-mono text-[11px] font-bold tracking-[.24em] text-[#ec3b78]">{step.number}</span>
+                </div>
+                <h3 className="mt-5 font-display text-[21px] leading-tight tracking-[-.03em] text-[#241c18] sm:text-[23px]">{step.title}</h3>
+                <p className="mt-3 max-w-[32ch] text-[14px] leading-6 text-[#625852]">{step.text}</p>
+              </article>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* FEATURED PROFILES */}
       {profiles.length > 0 && (
         <section className="bg-[#fbf8f2] px-5 py-24 lg:px-8 lg:py-28">
           <div className="mx-auto max-w-[1120px]">
             <div className="flex flex-col justify-between gap-6 sm:flex-row sm:items-end">
               <div className="animate-in slide-in-from-left-4 duration-700">
-                <p className="text-xs font-extrabold uppercase tracking-[.2em] text-[#e9515f]">Ils font partie d'ARAS</p>
+                <p className="text-xs font-extrabold uppercase tracking-[.2em] text-[#ec3b78]">Ils font partie d'ARAS</p>
                 <h2 className="font-display mt-4 text-5xl tracking-[-.045em]">Des personnes <span className="italic text-[#1a6b68]">exceptionnelles</span></h2>
               </div>
-              <Link href="/decouverte" className="flex items-center gap-2 text-sm font-extrabold text-[#e9515f] animate-in slide-in-from-right-4 duration-700 delay-100">Voir tous les profils <ArrowRight size={16} /></Link>
+              <Link href="/decouverte" className="flex items-center gap-2 text-sm font-extrabold text-[#ec3b78] animate-in slide-in-from-right-4 duration-700 delay-100">Voir tous les profils <ArrowRight size={16} /></Link>
             </div>
             <div className="mt-12 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
               {profiles.map((p, index) => (
@@ -146,97 +201,12 @@ export default function Home() {
         </section>
       )}
 
-      {/* CONCEPT */}
-      <section id="concept" className="bg-[#f3e9dc] px-5 py-24 lg:px-8 lg:py-32">
-        <div className="mx-auto grid max-w-[1120px] items-center gap-16 lg:grid-cols-[.85fr_1fr] lg:gap-24">
-          <div className="animate-in slide-in-from-left-4 duration-700">
-            <p className="text-xs font-extrabold uppercase tracking-[.2em] text-[#e9515f]">Une autre façon de se rencontrer</p>
-            <h2 className="font-display mt-5 text-5xl leading-[1.02] tracking-[-.045em] sm:text-6xl">Ici, on prend<br /><span className="italic text-[#1a6b68]">le temps.</span></h2>
-            <p className="mt-7 max-w-[430px] text-[15px] leading-7 text-[#756960]">Pas de swipe frénétique. Pas de conversations qui s'éteignent. ARAS vous accompagne vers des relations sincères, dans un cadre pensé pour l'humain.</p>
-            <Link href="/#values" className="mt-8 inline-flex items-center gap-2 text-sm font-extrabold text-[#e9515f]">Pourquoi ARAS ? <ArrowUpRight size={16} /></Link>
-          </div>
-          <div className="grid gap-4 sm:grid-cols-2">
-            {[
-              { icon: Users, bg: '#e9515f', title: 'Des profils vrais', text: 'Chaque membre est encouragé à se présenter avec sincérité, sans masque ni mise en scène.', cardBg: '#fbf8f2', offset: true },
-              { icon: ShieldCheck, bg: '#1a6b68', title: 'Un espace sûr', text: 'La bienveillance, la confidentialité et le respect sont au cœur de chaque interaction.', cardBg: '#e5f0ed', offset: false },
-              { icon: Heart, bg: '#d89b52', title: 'Des intentions alignées', text: 'ARAS s\'adresse aux personnes qui veulent construire quelque chose de durable, avec douceur et clarté.', cardBg: '#fae4e2', offset: false, span: true },
-            ].map((c, index) => (
-              <div key={c.title} className={`rounded-[28px] p-7 transition duration-300 hover:-translate-y-1 hover:shadow-lg ${c.offset ? 'sm:translate-y-8' : ''} ${c.span ? 'sm:col-span-2' : ''} animate-in fade-in slide-in-from-bottom-4 duration-500`} style={{ background: c.cardBg, animationDelay: `${index * 150}ms` }}>
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl text-white" style={{ background: c.bg }}>
-                  <c.icon size={21} fill={c.icon === Heart ? 'currentColor' : 'none'} />
-                </div>
-                <h3 className="mt-6 font-display text-2xl">{c.title}</h3>
-                <p className="mt-3 text-sm leading-6 text-[#756960]">{c.text}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* EVENTS */}
-      <section id="events" className="bg-[#fbf8f2] px-5 py-24 lg:px-8 lg:py-28">
-        <div className="mx-auto max-w-[1120px]">
-          <div className="flex flex-col justify-between gap-6 sm:flex-row sm:items-end">
-            <div className="animate-in slide-in-from-left-4 duration-700">
-              <p className="text-xs font-extrabold uppercase tracking-[.2em] text-[#e9515f]">Vivre la rencontre, autrement</p>
-              <h2 className="font-display mt-4 text-5xl tracking-[-.045em]">Les prochains <span className="italic text-[#1a6b68]">rendez-vous</span></h2>
-            </div>
-            <Link href="/evenements" className="flex items-center gap-2 text-sm font-extrabold text-[#e9515f] animate-in slide-in-from-right-4 duration-700 delay-100">Voir tous les événements <ArrowRight size={16} /></Link>
-          </div>
-          <div className="mt-12 grid gap-6 md:grid-cols-3">
-            {events.map((item, index) => (
-              <article key={item.id} className="group overflow-hidden rounded-[26px] bg-white shadow-[0_10px_35px_rgba(83,46,32,.06)] transition duration-300 hover:-translate-y-2 hover:shadow-[0_18px_45px_rgba(83,46,32,.13)] animate-in fade-in slide-in-from-bottom-4 duration-500" style={{ animationDelay: `${index * 150}ms` }}>
-                <div className="relative h-[220px] overflow-hidden">
-                  <img src={item.image_url} alt={item.title} className="h-full w-full object-cover transition duration-700 group-hover:scale-105" />
-                  <span className="absolute left-4 top-4 rounded-full bg-[#fbf8f2]/90 px-3 py-1.5 text-[10px] font-extrabold uppercase tracking-wider text-[#1a6b68]">{item.category}</span>
-                </div>
-                <div className="p-6">
-                  <div className="flex items-center gap-2 text-[11px] font-extrabold uppercase tracking-wider text-[#e9515f]"><CalendarDays size={14} /> {formatDate(item.event_date)}</div>
-                  <h3 className="mt-3 font-display text-[26px] leading-tight">{item.title}</h3>
-                  <p className="mt-3 text-sm leading-6 text-[#756960]">{item.description}</p>
-                  <div className="mt-5 flex items-center gap-2 text-xs font-bold text-[#756960]"><MapPin size={14} className="text-[#d89b52]" /> {item.location}</div>
-                  <div className="mt-6 flex items-center justify-between border-t border-[#eadfd5] pt-5">
-                    <span className="text-sm font-extrabold text-[#241c18]">{formatPrice(item.price_fcfa)}</span>
-                    <Link href="/evenements" className="rounded-full bg-[#e9515f] px-4 py-2.5 text-xs font-extrabold text-white transition hover:bg-[#c83d50]">S'inscrire</Link>
-                  </div>
-                </div>
-              </article>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* VALUES / TERANGA */}
-      <section id="values" className="relative bg-[#1a6b68] px-5 py-24 text-[#fbf8f2] lg:px-8 lg:py-32">
-        <div className="absolute right-0 top-0 h-full w-1/2 bg-[radial-gradient(circle_at_center,rgba(216,155,82,.18),transparent_55%)]" />
-        <div className="relative mx-auto grid max-w-[1120px] items-center gap-14 lg:grid-cols-[1fr_.8fr]">
-          <div className="animate-in slide-in-from-left-4 duration-700">
-            <p className="text-xs font-extrabold uppercase tracking-[.2em] text-[#f4c27a]">La Téranga, notre boussole</p>
-            <h2 className="font-display mt-5 max-w-[620px] text-5xl leading-[1.03] tracking-[-.045em] sm:text-6xl">L'hospitalité comme <span className="italic text-[#f4c27a]">point de départ.</span></h2>
-            <p className="mt-7 max-w-[490px] text-[15px] leading-7 text-white/70">Parce qu'une relation saine commence par un espace où l'on se sent écouté, respecté et libre d'être soi-même.</p>
-            <div className="mt-9 flex flex-wrap gap-x-7 gap-y-4 text-sm font-bold text-white/90">
-              {['Respect', 'Sincérité', 'Bienveillance'].map((v, index) => (
-                <span key={v} className="flex items-center gap-2 animate-in fade-in slide-in-from-bottom-2 duration-500" style={{ animationDelay: `${index * 100}ms` }}><Check size={17} className="text-[#f4c27a]" /> {v}</span>
-              ))}
-            </div>
-          </div>
-          <div className="relative mx-auto w-full max-w-[360px] animate-in slide-in-from-right-4 duration-700 delay-200">
-            <div className="rotate-3 overflow-hidden rounded-[180px] border-8 border-white/10 transition hover:rotate-0 duration-500">
-              <img src="https://images.pexels.com/photos/12243433/pexels-photo-12243433.jpeg?auto=compress&cs=tinysrgb&w=800" alt="Partage et confiance" className="h-[400px] w-full object-cover" />
-            </div>
-            <div className="absolute -bottom-4 -left-6 rounded-2xl bg-[#f4c27a] px-5 py-4 text-[#1e1916] shadow-xl animate-in fade-in slide-in-from-bottom-4 duration-500 delay-300">
-              <p className="font-display text-xl italic">« La vraie connexion<br />se reconnaît. »</p>
-            </div>
-          </div>
-        </div>
-      </section>
-
       {/* TESTIMONIALS */}
       {testimonials.length > 0 && (
         <section className="bg-[#fbf8f2] px-5 py-24 lg:px-8 lg:py-28">
           <div className="mx-auto max-w-[1120px]">
             <div className="text-center">
-              <p className="text-xs font-extrabold uppercase tracking-[.2em] text-[#e9515f]">Ils se sont rencontrés chez ARAS</p>
+              <p className="text-xs font-extrabold uppercase tracking-[.2em] text-[#ec3b78]">Ils se sont rencontrés chez ARAS</p>
               <h2 className="font-display mt-4 text-5xl tracking-[-.045em]">Des histoires <span className="italic text-[#1a6b68]">qui durent</span></h2>
             </div>
             <div className="mt-12 grid gap-6 md:grid-cols-3">
@@ -248,7 +218,7 @@ export default function Home() {
                     <p className="absolute bottom-3 left-4 text-lg font-display font-semibold text-white">{t.author_name}</p>
                   </div>
                   <div className="p-6">
-                    <Quote size={22} className="text-[#e9515f]" />
+                    <Quote size={22} className="text-[#ec3b78]" />
                     <p className="mt-3 text-sm leading-6 text-[#756960]">{t.story}</p>
                     <div className="mt-5 flex items-center justify-between border-t border-[#eadfd5] pt-4 text-xs font-bold text-[#756960]">
                       <span>{t.city}</span><span className="text-[#1a6b68]">{t.relationship_duration}</span>
@@ -265,14 +235,14 @@ export default function Home() {
       <section className="bg-[#f3e9dc] px-5 py-24 lg:px-8 lg:py-28">
         <div className="mx-auto max-w-[1120px]">
           <div className="text-center animate-in fade-in slide-in-from-bottom-4 duration-700">
-            <p className="text-xs font-extrabold uppercase tracking-[.2em] text-[#e9515f]">Choisissez votre formule</p>
+            <p className="text-xs font-extrabold uppercase tracking-[.2em] text-[#ec3b78]">Choisissez votre formule</p>
             <h2 className="font-display mt-4 text-5xl tracking-[-.045em]">Commencez <span className="italic text-[#1a6b68]">gratuitement</span></h2>
             <p className="mx-auto mt-4 max-w-[460px] text-sm leading-6 text-[#756960]">Explorez sans engagement. Passez à Premium quand vous voulez aller plus loin.</p>
           </div>
           <div className="mt-12 grid gap-6 md:grid-cols-3">
             {[
               { name: 'Découverte', price: 'Gratuit', features: ['Création du profil', 'Voir les profils', '1 like par jour', 'Participation aux événements'], bg: '#fbf8f2', accent: '#1a6b68', cta: 'Commencer', href: '/inscription' },
-              { name: 'Premium', price: '5 000 FCFA', period: '/ mois', features: ['Likes illimités', 'Voir qui vous a liké', 'Messagerie illimitée', 'Filtres avancés', 'Priorité aux événements'], bg: '#e9515f', accent: '#fff', cta: 'Passer Premium', href: '/tarifs', featured: true },
+              { name: 'Premium', price: '5 000 FCFA', period: '/ mois', features: ['Likes illimités', 'Voir qui vous a liké', 'Messagerie illimitée', 'Filtres avancés', 'Priorité aux événements'], bg: '#ec3b78', accent: '#fff', cta: 'Passer Premium', href: '/tarifs', featured: true },
               { name: 'Élite', price: '15 000 FCFA', period: '/ mois', features: ['Tout Premium', 'Conciergerie personnelle', 'Accès événements privés', 'Profil mis en avant', 'Coaching rencontre'], bg: '#241c18', accent: '#f4c27a', cta: 'Rejoindre l\'Élite', href: '/tarifs' },
             ].map((plan, index) => (
               <div key={plan.name} className={`rounded-[28px] p-8 transition duration-300 hover:-translate-y-2 hover:shadow-xl ${plan.featured ? 'text-white shadow-[0_20px_50px_rgba(233,81,95,.25)] lg:-translate-y-4' : plan.name === 'Élite' ? 'text-white shadow-[0_20px_50px_rgba(36,28,24,.25)] lg:-translate-y-4' : 'text-[#241c18] shadow-[0_10px_30px_rgba(83,46,32,.06)]'} animate-in fade-in slide-in-from-bottom-4 duration-500`} style={{ background: plan.bg, animationDelay: `${index * 150}ms` }}>
@@ -284,7 +254,7 @@ export default function Home() {
                     <li key={f} className="flex items-center gap-2 text-sm"><Check size={16} style={{ color: plan.accent }} /> {f}</li>
                   ))}
                 </ul>
-                <Link href={plan.href} className={`mt-8 block rounded-full py-3.5 text-center text-sm font-extrabold transition hover:-translate-y-0.5 ${plan.featured ? 'bg-white text-[#e9515f]' : plan.name === 'Élite' ? 'bg-[#f4c27a] text-[#241c18] hover:bg-[#e5b86a]' : 'bg-[#1a6b68] text-white hover:bg-[#125552]'}`}>{plan.cta}</Link>
+                <Link href={plan.href} className={`mt-8 block rounded-full py-3.5 text-center text-sm font-extrabold transition hover:-translate-y-0.5 ${plan.featured ? 'bg-white text-[#ec3b78]' : plan.name === 'Élite' ? 'bg-[#f4c27a] text-[#241c18] hover:bg-[#e5b86a]' : 'bg-[#1a6b68] text-white hover:bg-[#125552]'}`}>{plan.cta}</Link>
               </div>
             ))}
           </div>
@@ -294,10 +264,10 @@ export default function Home() {
       {/* CTA */}
       <section className="bg-[#fbf8f2] px-5 py-24 lg:px-8">
         <div className="mx-auto max-w-[1120px] rounded-[34px] bg-[#fae4e2] px-7 py-14 text-center sm:px-12">
-          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-[#e9515f] text-white"><MessageCircle size={22} /></div>
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-[#ec3b78] text-white"><MessageCircle size={22} /></div>
           <h2 className="font-display mt-6 text-4xl tracking-[-.04em] sm:text-5xl">Prêt·e à écrire la suite ?</h2>
           <p className="mx-auto mt-4 max-w-[480px] text-sm leading-6 text-[#756960]">Créez votre profil en quelques minutes et laissez la rencontre venir à vous.</p>
-          <Link href="/inscription" className="mt-8 inline-flex items-center gap-2 rounded-full bg-[#e9515f] px-7 py-4 text-sm font-extrabold text-white shadow-[0_10px_25px_rgba(233,81,95,.22)] transition hover:-translate-y-1 hover:bg-[#c83d50]">
+          <Link href="/inscription" className="mt-8 inline-flex items-center gap-2 rounded-full bg-[#ec3b78] px-7 py-4 text-sm font-extrabold text-white shadow-[0_10px_25px_rgba(233,81,95,.22)] transition hover:-translate-y-1 hover:bg-[#c92e63]">
             Je crée mon profil <ArrowRight size={16} />
           </Link>
         </div>
@@ -305,3 +275,7 @@ export default function Home() {
     </main>
   );
 }
+
+
+
+

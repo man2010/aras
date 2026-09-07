@@ -122,7 +122,7 @@ export function StoryManager({ userId, stories, onStoriesChange }: StoryManagerP
         <h2 className="font-display text-2xl">Mes stories</h2>
         <button
           onClick={() => setShowCreateModal(true)}
-          className="flex items-center gap-2 rounded-full bg-[#e9515f] px-4 py-2 text-xs font-extrabold text-white transition hover:bg-[#c83d50]"
+          className="flex items-center gap-2 rounded-full bg-[#ec3b78] px-4 py-2 text-xs font-extrabold text-white transition hover:bg-[#c92e63]"
         >
           <Camera size={14} /> Créer une story
         </button>
@@ -178,13 +178,13 @@ export function StoryManager({ userId, stories, onStoriesChange }: StoryManagerP
                 <div className="flex gap-2">
                   <button
                     onClick={() => setMediaType('image')}
-                    className={`flex items-center gap-2 rounded-full px-3 sm:px-4 py-2 text-[10px] sm:text-xs font-extrabold transition ${mediaType === 'image' ? 'bg-[#e9515f] text-white' : 'bg-[#f3e9dc] text-[#756960] hover:bg-[#e7cfc0]'}`}
+                    className={`flex items-center gap-2 rounded-full px-3 sm:px-4 py-2 text-[10px] sm:text-xs font-extrabold transition ${mediaType === 'image' ? 'bg-[#ec3b78] text-white' : 'bg-[#f3e9dc] text-[#756960] hover:bg-[#e7cfc0]'}`}
                   >
                     <ImageIcon size={14} /> Image
                   </button>
                   <button
                     onClick={() => setMediaType('video')}
-                    className={`flex items-center gap-2 rounded-full px-3 sm:px-4 py-2 text-[10px] sm:text-xs font-extrabold transition ${mediaType === 'video' ? 'bg-[#e9515f] text-white' : 'bg-[#f3e9dc] text-[#756960] hover:bg-[#e7cfc0]'}`}
+                    className={`flex items-center gap-2 rounded-full px-3 sm:px-4 py-2 text-[10px] sm:text-xs font-extrabold transition ${mediaType === 'video' ? 'bg-[#ec3b78] text-white' : 'bg-[#f3e9dc] text-[#756960] hover:bg-[#e7cfc0]'}`}
                   >
                     <Video size={14} /> Vidéo
                   </button>
@@ -231,7 +231,7 @@ export function StoryManager({ userId, stories, onStoriesChange }: StoryManagerP
                   onChange={(e) => setCaption(e.target.value)}
                   placeholder="Ajoutez une description..."
                   rows={3}
-                  className="w-full rounded-xl border border-[#dfd2c6] bg-[#fbf8f2] px-4 py-3 text-sm outline-none focus:border-[#e9515f]"
+                  className="w-full rounded-xl border border-[#dfd2c6] bg-[#fbf8f2] px-4 py-3 text-sm outline-none focus:border-[#ec3b78]"
                 />
               </div>
             </div>
@@ -239,7 +239,7 @@ export function StoryManager({ userId, stories, onStoriesChange }: StoryManagerP
             <button
               onClick={uploadStory}
               disabled={!mediaFile || uploading}
-              className="mt-4 sm:mt-6 w-full rounded-full bg-[#e9515f] py-3 text-sm font-extrabold text-white transition hover:bg-[#c83d50] disabled:opacity-50 disabled:cursor-not-allowed"
+              className="mt-4 sm:mt-6 w-full rounded-full bg-[#ec3b78] py-3 text-sm font-extrabold text-white transition hover:bg-[#c92e63] disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {uploading ? 'Upload en cours...' : 'Publier la story'}
             </button>
@@ -249,3 +249,4 @@ export function StoryManager({ userId, stories, onStoriesChange }: StoryManagerP
     </>
   );
 }
+

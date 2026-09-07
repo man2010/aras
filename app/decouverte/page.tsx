@@ -1,134 +1,207 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import Link from 'next/link';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ShieldCheck, Heart, MapPin, Sparkles, Search, Frown, MessageCircle, Flag, Filter, SlidersHorizontal, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Heart, MapPin, MessageCircle, Search, ShieldCheck, Sparkles, X } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
 import type { Profile } from '@/lib/types';
 import { toProfile, type ProfileRow } from '@/lib/adapters';
-import Pagination from '@/components/pagination';
+
+function getInitial(name: string) {
+  return name.trim().charAt(0).toUpperCase() || '?';
+}
+
+function Pagination({
+  currentPage,
+  totalPages,
+  onChange,
+}: {
+  currentPage: number;
+  totalPages: number;
+  onChange: (page: number) => void;
+}) {
+  const pages = Array.from({ length: totalPages }, (_, index) => index + 1);
+  const visiblePages = pages.slice(Math.max(0, currentPage - 3), Math.max(0, currentPage - 3) + 5);
+
+  return (
+    <div className="mt-10 flex items-center justify-center gap-2">
+      <button
+        onClick={() => onChange(Math.max(1, currentPage - 1))}
+        disabled={currentPage === 1}
+        className="rounded-full border border-[#dfd2c6] bg-white px-3 py-2 text-[#756960] disabled:cursor-not-allowed disabled:opacity-40"
+      >
+        <ChevronLeft size={16} />
+      </button>
+      {visiblePages.map((page) => (
+        <button
+          key={page}
+          onClick={() => onChange(page)}
+          className={`min-w-10 rounded-full px-4 py-2 text-sm font-extrabold transition ${
+            currentPage === page
+              ? 'bg-[#1a6b68] text-white'
+              : 'border border-[#dfd2c6] bg-white text-[#756960] hover:border-[#c8b7a8]'
+          }`}
+        >
+          {page}
+        </button>
+      ))}
+      <button
+        onClick={() => onChange(Math.min(totalPages, currentPage + 1))}
+        disabled={currentPage === totalPages}
+        className="rounded-full border border-[#dfd2c6] bg-white px-3 py-2 text-[#756960] disabled:cursor-not-allowed disabled:opacity-40"
+      >
+        <ChevronRight size={16} />
+      </button>
+    </div>
+  );
+}
 
 export default function DecouvertePage() {
   const router = useRouter();
+  const { user } = useAuth();
+
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filterCity, setFilterCity] = useState('all');
-  const [search, setSearch] = useState('');
   const [likedIds, setLikedIds] = useState<Set<string>>(new Set());
-  const [likeMessage, setLikeMessage] = useState('');
-  const [reportModal, setReportModal] = useState<{ open: boolean; profileId: string | null }>({ open: false, profileId: null });
-  const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage] = useState(8);
-  const [showFilters, setShowFilters] = useState(false);
-  const [totalProfiles, setTotalProfiles] = useState(0);
-  const [allCities, setAllCities] = useState<string[]>([]);
+  const [message, setMessage] = useState('');
   const [selectedProfile, setSelectedProfile] = useState<Profile | null>(null);
-  const { user } = useAuth();
+  const [modalMessage, setModalMessage] = useState('');
+
+  const [showFilters, setShowFilters] = useState(true);
+  const [cityFilter, setCityFilter] = useState('all');
+  const [search, setSearch] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 8;
+
+  const isConnected = Boolean(user);
 
   useEffect(() => {
     (async () => {
       setLoading(true);
-      
-      let query = supabase
-        .from('profiles')
-        .select('*', { count: 'exact' })
-        .eq('is_active', true);
-      
-      if (filterCity !== 'all') {
-        query = query.eq('city', filterCity);
-      }
-      
-      if (search) {
-        query = query.or(`display_name.ilike.%${search}%,profession.ilike.%${search}%,bio.ilike.%${search}%`);
-      }
-      
-      const { data, count } = await query
-        .order('created_at', { ascending: false })
-        .range((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage - 1);
-      
-      if (data) setProfiles((data as ProfileRow[]).map(toProfile));
-      setTotalProfiles(count || 0);
-      setLoading(false);
-    })();
-  }, [currentPage, filterCity, search]);
-
-  useEffect(() => {
-    (async () => {
       const { data } = await supabase
         .from('profiles')
-        .select('city')
-        .eq('is_active', true);
-      
+        .select('*')
+        .eq('is_active', true)
+        .order('created_at', { ascending: false })
+        .limit(60);
+
       if (data) {
-        const cities = Array.from(new Set(data.map((p: any) => p.city).filter(Boolean)));
-        setAllCities(cities);
+        setProfiles((data as ProfileRow[]).map(toProfile));
+      } else {
+        setProfiles([]);
       }
+      setLoading(false);
     })();
   }, []);
-
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [filterCity, search]);
 
   useEffect(() => {
     if (!user) return;
     (async () => {
       const { data } = await supabase.from('swipes').select('swiped_id').eq('swiper_id', user.id).eq('type', 'like');
-      if (data) setLikedIds(new Set(data.map((d: { swiped_id: string }) => d.swiped_id)));
+      if (data) {
+        setLikedIds(new Set(data.map((row: { swiped_id: string }) => row.swiped_id)));
+      }
     })();
   }, [user]);
 
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [cityFilter, search]);
+
+  useEffect(() => {
+    setModalMessage('');
+  }, [selectedProfile]);
+
+  const visibleProfiles = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    return profiles.filter((profile) => {
+      if (user && profile.id === user.id) return false;
+      const matchesCity = cityFilter === 'all' || profile.city === cityFilter;
+      const matchesTerm =
+        !term ||
+        profile.display_name.toLowerCase().includes(term) ||
+        profile.city.toLowerCase().includes(term) ||
+        profile.bio.toLowerCase().includes(term) ||
+        profile.profession.toLowerCase().includes(term);
+      return matchesCity && matchesTerm;
+    });
+  }, [profiles, cityFilter, search, user]);
+
+  const totalPages = Math.max(1, Math.ceil(visibleProfiles.length / itemsPerPage));
+  const paginatedProfiles = useMemo(
+    () => visibleProfiles.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage),
+    [visibleProfiles, currentPage]
+  );
+
+  const cities = useMemo(() => {
+    const list = Array.from(new Set(profiles.map((profile) => profile.city).filter(Boolean)));
+    return ['all', ...list];
+  }, [profiles]);
+
   const handleLike = async (profileId: string) => {
-    if (!user) { setLikeMessage('Connectez-vous pour liker un profil.'); return; }
+    if (!user) {
+      setMessage('Connectez-vous pour liker un profil.');
+      router.push('/connexion');
+      return;
+    }
 
     const { error } = await supabase.from('swipes').upsert({
       swiper_id: user.id,
       swiped_id: profileId,
       type: 'like',
     });
+
     if (!error) {
       setLikedIds((prev) => new Set(prev).add(profileId));
-
-      const { data: reciprocalSwipe } = await supabase
-        .from('swipes')
-        .select('*')
-        .eq('swiper_id', profileId)
-        .eq('swiped_id', user.id)
-        .eq('type', 'like')
-        .maybeSingle();
-
-      if (reciprocalSwipe) {
-        const { data: conversationId } = await supabase.rpc('create_match_from_swipe', {
-          target_profile_id: profileId,
-        });
-
-        if (conversationId) {
-          setLikeMessage('🎉 C\'est un match ! Vous pouvez maintenant discuter ensemble !');
-          setTimeout(() => setLikeMessage(''), 5000);
-        }
-      } else {
-        setLikeMessage('Vous avez liké ce profil. Si cette personne vous like en retour, c\'est un match !');
-        setTimeout(() => setLikeMessage(''), 3000);
-      }
+      setMessage('Profil liké avec succès.');
+      setTimeout(() => setMessage(''), 3000);
     }
   };
 
-  const startConversation = async (profileId: string) => {
-    if (!user) { setLikeMessage('Connectez-vous pour discuter.'); return; }
-    
+  const handleUnlike = async (profileId: string) => {
+    if (!user) {
+      router.push('/connexion');
+      return;
+    }
+
+    const { error } = await supabase
+      .from('swipes')
+      .delete()
+      .eq('swiper_id', user.id)
+      .eq('swiped_id', profileId)
+      .eq('type', 'like');
+
+    if (!error) {
+      setLikedIds((prev) => {
+        const next = new Set(prev);
+        next.delete(profileId);
+        return next;
+      });
+      setMessage('Like retiré.');
+      setTimeout(() => setMessage(''), 2500);
+    }
+  };
+
+  const handleMessages = async (profileId: string) => {
+    if (!user) {
+      setMessage('Connectez-vous pour écrire à quelqu’un.');
+      router.push('/connexion');
+      return;
+    }
+
     const { data: existingMatch } = await supabase
       .from('matches')
       .select('*')
       .or(`and(user_1_id.eq.${user.id},user_2_id.eq.${profileId}),and(user_1_id.eq.${profileId},user_2_id.eq.${user.id})`)
       .maybeSingle();
-    
+
     if (existingMatch) {
+      setModalMessage('');
       router.push(`/espace?tab=messages&conv=${existingMatch.id}`);
       return;
     }
-    
+
     const { data: existingSwipe } = await supabase
       .from('swipes')
       .select('*')
@@ -136,13 +209,12 @@ export default function DecouvertePage() {
       .eq('swiped_id', profileId)
       .eq('type', 'like')
       .maybeSingle();
-    
+
     if (!existingSwipe) {
-      setLikeMessage('Likez d\'abord ce profil pour pouvoir discuter après un match réciproque !');
-      setTimeout(() => setLikeMessage(''), 4000);
+      setModalMessage('Likez d’abord ce profil pour pouvoir lui écrire ensuite.');
       return;
     }
-    
+
     const { data: reciprocalSwipe } = await supabase
       .from('swipes')
       .select('*')
@@ -150,254 +222,310 @@ export default function DecouvertePage() {
       .eq('swiped_id', user.id)
       .eq('type', 'like')
       .maybeSingle();
-    
+
     if (!reciprocalSwipe) {
-      setLikeMessage('Vous avez liké ce profil. Attendez que cette personne vous like en retour pour discuter !');
-      setTimeout(() => setLikeMessage(''), 4000);
+      setModalMessage('Ce profil doit aussi vous liker pour ouvrir la discussion.');
       return;
     }
-    
+
     const { data: conversationId, error } = await supabase.rpc('create_match_from_swipe', {
       target_profile_id: profileId,
     });
-    
+
     if (error || !conversationId) {
-      setLikeMessage('Erreur lors de la création du match. Veuillez réessayer.');
-      setTimeout(() => setLikeMessage(''), 4000);
+      setModalMessage('Impossible d’ouvrir la conversation pour le moment.');
       return;
     }
 
-    setLikeMessage('🎉 C\'est un match ! Conversation ouverte !');
-    setTimeout(() => router.push(`/espace?tab=messages&conv=${conversationId}`), 1000);
+    setModalMessage('');
+    router.push(`/espace?tab=messages&conv=${conversationId}`);
   };
-
-  const handleReport = async (profileId: string, reason: string) => {
-    if (!user) { setLikeMessage('Connectez-vous pour signaler un profil.'); return; }
-    const { error } = await supabase.from('reports').insert({
-      reporter_id: user.id,
-      reported_id: profileId,
-      reason,
-      description: reason,
-    });
-    if (!error) {
-      setLikeMessage('Profil signalé avec succès. Nos modérateurs vont examiner ce signalement.');
-      setReportModal({ open: false, profileId: null });
-      setTimeout(() => setLikeMessage(''), 5000);
-    }
-  };
-
-  const cities = ['all', ...allCities];
-  const totalPages = Math.ceil(totalProfiles / itemsPerPage);
 
   return (
     <main className="min-h-screen bg-[#fbf8f2] px-5 pb-24 pt-[100px] lg:px-8 lg:pt-[120px]">
-      <div className="mx-auto max-w-[1120px]">
+      <div className="mx-auto max-w-[1200px]">
         <div className="text-center">
-          <p className="text-xs font-extrabold uppercase tracking-[.2em] text-[#e9515f]">Parcours la communauté</p>
-          <h1 className="font-display mt-4 text-5xl tracking-[-.045em] sm:text-6xl">La <span className="italic text-[#1a6b68]">découverte</span></h1>
-          <p className="mx-auto mt-4 max-w-[460px] text-sm leading-6 text-[#756960]">Des profils sincères, vérifiés et prêts pour une belle rencontre. Prenez le temps de regarder.</p>
+          <p className="text-xs font-extrabold uppercase tracking-[.2em] text-[#ec3b78]">
+            {isConnected ? 'Ils nous ont fait confiance' : 'Parcours la communauté'}
+          </p>
+          <h1 className="font-display mt-4 text-5xl tracking-[-.045em] sm:text-6xl">
+            Des <span className="italic text-[#1a6b68]">âmes connectées</span>
+          </h1>
+          <p className="mx-auto mt-4 max-w-[720px] text-sm leading-6 text-[#756960]">
+            {isConnected
+              ? 'Des profils sincères, vérifiés et prêts pour une belle rencontre. Prenez le temps de regarder.'
+              : 'Une communauté qui avance avec sincérité, discrétion et respect.'}
+          </p>
         </div>
 
-        <div className="mt-10 rounded-[24px] bg-white p-5 shadow-[0_8px_30px_rgba(83,46,32,.05)]">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div className="relative w-full sm:max-w-[320px]">
-              <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-[#9a8b82]" />
-              <input 
-                value={search} 
-                onChange={(e) => setSearch(e.target.value)} 
-                placeholder="Rechercher par nom, profession, intérêts..." 
-                className="w-full rounded-full border border-[#dfd2c6] bg-[#fbf8f2] py-3 pl-11 pr-4 text-sm outline-none transition focus:border-[#e9515f]" 
-              />
-            </div>
-            <button
-              onClick={() => setShowFilters(!showFilters)}
-              className="flex items-center gap-2 rounded-full border border-[#dfd2c6] bg-[#f3e9dc] px-4 py-3 text-xs font-extrabold text-[#756960] transition hover:bg-[#e7cfc0]"
-            >
-              <SlidersHorizontal size={16} />
-              Filtres {showFilters ? '▼' : '▶'}
-            </button>
+        {message && (
+          <div className="mt-8 rounded-2xl bg-[#e5f0ed] px-5 py-4 text-center text-sm font-bold text-[#1a6b68]">
+            {message}
           </div>
-          
-          {showFilters && (
-            <div className="mt-4 border-t border-[#f3e9dc] pt-4">
-              <p className="mb-3 text-xs font-extrabold text-[#625852]">Filtrer par ville</p>
-              <div className="flex flex-wrap gap-2">
-                {cities.slice(0, 10).map((c) => (
-                  <button 
-                    key={c} 
-                    onClick={() => setFilterCity(c)} 
-                    className={`rounded-full px-4 py-2 text-xs font-extrabold transition ${filterCity === c ? 'bg-[#e9515f] text-white' : 'bg-[#f3e9dc] text-[#756960] hover:bg-[#e7cfc0]'}`}
-                  >
-                    {c === 'all' ? 'Toutes les villes' : c}
-                  </button>
-                ))}
-                {cities.length > 10 && (
-                  <span className="rounded-full bg-[#f3e9dc] px-4 py-2 text-xs font-extrabold text-[#9a8b82]">
-                    +{cities.length - 10} autres villes
-                  </span>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
-
-        {likeMessage && (
-          <div className="mt-6 rounded-2xl bg-[#e5f0ed] px-5 py-4 text-center text-sm font-bold text-[#1a6b68]">{likeMessage}</div>
         )}
 
         {loading ? (
           <div className="mt-16 text-center text-sm font-bold text-[#9a8b82]">Chargement des profils...</div>
         ) : profiles.length === 0 ? (
           <div className="mt-16 flex flex-col items-center gap-4 text-center">
-            <Frown size={40} className="text-[#dfd2c6]" />
-            <p className="text-sm font-bold text-[#756960]">Aucun profil ne correspond à votre recherche.</p>
+            <Sparkles size={40} className="text-[#dfd2c6]" />
+            <p className="text-sm font-bold text-[#756960]">Aucun profil disponible pour le moment.</p>
           </div>
-        ) : (
-          <>
-            <div className="mt-10 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              {profiles.map((p) => (
-              <div key={p.id} className="group flex items-center gap-3 rounded-[22px] bg-white p-3 sm:p-4 shadow-[0_8px_30px_rgba(83,46,32,.05)] transition duration-300 hover:-translate-y-1 hover:shadow-[0_16px_40px_rgba(83,46,32,.12)]">
-                <div className="relative shrink-0">
-                  <div className="h-16 w-16 sm:h-20 sm:w-20 overflow-hidden rounded-full border-4 border-[#f3e9dc]">
-                    <img src={p.photo_url} alt={p.display_name} className="h-full w-full object-cover" />
+        ) : !isConnected ? (
+          <div className="mt-12 overflow-hidden rounded-[32px] bg-white py-6 shadow-[0_8px_30px_rgba(83,46,32,.05)]">
+            <div className="flex gap-4 px-6 animate-[scroll_35s_linear_infinite] hover:[animation-play-state:paused]">
+              {[...profiles, ...profiles].map((profile, index) => (
+                <article
+                  key={`${profile.id}-${index}`}
+                  className="w-[280px] shrink-0 rounded-[24px] border border-[#f1e6da] bg-[#fcfaf7] p-4"
+                >
+                  <div className="flex items-center gap-4">
+                    <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-full bg-[#f4e9dc] text-lg font-black text-[#1a6b68]">
+                      {profile.photo_url ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={profile.photo_url} alt={profile.display_name} className="h-full w-full object-cover" />
+                      ) : (
+                        getInitial(profile.display_name)
+                      )}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="font-display truncate text-lg text-[#24171b]">
+                        {profile.display_name}, <span className="text-[#b58f7d]">{profile.age}</span>
+                      </p>
+                      <p className="mt-1 flex items-center gap-1 text-sm font-medium text-[#756960]">
+                        <MapPin size={14} /> {profile.city || 'Ville non renseignée'}
+                      </p>
+                    </div>
                   </div>
-                  {p.is_verified && <span className="absolute -bottom-1 -right-1 flex h-5 w-5 sm:h-6 sm:w-6 items-center justify-center rounded-full bg-[#1a6b68]"><ShieldCheck size={10} className="text-white" /></span>}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-display text-base sm:text-lg font-semibold truncate">{p.display_name}, <span className="text-[#9a8b82]">{p.age}</span></p>
-                  <p className="mt-0.5 sm:mt-1 flex items-center gap-1 text-[10px] sm:text-xs font-bold text-[#756960]"><MapPin size={11} /> {p.city}</p>
-                  <p className="mt-0.5 sm:mt-1 text-[10px] sm:text-xs text-[#9a8b82] truncate">{p.profession}</p>
-                  <div className="mt-1.5 sm:mt-2 flex flex-wrap gap-1">
-                    {p.interests.slice(0, 2).map((tag) => (
-                      <span key={tag} className="rounded-full bg-[#f3e9dc] px-1.5 sm:px-2 py-0.5 text-[8px] sm:text-[9px] font-bold text-[#9a682f]">{tag}</span>
-                    ))}
-                  </div>
-                  <div className="mt-2 sm:mt-3 flex gap-2">
+                  <div className="mt-4 flex items-center gap-3">
                     <button
-                      onClick={() => handleLike(p.id)}
-                      disabled={likedIds.has(p.id)}
-                      className={`flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-full transition ${likedIds.has(p.id) ? 'bg-[#e9515f] text-white' : 'bg-[#f3e9dc] text-[#e9515f] hover:bg-[#e9515f] hover:text-white'}`}
-                      aria-label="J'aime ce profil"
+                      onClick={() => handleLike(profile.id)}
+                      className={`flex h-11 w-11 items-center justify-center rounded-full border transition ${
+                        likedIds.has(profile.id)
+                          ? 'border-[#ec3b78] bg-[#ec3b78] text-white'
+                          : 'border-[#f0e3d7] bg-[#f6efe6] text-[#ec3b78]'
+                      }`}
                     >
-                      <Heart size={14} fill={likedIds.has(p.id) ? 'currentColor' : 'none'} />
+                      <Heart size={16} fill={likedIds.has(profile.id) ? 'currentColor' : 'none'} />
                     </button>
                     <button
-                      onClick={() => setSelectedProfile(p)}
-                      className="flex-1 rounded-full bg-[#1a6b68] px-2 py-1.5 sm:px-3 sm:py-1.5 text-[9px] sm:text-[10px] font-extrabold text-white transition hover:bg-[#125552]"
+                      onClick={() => setSelectedProfile(profile)}
+                      className="flex-1 rounded-full bg-[#1a6b68] px-4 py-3 text-sm font-extrabold text-white"
                     >
                       Détails
                     </button>
                   </div>
-                </div>
-              </div>
-            ))}
-          </div>
-          
-          {totalProfiles > 0 && (
-            <div className="mt-8">
-              <Pagination
-                currentPage={currentPage}
-                totalPages={totalPages}
-                onPageChange={setCurrentPage}
-                itemsPerPage={itemsPerPage}
-                totalItems={totalProfiles}
-              />
+                </article>
+              ))}
             </div>
-          )}
-        </>
-        )}
-
-        {!user && (
-          <div className="mt-16 rounded-[28px] bg-[#fae4e2] p-8 text-center">
-            <Sparkles size={24} className="mx-auto text-[#e9515f]" />
-            <p className="mt-4 font-display text-2xl">Créez un compte pour liker et discuter</p>
-            <p className="mt-2 text-sm text-[#756960]">Sans compte, vous pouvez voir les profils mais pas interagir.</p>
-            <Link href="/inscription" className="mt-5 inline-block rounded-full bg-[#e9515f] px-6 py-3 text-sm font-extrabold text-white transition hover:bg-[#c83d50]">Créer mon compte</Link>
           </div>
+        ) : (
+          <section className="mt-12 space-y-8">
+            <div className="rounded-[28px] bg-white p-5 shadow-[0_8px_30px_rgba(83,46,32,.05)] sm:p-6">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="relative w-full sm:max-w-[460px]">
+                  <Search size={18} className="absolute left-5 top-1/2 -translate-y-1/2 text-[#9a8b82]" />
+                  <input
+                    value={search}
+                    onChange={(event) => setSearch(event.target.value)}
+                    placeholder="Rechercher par nom, profession, intérêt..."
+                    className="w-full rounded-full border border-[#dfd2c6] bg-[#fbf8f2] py-4 pl-[52px] pr-5 text-sm outline-none transition focus:border-[#ec3b78]"
+                  />
+                </div>
+                <button
+                  onClick={() => setShowFilters((value) => !value)}
+                  className="flex items-center gap-2 rounded-full border border-[#dfd2c6] bg-[#f3e9dc] px-5 py-3.5 text-sm font-extrabold text-[#756960]"
+                >
+                  Filtres {showFilters ? '▼' : '▶'}
+                </button>
+              </div>
+
+              {showFilters && (
+                <div className="mt-6 border-t border-[#f3e9dc] pt-6">
+                  <p className="text-base font-extrabold text-[#625852]">Filtrer par ville</p>
+                  <div className="mt-4 flex flex-wrap gap-3">
+                    {cities.slice(0, 9).map((city) => (
+                      <button
+                        key={city}
+                        onClick={() => setCityFilter(city)}
+                        className={`rounded-full px-5 py-3 text-sm font-extrabold transition ${
+                          cityFilter === city
+                            ? 'bg-[#ec3b78] text-white'
+                            : 'bg-[#f3e9dc] text-[#756960] hover:bg-[#e7cfc0]'
+                        }`}
+                      >
+                        {city === 'all' ? 'Toutes les villes' : city}
+                      </button>
+                    ))}
+                    {cities.length > 9 && (
+                      <span className="rounded-full bg-[#f3e9dc] px-5 py-3 text-sm font-extrabold text-[#9a8b82]">
+                        +{cities.length - 9} autres villes
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-4">
+              {paginatedProfiles.map((profile) => {
+                const initial = getInitial(profile.display_name);
+                return (
+                  <article
+                    key={profile.id}
+                    className="flex min-h-[210px] flex-col gap-4 rounded-[28px] bg-white p-5 shadow-[0_8px_30px_rgba(83,46,32,.05)] transition duration-300 hover:-translate-y-1 hover:shadow-[0_16px_40px_rgba(83,46,32,.12)]"
+                  >
+                    <div className="flex items-start gap-4">
+                      <div className="h-[82px] w-[82px] shrink-0 overflow-hidden rounded-full border-4 border-[#f3e9dc] bg-[#f4e9dc] text-2xl font-black text-[#1a6b68]">
+                        {profile.photo_url ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={profile.photo_url}
+                            alt={profile.display_name}
+                            className="h-full w-full object-cover object-center"
+                          />
+                        ) : (
+                          <div className="flex h-full w-full items-center justify-center">{initial}</div>
+                        )}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <h3 className="font-display truncate text-[28px] leading-none text-[#24171b]">
+                          {profile.display_name}, <span className="text-[#b58f7d]">{profile.age}</span>
+                        </h3>
+                        <p className="mt-3 flex items-center gap-2 text-sm font-semibold text-[#756960]">
+                          <MapPin size={15} /> {profile.city || 'Ville non renseignée'}
+                        </p>
+                        {profile.profession && <p className="mt-2 text-sm text-[#8a7c73]">{profile.profession}</p>}
+                      </div>
+                    </div>
+
+                    {profile.bio && (
+                      <p className="line-clamp-2 text-sm leading-6 text-[#756960]">{profile.bio}</p>
+                    )}
+
+                    {profile.interests?.length ? (
+                      <div className="flex flex-wrap gap-2">
+                        {profile.interests.slice(0, 2).map((interest) => (
+                          <span key={interest} className="rounded-full bg-[#f6efe6] px-3 py-1 text-xs font-semibold text-[#b58f7d]">
+                            {interest}
+                          </span>
+                        ))}
+                      </div>
+                    ) : null}
+
+                    <div className="mt-auto flex items-center gap-3">
+                      <button
+                        onClick={() => handleLike(profile.id)}
+                        className={`flex h-12 w-12 items-center justify-center rounded-full border transition ${
+                          likedIds.has(profile.id)
+                            ? 'border-[#ec3b78] bg-[#ec3b78] text-white'
+                            : 'border-[#f0e3d7] bg-[#f6efe6] text-[#ec3b78]'
+                        }`}
+                      >
+                        <Heart size={18} fill={likedIds.has(profile.id) ? 'currentColor' : 'none'} />
+                      </button>
+                      <button
+                        onClick={() => setSelectedProfile(profile)}
+                        className="flex-1 rounded-full bg-[#1a6b68] px-5 py-3 text-sm font-extrabold text-white"
+                      >
+                        Détails
+                      </button>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+
+            {visibleProfiles.length > itemsPerPage && (
+              <Pagination currentPage={currentPage} totalPages={totalPages} onChange={setCurrentPage} />
+            )}
+          </section>
         )}
       </div>
 
       {selectedProfile && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-lg rounded-[28px] bg-white p-4 sm:p-6 shadow-[0_20px_60px_rgba(0,0,0,.3)]">
-            <div className="flex items-center justify-between">
-              <h3 className="font-display text-xl sm:text-2xl">Profil de {selectedProfile.display_name}</h3>
-              <button onClick={() => setSelectedProfile(null)} className="rounded-full bg-[#f3e9dc] p-2 text-[#756960] transition hover:bg-[#e7cfc0]">
-                <X size={20} />
-              </button>
-            </div>
-            
-            <div className="mt-4 sm:mt-6 flex flex-col items-center">
-              <div className="relative h-24 w-24 sm:h-32 sm:w-32 overflow-hidden rounded-full border-4 border-[#f3e9dc]">
-                <img src={selectedProfile.photo_url} alt={selectedProfile.display_name} className="h-full w-full object-cover" />
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4 py-8">
+          <div className="relative w-full max-w-2xl rounded-[32px] bg-white p-6 shadow-2xl">
+            <button
+              onClick={() => setSelectedProfile(null)}
+              className="absolute right-4 top-4 rounded-full bg-[#f6efe6] p-2 text-[#756960]"
+            >
+              <X size={18} />
+            </button>
+
+            <div className="flex flex-col gap-6 sm:flex-row sm:items-start">
+              <div className="h-24 w-24 shrink-0 overflow-hidden rounded-full bg-[#f4e9dc]">
+                {selectedProfile.photo_url ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={selectedProfile.photo_url}
+                    alt={selectedProfile.display_name}
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center text-3xl font-black text-[#1a6b68]">
+                    {getInitial(selectedProfile.display_name)}
+                  </div>
+                )}
               </div>
-              {selectedProfile.is_verified && <span className="mt-2 sm:mt-3 inline-flex items-center gap-1 rounded-full bg-[#e5f0ed] px-2.5 sm:px-3 py-1.5 text-[9px] sm:text-[10px] font-extrabold uppercase text-[#1a6b68]"><ShieldCheck size={12} /> Vérifié</span>}
-              <p className="mt-3 sm:mt-4 font-display text-xl sm:text-2xl">{selectedProfile.display_name}, <span className="text-[#9a8b82]">{selectedProfile.age}</span></p>
-              <p className="mt-1 flex items-center gap-1 text-xs sm:text-sm font-bold text-[#756960]"><MapPin size={14} /> {selectedProfile.city}</p>
-              <p className="mt-1 text-xs sm:text-sm text-[#9a8b82]">{selectedProfile.profession}</p>
-            </div>
-            
-            <div className="mt-4 sm:mt-6 space-y-3 sm:space-y-4">
-              <div>
-                <p className="text-[10px] sm:text-xs font-extrabold text-[#625852]">À propos</p>
-                <p className="mt-1.5 sm:mt-2 text-xs sm:text-sm text-[#756960]">{selectedProfile.bio || 'Aucune description'}</p>
-              </div>
-              
-              <div>
-                <p className="text-[10px] sm:text-xs font-extrabold text-[#625852]">Centres d'intérêt</p>
-                <div className="mt-1.5 sm:mt-2 flex flex-wrap gap-1.5 sm:gap-2">
-                  {selectedProfile.interests.map((tag) => (
-                    <span key={tag} className="rounded-full bg-[#f3e9dc] px-2 sm:px-3 py-0.5 sm:py-1 text-[10px] sm:text-xs font-bold text-[#9a682f]">{tag}</span>
-                  ))}
+
+              <div className="flex-1">
+                <h3 className="font-display text-3xl text-[#24171b]">
+                  {selectedProfile.display_name}, <span className="text-[#b58f7d]">{selectedProfile.age}</span>
+                </h3>
+                <p className="mt-3 flex items-center gap-2 text-sm font-semibold text-[#756960]">
+                  <MapPin size={15} /> {selectedProfile.city || 'Ville non renseignée'}
+                </p>
+                <div className="mt-4 flex items-center gap-2 text-sm font-semibold text-[#1a6b68]">
+                  <ShieldCheck size={16} />
+                  Profil vérifié
                 </div>
+                {selectedProfile.bio && <p className="mt-4 text-sm leading-6 text-[#756960]">{selectedProfile.bio}</p>}
+                <div className="mt-6 flex flex-wrap gap-3">
+                  <button
+                    onClick={() =>
+                      likedIds.has(selectedProfile.id)
+                        ? handleUnlike(selectedProfile.id)
+                        : handleLike(selectedProfile.id)
+                    }
+                    className={`flex h-14 w-14 items-center justify-center rounded-full border transition ${
+                      likedIds.has(selectedProfile.id)
+                        ? 'border-[#ec3b78] bg-[#ec3b78] text-white'
+                        : 'border-[#f0e3d7] bg-[#f6efe6] text-[#ec3b78]'
+                    }`}
+                    aria-label={likedIds.has(selectedProfile.id) ? 'Retirer le like' : 'Liker'}
+                  >
+                    <Heart size={20} fill={likedIds.has(selectedProfile.id) ? 'currentColor' : 'none'} />
+                  </button>
+                  <button
+                    onClick={() => handleMessages(selectedProfile.id)}
+                    className="rounded-full bg-[#1a6b68] px-5 py-3 text-sm font-extrabold text-white"
+                  >
+                    <MessageCircle size={16} className="mr-2 inline-block" />
+                    Messages
+                  </button>
+                </div>
+                {modalMessage && (
+                  <div className="mt-5 rounded-2xl bg-[#fbe8ec] px-4 py-3 text-sm font-bold text-[#b32d58]">
+                    {modalMessage}
+                  </div>
+                )}
               </div>
-            </div>
-            
-            <div className="mt-4 sm:mt-6 flex gap-2 sm:gap-3">
-              <button
-                onClick={() => { handleLike(selectedProfile.id); setSelectedProfile(null); }}
-                disabled={likedIds.has(selectedProfile.id)}
-                className={`flex-1 flex items-center justify-center gap-1.5 sm:gap-2 rounded-full py-2.5 sm:py-3 text-[11px] sm:text-sm font-extrabold transition ${likedIds.has(selectedProfile.id) ? 'bg-[#e9515f] text-white' : 'bg-[#f3e9dc] text-[#e9515f] hover:bg-[#e9515f] hover:text-white'}`}
-              >
-                <Heart size={16} fill={likedIds.has(selectedProfile.id) ? 'currentColor' : 'none'} />
-                {likedIds.has(selectedProfile.id) ? 'Liké' : 'Liker'}
-              </button>
-              <button
-                onClick={() => { startConversation(selectedProfile.id); setSelectedProfile(null); }}
-                className="flex-1 flex items-center justify-center gap-1.5 sm:gap-2 rounded-full bg-[#1a6b68] py-2.5 sm:py-3 text-[11px] sm:text-sm font-extrabold text-white transition hover:bg-[#125552]"
-              >
-                <MessageCircle size={16} /> Discuter
-              </button>
             </div>
           </div>
         </div>
       )}
 
-      {reportModal.open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-md rounded-[28px] bg-white p-6 shadow-[0_20px_60px_rgba(0,0,0,.3)]">
-            <h3 className="font-display text-xl">Signaler ce profil</h3>
-            <p className="mt-2 text-sm text-[#756960]">Pourquoi signalez-vous ce profil ?</p>
-            <div className="mt-4 space-y-2">
-              {['Profil faux', 'Comportement inapproprié', 'Photo frauduleuse', 'Spam', 'Autre'].map((reason) => (
-                <button
-                  key={reason}
-                  onClick={() => handleReport(reportModal.profileId!, reason)}
-                  className="w-full rounded-xl border border-[#dfd2c6] px-4 py-3 text-left text-sm font-bold text-[#241c18] transition hover:bg-[#fae4e2] hover:border-[#e9515f]"
-                >
-                  {reason}
-                </button>
-              ))}
-            </div>
-            <button
-              onClick={() => setReportModal({ open: false, profileId: null })}
-              className="mt-4 w-full rounded-full bg-[#f3e9dc] py-3 text-sm font-extrabold text-[#756960] transition hover:bg-[#e7cfc0]"
-            >
-              Annuler
-            </button>
-          </div>
-        </div>
-      )}
+      <style jsx global>{`
+        @keyframes scroll {
+          from {
+            transform: translateX(0);
+          }
+          to {
+            transform: translateX(-50%);
+          }
+        }
+      `}</style>
     </main>
   );
 }
