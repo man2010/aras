@@ -93,11 +93,11 @@ export function AdminStories({ stories, profiles, onDeleteStory }: AdminStoriesP
                 )}
                 <div>
                   <p className="text-lg font-bold text-[#241c18]">{user?.full_name || 'Utilisateur inconnu'}</p>
-                  <p className="text-sm text-[#9a8b82]">{userStories.length} story(s)</p>
+                  <p className="text-sm text-[#9a8b82]">{(userStories as any[]).length} story(s)</p>
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4 sm:grid-cols-4 lg:grid-cols-6">
-                {userStories.map((story) => (
+                {(userStories as any[]).map((story) => (
                   <div key={story.id} className="relative aspect-[9/16] overflow-hidden rounded-xl bg-[#f3e9dc]">
                     {story.media_type === 'image' ? (
                       <img src={story.media_url} alt="Story" className="h-full w-full object-cover" />
