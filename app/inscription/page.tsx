@@ -145,22 +145,29 @@ export default function InscriptionPage() {
     setLoading(true);
     setMessage('');
 
-    const payload =
-      method === 'email'
-        ? { email: pendingContact }
-        : { phone: normalizePhone(pendingContact) };
+    if (method === 'email') {
+      const { error } = await supabase.auth.signInWithOtp({
+        email: pendingContact,
+        options: {
+          emailRedirectTo: typeof window !== 'undefined' ? window.location.origin : undefined,
+        },
+      });
 
-    const { error } = await supabase.auth.signInWithOtp({
-      ...payload,
-      options: {
-        emailRedirectTo: typeof window !== 'undefined' ? window.location.origin : undefined,
-      },
-    });
+      if (error) {
+        setMessage(error.message);
+        setLoading(false);
+        return;
+      }
+    } else {
+      const { error } = await supabase.auth.signInWithOtp({
+        phone: normalizePhone(pendingContact),
+      });
 
-    if (error) {
-      setMessage(error.message);
-      setLoading(false);
-      return;
+      if (error) {
+        setMessage(error.message);
+        setLoading(false);
+        return;
+      }
     }
 
     setCountdown(30);
