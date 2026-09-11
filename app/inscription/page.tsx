@@ -1,9 +1,9 @@
 'use client';
 
-import { FormEvent, useMemo, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ArrowRight, Check, Eye, EyeOff, LockKeyhole, Mail, Phone, ShieldCheck, X } from 'lucide-react';
+import { ArrowRight, Check, Eye, EyeOff, LockKeyhole, Mail, Phone, RefreshCw, ShieldCheck, X } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 
 type Method = 'email' | 'phone';
@@ -31,10 +31,25 @@ export default function InscriptionPage() {
   const [needsVerification, setNeedsVerification] = useState(false);
   const [pendingContact, setPendingContact] = useState('');
   const [verificationCode, setVerificationCode] = useState('');
+  const [countdown, setCountdown] = useState(30);
+  const [canResend, setCanResend] = useState(false);
 
   const canSubmit = useMemo(() => {
     return isStrongPassword(password);
   }, [password]);
+
+  // Timer pour l'expiration du code (30 secondes)
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (needsVerification && countdown > 0) {
+      interval = setInterval(() => {
+        setCountdown((prev) => prev - 1);
+      }, 1000);
+    } else if (countdown === 0) {
+      setCanResend(true);
+    }
+    return () => clearInterval(interval);
+  }, [needsVerification, countdown]);
 
   const createProfile = async (userId: string, displayName: string) => {
     await supabase.from('profiles').upsert(
@@ -119,8 +134,39 @@ export default function InscriptionPage() {
 
     setPendingContact(contact);
     setNeedsVerification(true);
+    setCountdown(30);
+    setCanResend(false);
     setSuccess(true);
     setMessage(method === 'phone' ? 'Un code SMS a été envoyé. Saisissez-le pour confirmer votre compte.' : 'Un email de confirmation a été envoyé. Suivez le lien reçu pour activer votre compte.');
+    setLoading(false);
+  };
+
+  const handleResendCode = async () => {
+    setLoading(true);
+    setMessage('');
+
+    const payload =
+      method === 'email'
+        ? { email: pendingContact }
+        : { phone: normalizePhone(pendingContact) };
+
+    const { error } = await supabase.auth.signInWithOtp({
+      ...payload,
+      options: {
+        emailRedirectTo: typeof window !== 'undefined' ? window.location.origin : undefined,
+      },
+    });
+
+    if (error) {
+      setMessage(error.message);
+      setLoading(false);
+      return;
+    }
+
+    setCountdown(30);
+    setCanResend(false);
+    setSuccess(true);
+    setMessage(method === 'phone' ? 'Un nouveau code SMS a été envoyé.' : 'Un nouvel email de confirmation a été envoyé.');
     setLoading(false);
   };
 
@@ -194,14 +240,14 @@ export default function InscriptionPage() {
           <div className="mt-6 grid grid-cols-2 gap-2 rounded-full bg-[#f3e9dc] p-1">
             <button
               type="button"
-              onClick={() => setMethod('email')}
+              onClick={() => { setMethod('email'); setNeedsVerification(false); setVerificationCode(''); setPendingContact(''); setMessage(''); setCountdown(30); setCanResend(false); }}
               className={`rounded-full px-4 py-3 text-sm font-extrabold transition ${method === 'email' ? 'bg-white text-[#241c18]' : 'text-[#756960]'}`}
             >
               <span className="inline-flex items-center gap-2"><Mail size={15} /> Email</span>
             </button>
             <button
               type="button"
-              onClick={() => setMethod('phone')}
+              onClick={() => { setMethod('phone'); setNeedsVerification(false); setVerificationCode(''); setPendingContact(''); setMessage(''); setCountdown(30); setCanResend(false); }}
               className={`rounded-full px-4 py-3 text-sm font-extrabold transition ${method === 'phone' ? 'bg-white text-[#241c18]' : 'text-[#756960]'}`}
             >
               <span className="inline-flex items-center gap-2"><Phone size={15} /> Téléphone</span>
@@ -288,6 +334,15 @@ export default function InscriptionPage() {
                     ? `Un code SMS a été envoyé à ${pendingContact}.`
                     : `Un email a été envoyé à ${pendingContact}.`}
                 </p>
+                {countdown > 0 ? (
+                  <p className="mt-2 text-xs font-bold text-[#1a6b68]">
+                    Code valide pendant {countdown} seconde{countdown > 1 ? 's' : ''}
+                  </p>
+                ) : (
+                  <p className="mt-2 text-xs font-bold text-[#c92e63]">
+                    Code expiré
+                  </p>
+                )}
               </div>
 
               <label className="block text-xs font-extrabold text-[#625852]">
@@ -297,9 +352,21 @@ export default function InscriptionPage() {
                   onChange={(e) => setVerificationCode(e.target.value)}
                   inputMode="numeric"
                   placeholder="123456"
-                  className="mt-2 w-full rounded-xl border border-[#dfd2c6] bg-white px-4 py-3.5 text-sm outline-none transition focus:border-[#ec3b78]"
+                  disabled={countdown === 0}
+                  className="mt-2 w-full rounded-xl border border-[#dfd2c6] bg-white px-4 py-3.5 text-sm outline-none transition focus:border-[#ec3b78] disabled:opacity-50 disabled:cursor-not-allowed"
                 />
               </label>
+
+              {countdown === 0 && (
+                <button
+                  onClick={handleResendCode}
+                  disabled={loading}
+                  className="flex items-center justify-center gap-2 w-full rounded-full border border-[#ec3b78] bg-white px-4 py-3 text-sm font-extrabold text-[#ec3b78] transition hover:bg-[#fbf8f2] disabled:opacity-50"
+                >
+                  <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
+                  {loading ? 'Envoi en cours...' : 'Renvoyer le code'}
+                </button>
+              )}
 
               {message && (
                 <div className={`flex items-start gap-2 rounded-xl px-4 py-3 text-sm ${success ? 'bg-[#e5f0ed] text-[#1a6b68]' : 'bg-[#fae4e2] text-[#c92e63]'}`}>
@@ -310,7 +377,7 @@ export default function InscriptionPage() {
 
               <button
                 onClick={handleVerify}
-                disabled={loading || !verificationCode.trim()}
+                disabled={loading || !verificationCode.trim() || countdown === 0}
                 className="w-full rounded-full bg-[#1a6b68] py-4 text-sm font-extrabold text-white transition hover:bg-[#125552] disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {loading ? 'Vérification...' : 'Confirmer mon compte'}

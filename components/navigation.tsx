@@ -131,7 +131,9 @@ export function Footer() {
       <div className="mx-auto max-w-[1120px]">
         <div className="grid gap-10 pb-14 md:grid-cols-[1.4fr_1fr_1fr_1.2fr]">
           <div>
-            <Link href="/" className="font-display text-4xl font-bold tracking-[-.06em] text-[#ec3b78]">ARAS<span className="text-[#d89b52]">.</span></Link>
+            <Link href="/" className="inline-block">
+              <Image src="/aras-logo.jpeg" alt="ARAS" width={140} height={56} className="h-12 w-auto object-contain" />
+            </Link>
             <p className="mt-5 max-w-[240px] text-sm leading-6 text-white/55">Des rencontres qui ont du sens, dans un espace pensé pour le vrai.</p>
             <div className="mt-6 flex gap-3">
               <span className="flex items-center gap-2 rounded-full border border-white/15 px-4 py-2 text-xs text-white/60">

@@ -21,6 +21,7 @@ export default function TarifsPage() {
         'Participation aux événements (accès standard)',
         '3 conversations par semaine',
         'Badge profil vérifié',
+        'AI Chatbot(SARAH)',
         'Support 24h/7',
       ],
     },
@@ -129,7 +130,6 @@ export default function TarifsPage() {
                 Vous cherchez l'amour mais préférez rester discret ? Remplissez un formulaire confidentiel : notre équipe recherche pour vous et vous recontacte en privé, sans profil visible ni photo en ligne.
               </p>
               <p className="mx-auto mt-4 max-w-[720px] text-[14px] leading-7 text-[#9a8b82] lg:mx-0">
-                À cette étape, le membre Golden remplit un formulaire et paie 50 000 FCFA pour que la demande soit soumise à l'administrateur.
               </p>
             </div>
 
