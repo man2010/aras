@@ -203,6 +203,11 @@ export default function DecouvertePage() {
   const handleLike = (profileId: string) => void toggleLike(profileId);
   const handleUnlike = (profileId: string) => void toggleLike(profileId);
 
+  const handleGuestDetails = () => {
+    setMessage('Créez votre compte pour découvrir les profils et leurs photos.');
+    router.push('/inscription');
+  };
+
   const handleMessages = async (profileId: string) => {
     if (!user) {
       setMessage('Connectez-vous pour écrire à quelqu’un.');
@@ -262,7 +267,7 @@ export default function DecouvertePage() {
   };
 
   return (
-    <main className="min-h-screen bg-[#fbf8f2] px-5 pb-24 pt-[100px] lg:px-8 lg:pt-[120px]">
+    <main className="min-h-screen bg-[#fbf8f2] px-5 pb-24 pt-[100px] dark:bg-[#121212] lg:px-8 lg:pt-[120px]">
       <div className="mx-auto max-w-[1200px]">
         <div className="text-center">
           <p className="text-xs font-extrabold uppercase tracking-[.2em] text-[#ec3b78]">
@@ -292,27 +297,22 @@ export default function DecouvertePage() {
             <p className="text-sm font-bold text-[#756960]">Aucun profil disponible pour le moment.</p>
           </div>
         ) : !isConnected ? (
-          <div className="mt-12 overflow-hidden rounded-[32px] bg-white py-6 shadow-[0_8px_30px_rgba(83,46,32,.05)]">
+          <div className="mt-12 overflow-hidden rounded-[32px] bg-white py-6 shadow-[0_8px_30px_rgba(83,46,32,.05)] dark:bg-[#1e1e1e] dark:shadow-black/30">
             <div className="flex gap-4 px-6 animate-[scroll_35s_linear_infinite] hover:[animation-play-state:paused]">
               {[...profiles, ...profiles].map((profile, index) => (
                 <article
                   key={`${profile.id}-${index}`}
-                  className="w-[280px] shrink-0 rounded-[24px] border border-[#f1e6da] bg-[#fcfaf7] p-4"
+                  className="w-[280px] shrink-0 rounded-[24px] border border-[#f1e6da] bg-[#fcfaf7] p-4 dark:border-[#3a3a3a] dark:bg-[#252525]"
                 >
                   <div className="flex items-center gap-4">
-                    <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-full bg-[#f4e9dc] text-lg font-black text-[#1a6b68]">
-                      {profile.photo_url ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={profile.photo_url} alt={profile.display_name} className="h-full w-full object-cover" />
-                      ) : (
-                        getInitial(profile.display_name)
-                      )}
+                    <div aria-label="Profil masqué" className="flex h-16 w-16 items-center justify-center rounded-full bg-[#f4e9dc] text-lg font-black text-[#1a6b68] dark:bg-[#173c3a] dark:text-[#79c5c1]">
+                      {getInitial(profile.display_name)}
                     </div>
                     <div className="min-w-0">
-                      <p className="font-display truncate text-lg text-[#24171b]">
-                        {profile.display_name}, <span className="text-[#b58f7d]">{profile.age}</span>
+                      <p className="font-display truncate text-lg text-[#24171b] dark:text-[#f5f5f5]">
+                        {getInitial(profile.display_name)}.
                       </p>
-                      <p className="mt-1 flex items-center gap-1 text-sm font-medium text-[#756960]">
+                      <p className="mt-1 flex items-center gap-1 text-sm font-medium text-[#756960] dark:text-[#c9c3bf]">
                         <MapPin size={14} /> {profile.city || 'Ville non renseignée'}
                       </p>
                     </div>
@@ -331,10 +331,10 @@ export default function DecouvertePage() {
                       <Heart size={16} fill={likedIds.has(profile.id) ? 'currentColor' : 'none'} />
                     </button>
                     <button
-                      onClick={() => setSelectedProfile(profile)}
+                      onClick={handleGuestDetails}
                       className="flex-1 rounded-full bg-[#1a6b68] px-4 py-3 text-sm font-extrabold text-white"
                     >
-                      Détails
+                      Découvrir ARAS
                     </button>
                   </div>
                 </article>
@@ -467,7 +467,7 @@ export default function DecouvertePage() {
         )}
       </div>
 
-      {selectedProfile && (
+      {selectedProfile && isConnected && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4 py-8">
           <div className="relative w-full max-w-2xl rounded-[32px] bg-white p-6 shadow-2xl">
             <button

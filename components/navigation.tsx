@@ -4,15 +4,25 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { Menu, X, Heart, LogOut, LayoutDashboard, Bell } from 'lucide-react';
+import { Menu, X, Heart, LogOut, LayoutDashboard, Bell, Moon, Sun } from 'lucide-react';
+import { useTheme } from 'next-themes';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
 
 export function Navbar() {
   const [open, setOpen] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const { user, signOut, unreadCount } = useAuth();
   const router = useRouter();
+  const { resolvedTheme, setTheme } = useTheme();
+  // Le thème sauvegardé n'existe que dans le navigateur : conserver le rendu
+  // clair jusqu'au montage évite une divergence serveur/client (icône SVG).
+  const isDark = mounted && resolvedTheme === 'dark';
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -51,9 +61,14 @@ export function Navbar() {
           <Link href="/evenements" className="transition hover:text-[#ec3b78]">Événements</Link>
           <Link href="/#how-it-works" className="transition hover:text-[#ec3b78]">Comment ça marche</Link>
           <Link href="/tarifs" className="transition hover:text-[#ec3b78]">Tarifs</Link>
+          <Link href="/faq" className="transition hover:text-[#ec3b78]">FAQ</Link>
+          <Link href="/contact" className="transition hover:text-[#ec3b78]">Contact</Link>
         </div>
 
         <div className="hidden items-center gap-3 md:flex">
+          <button onClick={() => setTheme(isDark ? 'light' : 'dark')} aria-label={isDark ? 'Activer le mode clair' : 'Activer le mode sombre'} className="rounded-full border border-[#dfd2c6] p-2.5 text-[#625852] transition hover:border-[#ec3b78] hover:text-[#ec3b78]">
+            {isDark ? <Sun size={16} /> : <Moon size={16} />}
+          </button>
           {user ? (
             <>
               <Link href="/espace?tab=messages" className="relative flex items-center gap-2 px-4 py-2.5 text-[13px] font-bold text-[#625852] transition hover:text-[#ec3b78]">
@@ -98,6 +113,11 @@ export function Navbar() {
             <Link href="/evenements" onClick={() => setOpen(false)} className="hover:text-[#ec3b78] transition-colors">Événements</Link>
             <Link href="/#how-it-works" onClick={() => setOpen(false)} className="hover:text-[#ec3b78] transition-colors">Comment ça marche</Link>
             <Link href="/tarifs" onClick={() => setOpen(false)} className="hover:text-[#ec3b78] transition-colors">Tarifs</Link>
+            <Link href="/faq" onClick={() => setOpen(false)} className="hover:text-[#ec3b78] transition-colors">FAQ</Link>
+            <Link href="/contact" onClick={() => setOpen(false)} className="hover:text-[#ec3b78] transition-colors">Contact</Link>
+            <button onClick={() => setTheme(isDark ? 'light' : 'dark')} className="flex items-center gap-2 text-left hover:text-[#ec3b78] transition-colors">
+              {isDark ? <Sun size={16} /> : <Moon size={16} />} {isDark ? 'Mode clair' : 'Mode sombre'}
+            </button>
             {user ? (
               <>
                 <Link href="/espace" onClick={() => setOpen(false)} className="flex items-center gap-2 hover:text-[#ec3b78] transition-colors">
@@ -148,6 +168,7 @@ export function Footer() {
               <Link href="/evenements" className="hover:text-white">Événements</Link>
               <Link href="/#how-it-works" className="hover:text-white">Comment ça marche</Link>
               <Link href="/tarifs" className="hover:text-white">Tarifs</Link>
+              <Link href="/faq" className="hover:text-white">Questions fréquentes</Link>
             </div>
           </div>
           <div>
@@ -161,7 +182,8 @@ export function Footer() {
           <div>
             <p className="text-xs font-extrabold uppercase tracking-[.18em] text-[#f4c27a]">Une question ?</p>
             <p className="mt-5 text-sm leading-6 text-white/60">Notre équipe est là pour vous accompagner avec attention.</p>
-            <a href="mailto:bonjour@aras.sn" className="mt-4 inline-block text-sm font-bold text-white hover:text-[#f4c27a]">bonjour@aras.sn</a>
+            <Link href="/contact" className="mt-4 inline-block text-sm font-bold text-white hover:text-[#f4c27a]">Nous contacter</Link>
+            <a href="mailto:contact@aras.sn" className="mt-2 block text-sm font-bold text-white hover:text-[#f4c27a]">contact@aras.sn</a>
           </div>
         </div>
         <div className="flex flex-col justify-between gap-3 border-t border-white/10 pt-6 text-[11px] text-white/35 sm:flex-row">

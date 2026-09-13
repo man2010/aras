@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useTheme } from 'next-themes';
 import Link from 'next/link';
 import Image from 'next/image';
 import {
@@ -21,6 +22,8 @@ const formatDate = (d: string) => { const date = new Date(d); return isNaN(date.
 const formatPrice = (p: number) => p === 0 ? 'Gratuit' : `${new Intl.NumberFormat('fr-FR').format(p)} FCFA`;
 
 export default function Home() {
+  const { resolvedTheme } = useTheme();
+  const isDark = resolvedTheme === 'dark';
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [events, setEvents] = useState<EventItem[]>(fallbackEvents);
   const [testimonials, setTestimonials] = useState<Testimonial[]>([]);
@@ -42,7 +45,7 @@ export default function Home() {
       <section className="relative min-h-[200px] bg-gradient-to-b from-[#f3e9dc] to-[#f5efe6] px-4 pb-2 pt-[72px] lg:min-h-[360px] lg:px-8 lg:pt-[85px]">
         <div className="relative mx-auto grid max-w-[1240px] items-center gap-6 lg:grid-cols-[1fr_0.8fr]">
           <div className="relative z-10 animate-[reveal_.8s_ease_both]">
-            <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-[#d89b52]/40 bg-white/40 px-3 py-1.5 text-[10px] font-extrabold uppercase tracking-[.18em] text-[#9a682f]">
+            <div className={`mb-4 inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-[10px] font-extrabold uppercase tracking-[.18em] ${isDark ? 'border-white/30 bg-white/10 text-white' : 'border-[#d89b52]/40 bg-white/40 text-[#9a682f]'}`}>
               <Sparkles size={11} /> Là où les âmes se rencontrent
             </div>
             <h1 className="font-display max-w-[640px] text-[36px] font-semibold leading-[1.1] tracking-[-.055em] text-[#241c18] sm:text-[52px] lg:text-[88px]">
@@ -77,7 +80,7 @@ export default function Home() {
       </section>
 
       {/* STATS */}
-      <section className="border-y border-[#e4d8cc] bg-[#fbf8f2] px-5 py-8 lg:px-8">
+      <section className="home-stats border-y border-[#e4d8cc] bg-[#fbf8f2] px-5 py-8 lg:px-8">
         <div className="mx-auto grid max-w-[1080px] grid-cols-2 gap-8 text-center sm:grid-cols-4">
           {[
             { v: '1 200+', l: 'Membres actifs', c: '#ec3b78' },
@@ -109,7 +112,7 @@ export default function Home() {
               { icon: MapPin, bg: '#d89b52', title: 'Ancrée localement', text: 'Villes, langues et codes sociaux du Sénégal, au cœur du fonctionnement de l\'app.', cardBg: '#fae4e2' },
               { icon: Heart, bg: '#b93a63', title: 'Ouverte à toutes et tous', text: 'Chrétiens, musulmans, ou sans confession particulière — ARAS accueille toutes les personnes en recherche de mariage.', cardBg: '#fff1df' },
             ].map((c, index) => (
-              <div key={c.title} className="rounded-[28px] p-7 transition duration-300 hover:-translate-y-1 hover:shadow-lg animate-in fade-in slide-in-from-bottom-4 duration-500" style={{ background: c.cardBg, animationDelay: `${index * 150}ms` }}>
+              <div key={c.title} className="rounded-[28px] p-7 transition duration-300 hover:-translate-y-1 hover:shadow-lg animate-in fade-in slide-in-from-bottom-4 duration-500" style={{ background: isDark ? '#252525' : c.cardBg, animationDelay: `${index * 150}ms` }}>
                 <div className="flex h-12 w-12 items-center justify-center rounded-2xl text-white" style={{ background: c.bg }}>
                   <c.icon size={21} fill={c.icon === Heart ? 'currentColor' : 'none'} />
                 </div>
@@ -151,7 +154,7 @@ export default function Home() {
               <article
                 key={step.number}
                 className={`group relative overflow-hidden rounded-[24px] border border-black/5 p-5 shadow-[0_10px_28px_rgba(83,46,32,.06)] transition duration-300 hover:-translate-y-1 hover:shadow-[0_18px_40px_rgba(83,46,32,.1)] animate-in fade-in slide-in-from-bottom-4 ${step.span ? 'sm:col-span-2' : ''}`}
-                style={{ background: step.bg, animationDelay: `${index * 120}ms` }}
+                style={{ background: isDark ? '#252525' : step.bg, animationDelay: `${index * 120}ms` }}
               >
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#ec3b78] text-white shadow-[0_10px_20px_rgba(236,59,120,.18)]">
@@ -232,7 +235,7 @@ export default function Home() {
       )}
 
       {/* PRICING TEASER */}
-      <section className="bg-[#f3e9dc] px-5 py-24 lg:px-8 lg:py-28">
+      <section className="home-pricing bg-[#f3e9dc] px-5 py-24 lg:px-8 lg:py-28">
         <div className="mx-auto max-w-[1120px]">
           <div className="text-center animate-in fade-in slide-in-from-bottom-4 duration-700">
             <p className="text-xs font-extrabold uppercase tracking-[.2em] text-[#ec3b78]">Choisissez votre formule</p>
@@ -245,7 +248,7 @@ export default function Home() {
               { name: 'Premium', price: '5 000 FCFA', period: '/ mois', features: ['Likes illimités', 'Voir qui vous a liké', 'Messagerie illimitée', 'Filtres avancés', 'Priorité aux événements'], bg: '#ec3b78', accent: '#fff', cta: 'Passer Premium', href: '/tarifs', featured: true },
               { name: 'Élite', price: '15 000 FCFA', period: '/ mois', features: ['Tout Premium', 'Conciergerie personnelle', 'Accès événements privés', 'Profil mis en avant', 'Coaching rencontre'], bg: '#241c18', accent: '#f4c27a', cta: 'Rejoindre l\'Élite', href: '/tarifs' },
             ].map((plan, index) => (
-              <div key={plan.name} className={`rounded-[28px] p-8 transition duration-300 hover:-translate-y-2 hover:shadow-xl ${plan.featured ? 'text-white shadow-[0_20px_50px_rgba(233,81,95,.25)] lg:-translate-y-4' : plan.name === 'Élite' ? 'text-white shadow-[0_20px_50px_rgba(36,28,24,.25)] lg:-translate-y-4' : 'text-[#241c18] shadow-[0_10px_30px_rgba(83,46,32,.06)]'} animate-in fade-in slide-in-from-bottom-4 duration-500`} style={{ background: plan.bg, animationDelay: `${index * 150}ms` }}>
+              <div key={plan.name} className={`rounded-[28px] p-8 transition duration-300 hover:-translate-y-2 hover:shadow-xl ${plan.featured ? 'text-white shadow-[0_20px_50px_rgba(233,81,95,.25)] lg:-translate-y-4' : plan.name === 'Élite' ? 'text-white shadow-[0_20px_50px_rgba(36,28,24,.25)] lg:-translate-y-4' : 'text-[#241c18] shadow-[0_10px_30px_rgba(83,46,32,.06)]'} animate-in fade-in slide-in-from-bottom-4 duration-500`} style={{ background: isDark && !plan.featured && plan.name !== 'Élite' ? '#252525' : plan.bg, animationDelay: `${index * 150}ms` }}>
                 {plan.featured && <span className="mb-4 inline-block rounded-full bg-white/20 px-3 py-1 text-[10px] font-extrabold uppercase tracking-wider">Le plus choisi</span>}
                 <h3 className="font-display text-2xl">{plan.name}</h3>
                 <p className="mt-3"><span className="font-display text-4xl font-semibold">{plan.price}</span><span className="text-sm opacity-60">{plan.period}</span></p>
@@ -262,8 +265,8 @@ export default function Home() {
       </section>
 
       {/* CTA */}
-      <section className="bg-[#fbf8f2] px-5 py-24 lg:px-8">
-        <div className="mx-auto max-w-[1120px] rounded-[34px] bg-[#fae4e2] px-7 py-14 text-center sm:px-12">
+      <section className="home-cta bg-[#fbf8f2] px-5 py-24 lg:px-8">
+        <div className="mx-auto max-w-[1120px] rounded-[34px] bg-[#fae4e2] px-7 py-14 text-center sm:px-12 dark:bg-[#252525]">
           <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-[#ec3b78] text-white"><MessageCircle size={22} /></div>
           <h2 className="font-display mt-6 text-4xl tracking-[-.04em] sm:text-5xl">Prêt·e à écrire la suite ?</h2>
           <p className="mx-auto mt-4 max-w-[480px] text-sm leading-6 text-[#756960]">Créez votre profil en quelques minutes et laissez la rencontre venir à vous.</p>

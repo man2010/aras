@@ -2,8 +2,11 @@
 
 import Link from 'next/link';
 import { Check, Crown, Sparkles, Heart, ShieldCheck } from 'lucide-react';
+import { useTheme } from 'next-themes';
 
 export default function TarifsPage() {
+  const { resolvedTheme } = useTheme();
+  const isDark = resolvedTheme === 'dark';
   const plans = [
     {
       name: 'Gratuit',
@@ -102,7 +105,7 @@ export default function TarifsPage() {
 
         <div className="mt-12 grid gap-6 md:grid-cols-3">
           {plans.map((plan) => (
-            <div key={plan.name} className={`rounded-[28px] p-8 ${plan.featured ? 'text-white shadow-[0_20px_50px_rgba(233,81,95,.25)] lg:-translate-y-4' : plan.name === 'Elite' ? 'text-white shadow-[0_20px_50px_rgba(36,28,24,.25)] lg:-translate-y-4' : 'text-[#241c18] shadow-[0_10px_30px_rgba(83,46,32,.06)]'}`} style={{ background: plan.bg }}>
+            <div key={plan.name} className={`rounded-[28px] p-8 ${plan.featured ? 'text-white shadow-[0_20px_50px_rgba(233,81,95,.25)] lg:-translate-y-4' : plan.name === 'Elite' ? 'text-white shadow-[0_20px_50px_rgba(36,28,24,.25)] lg:-translate-y-4' : 'text-[#241c18] shadow-[0_10px_30px_rgba(83,46,32,.06)]'}`} style={{ background: isDark && !plan.featured && plan.name !== 'Elite' ? '#252525' : plan.bg }}>
               {plan.featured && <span className="mb-4 inline-block rounded-full bg-white/20 px-3 py-1 text-[10px] font-extrabold uppercase tracking-wider">Le plus choisi</span>}
               <div className="flex h-12 w-12 items-center justify-center rounded-2xl" style={{ background: plan.featured ? 'rgba(255,255,255,.2)' : `${plan.accent}15`, color: plan.accent }}>
                 <plan.icon size={22} fill={plan.icon === Heart ? 'currentColor' : 'none'} />
