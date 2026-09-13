@@ -2,19 +2,17 @@
 
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { ArrowRight, Check, Eye, EyeOff, LockKeyhole, Mail, Phone, RefreshCw, ShieldCheck, X } from 'lucide-react';
+import { AuthPhoneInput } from '@/components/auth-phone-input';
+import { normalizePhone, isValidPhone } from '@/lib/phone';
+import { HumanVerification } from '@/components/human-verification';
+import { createProfileAfterSignup } from '@/lib/create-profile';
+import { requestHumanVerification } from '@/lib/verify-human-client';
 import { supabase } from '@/lib/supabase';
 
 type Method = 'email' | 'phone';
-
-function normalizePhone(value: string) {
-  return value.replace(/[^\d+]/g, '').trim();
-}
-
-function isValidPhone(value: string) {
-  return /^\+?[1-9]\d{7,14}$/.test(normalizePhone(value));
-}
 
 function isStrongPassword(value: string) {
   return value.length >= 8 && /[A-Z]/.test(value) && /\d/.test(value) && /[^A-Za-z0-9]/.test(value);
@@ -33,10 +31,12 @@ export default function InscriptionPage() {
   const [verificationCode, setVerificationCode] = useState('');
   const [countdown, setCountdown] = useState(30);
   const [canResend, setCanResend] = useState(false);
+  const [turnstileToken, setTurnstileToken] = useState('');
+  const [pendingHumanProof, setPendingHumanProof] = useState('');
 
   const canSubmit = useMemo(() => {
-    return isStrongPassword(password);
-  }, [password]);
+    return isStrongPassword(password) && Boolean(turnstileToken);
+  }, [password, turnstileToken]);
 
   // Timer pour l'expiration du code (30 secondes)
   useEffect(() => {
@@ -51,29 +51,19 @@ export default function InscriptionPage() {
     return () => clearInterval(interval);
   }, [needsVerification, countdown]);
 
-  const createProfile = async (userId: string, displayName: string) => {
-    await supabase.from('profiles').upsert(
-      {
-        id: userId,
-        full_name: displayName,
-        is_active: true,
-        is_online: true,
-        avatar_urls: ['https://images.pexels.com/photos/733872/pexels-photo-733872.jpeg?auto=compress&cs=tinysrgb&w=600'],
-        interests: [],
-        languages: [],
-        notif_messages: true,
-        notif_likes: true,
-        notif_matches: true,
-        show_age: true,
-        show_online_status: true,
-        show_distance: true,
-        notif_events: true,
-        profile_status: 'verified',
-        onboarding_completed: false,
-        is_verified: true,
-      },
-      { onConflict: 'id' }
-    );
+  const finalizeProfile = async (displayName: string, humanProof: string) => {
+    const result = await createProfileAfterSignup(displayName, humanProof);
+    if (!result.ok) {
+      setMessage(result.error);
+      setSuccess(false);
+      return false;
+    }
+    if (!result.is_verified) {
+      setMessage(
+        'Compte créé. Votre profil n’est pas marqué « vérifié » : la vérification anti-robot n’a pas abouti. Vous pouvez continuer l’inscription.'
+      );
+    }
+    return true;
   };
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
@@ -83,12 +73,11 @@ export default function InscriptionPage() {
 
     const form = new FormData(e.currentTarget);
     const contact = String(form.get('contact') ?? '').trim();
-    const acceptedTerms = form.get('terms') === 'on';
-    const acceptedPrivacy = form.get('privacy') === 'on';
+    const acceptedLegal = form.get('legal') === 'on';
     const over18 = form.get('over18') === 'on';
 
-    if (!acceptedTerms || !acceptedPrivacy || !over18) {
-      setMessage('Vous devez accepter les conditions, la confidentialité et confirmer avoir plus de 18 ans.');
+    if (!acceptedLegal || !over18) {
+      setMessage('Vous devez accepter les conditions générales et la politique de confidentialité, et confirmer avoir plus de 18 ans.');
       setLoading(false);
       return;
     }
@@ -100,10 +89,25 @@ export default function InscriptionPage() {
     }
 
     if (method === 'phone' && !isValidPhone(contact)) {
-      setMessage('Veuillez saisir un numéro de téléphone valide au format international, par exemple +221...');
+      setMessage('Veuillez saisir un numéro de téléphone valide.');
       setLoading(false);
       return;
     }
+
+    if (!turnstileToken) {
+      setMessage('Veuillez confirmer que vous n’êtes pas un robot.');
+      setLoading(false);
+      return;
+    }
+
+    const humanCheck = await requestHumanVerification(turnstileToken);
+    if (!humanCheck.ok) {
+      setMessage(humanCheck.error);
+      setTurnstileToken('');
+      setLoading(false);
+      return;
+    }
+    setPendingHumanProof(humanCheck.proof);
 
     const payload =
       method === 'email'
@@ -124,9 +128,16 @@ export default function InscriptionPage() {
     }
 
     if (data.user && data.session) {
-      await createProfile(data.user.id, method === 'email' ? contact.split('@')[0] : contact);
+      const displayName = method === 'email' ? contact.split('@')[0] : contact;
+      const profileOk = await finalizeProfile(displayName, humanCheck.proof);
+      if (!profileOk) {
+        setLoading(false);
+        return;
+      }
       setSuccess(true);
-      setMessage('Compte créé avec succès. Complétez maintenant votre profil.');
+      if (!message) {
+        setMessage('Compte créé avec succès. Complétez maintenant votre profil.');
+      }
       setTimeout(() => router.push('/onboarding'), 1200);
       setLoading(false);
       return;
@@ -195,9 +206,15 @@ export default function InscriptionPage() {
       }
 
       if (data.user) {
-        await createProfile(data.user.id, pendingContact);
+        const profileOk = await finalizeProfile(pendingContact, pendingHumanProof);
+        if (!profileOk) {
+          setLoading(false);
+          return;
+        }
         setSuccess(true);
-        setMessage('Téléphone confirmé. Complétez maintenant votre profil.');
+        if (!message) {
+          setMessage('Téléphone confirmé. Complétez maintenant votre profil.');
+        }
         setTimeout(() => router.push('/onboarding'), 1200);
         setLoading(false);
         return;
@@ -216,9 +233,15 @@ export default function InscriptionPage() {
       }
 
       if (data.user) {
-        await createProfile(data.user.id, pendingContact.split('@')[0]);
+        const profileOk = await finalizeProfile(pendingContact.split('@')[0], pendingHumanProof);
+        if (!profileOk) {
+          setLoading(false);
+          return;
+        }
         setSuccess(true);
-        setMessage('Email confirmé. Complétez maintenant votre profil.');
+        if (!message) {
+          setMessage('Email confirmé. Complétez maintenant votre profil.');
+        }
         setTimeout(() => router.push('/onboarding'), 1200);
         setLoading(false);
         return;
@@ -233,12 +256,10 @@ export default function InscriptionPage() {
     <main className="flex min-h-screen items-center justify-center bg-gradient-to-b from-[#f3e9dc] to-[#fbf8f2] px-5 pt-[72px]">
       <div className="w-full max-w-[520px]">
         <div className="rounded-[28px] bg-[#fbf8f2] p-8 shadow-[0_20px_60px_rgba(83,46,32,.08)] sm:p-10">
-          <Link href="/" className="font-display text-3xl font-bold tracking-[-.06em] text-[#ec3b78]">
-            ARAS<span className="text-[#d89b52]">.</span>
+          <Link href="/" className="flex justify-center" aria-label="ARAS">
+            <Image src="/aras-logo.jpeg" alt="ARAS" width={180} height={72} className="h-14 w-auto object-contain sm:h-16" priority />
           </Link>
-          <div className="mt-6 inline-flex items-center gap-2 rounded-full border border-[#d89b52]/40 bg-white/40 px-4 py-2 text-[11px] font-extrabold uppercase tracking-[.18em] text-[#9a682f]">
-            <ShieldCheck size={13} /> Inscription sécurisée
-          </div>
+          
           <h1 className="mt-6 font-display text-4xl tracking-[-.04em]">Créer mon compte</h1>
           <p className="mt-2 text-sm leading-6 text-[#756960]">
             Choisissez email ou téléphone, puis confirmez votre accès avant de rejoindre ARAS.
@@ -247,15 +268,15 @@ export default function InscriptionPage() {
           <div className="mt-6 grid grid-cols-2 gap-2 rounded-full bg-[#f3e9dc] p-1">
             <button
               type="button"
-              onClick={() => { setMethod('email'); setNeedsVerification(false); setVerificationCode(''); setPendingContact(''); setMessage(''); setCountdown(30); setCanResend(false); }}
-              className={`rounded-full px-4 py-3 text-sm font-extrabold transition ${method === 'email' ? 'bg-white text-[#241c18]' : 'text-[#756960]'}`}
+              onClick={() => { setMethod('email'); setNeedsVerification(false); setVerificationCode(''); setPendingContact(''); setMessage(''); setCountdown(30); setCanResend(false); setTurnstileToken(''); setPendingHumanProof(''); }}
+              className={`rounded-full px-4 py-3 text-sm font-extrabold transition ${method === 'email' ? 'bg-[#ec3b78] text-white shadow-[0_8px_20px_rgba(236,59,120,.22)]' : 'text-[#756960] hover:text-[#ec3b78]'}`}
             >
               <span className="inline-flex items-center gap-2"><Mail size={15} /> Email</span>
             </button>
             <button
               type="button"
-              onClick={() => { setMethod('phone'); setNeedsVerification(false); setVerificationCode(''); setPendingContact(''); setMessage(''); setCountdown(30); setCanResend(false); }}
-              className={`rounded-full px-4 py-3 text-sm font-extrabold transition ${method === 'phone' ? 'bg-white text-[#241c18]' : 'text-[#756960]'}`}
+              onClick={() => { setMethod('phone'); setNeedsVerification(false); setVerificationCode(''); setPendingContact(''); setMessage(''); setCountdown(30); setCanResend(false); setTurnstileToken(''); setPendingHumanProof(''); }}
+              className={`rounded-full px-4 py-3 text-sm font-extrabold transition ${method === 'phone' ? 'bg-[#ec3b78] text-white shadow-[0_8px_20px_rgba(236,59,120,.22)]' : 'text-[#756960] hover:text-[#ec3b78]'}`}
             >
               <span className="inline-flex items-center gap-2"><Phone size={15} /> Téléphone</span>
             </button>
@@ -265,13 +286,17 @@ export default function InscriptionPage() {
             <form onSubmit={handleSubmit} className="mt-8 space-y-4">
               <label className="block text-xs font-extrabold text-[#625852]">
                 {method === 'email' ? 'Votre email' : 'Votre téléphone'}
-                <input
-                  required
-                  name="contact"
-                  type={method === 'email' ? 'email' : 'tel'}
-                  placeholder={method === 'email' ? 'vous@exemple.com' : '+221 77 123 45 67'}
-                  className="mt-2 w-full rounded-xl border border-[#dfd2c6] bg-white px-4 py-3.5 text-sm outline-none transition focus:border-[#ec3b78]"
-                />
+                {method === 'email' ? (
+                  <input
+                    required
+                    name="contact"
+                    type="email"
+                    placeholder="vous@exemple.com"
+                    className="mt-2 w-full rounded-xl border border-[#dfd2c6] bg-white px-4 py-3.5 text-sm outline-none transition focus:border-[#ec3b78]"
+                  />
+                ) : (
+                  <AuthPhoneInput key="phone" required name="contact" />
+                )}
               </label>
 
 
@@ -300,17 +325,31 @@ export default function InscriptionPage() {
 
               <div className="grid gap-2 rounded-2xl bg-white p-4 text-sm text-[#756960]">
                 <label className="flex items-start gap-3">
-                  <input type="checkbox" name="terms" className="mt-1 h-4 w-4 accent-[#ec3b78]" />
-                  <span>J’accepte les conditions générales d’utilisation.</span>
-                </label>
-                <label className="flex items-start gap-3">
-                  <input type="checkbox" name="privacy" className="mt-1 h-4 w-4 accent-[#ec3b78]" />
-                  <span>J’accepte la politique de confidentialité.</span>
+                  <input type="checkbox" name="legal" className="mt-1 h-4 w-4 accent-[#ec3b78]" />
+                  <span>
+                    J’accepte les{' '}
+                    <Link href="/cgu" className="font-extrabold text-[#ec3b78] underline-offset-2 hover:underline">
+                      conditions générales d&apos;utilisation
+                    </Link>{' '}
+                    et la politique de confidentialité.
+                  </span>
                 </label>
                 <label className="flex items-start gap-3">
                   <input type="checkbox" name="over18" className="mt-1 h-4 w-4 accent-[#ec3b78]" />
                   <span>Je confirme avoir plus de 18 ans.</span>
                 </label>
+              </div>
+
+              <div className="rounded-2xl bg-white p-4">
+                <p className="mb-3 flex items-center gap-2 text-xs font-extrabold text-[#625852]">
+                  <ShieldCheck size={14} className="text-[#1a6b68]" />
+                  Vérification rapide (anti-robot)
+                </p>
+                <HumanVerification
+                  onToken={setTurnstileToken}
+                  onExpire={() => setTurnstileToken('')}
+                  onError={() => setTurnstileToken('')}
+                />
               </div>
 
               {message && (

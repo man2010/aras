@@ -2,15 +2,14 @@
 
 import { FormEvent, useMemo, useState } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { ArrowRight, Eye, EyeOff, LockKeyhole, Mail, Phone, X } from 'lucide-react';
+import { AuthPhoneInput } from '@/components/auth-phone-input';
+import { normalizePhone, isValidPhone } from '@/lib/phone';
 import { supabase } from '@/lib/supabase';
 
 type Method = 'email' | 'phone';
-
-function normalizePhone(value: string) {
-  return value.replace(/[^\d+]/g, '').trim();
-}
 
 export default function ConnexionPage() {
   const router = useRouter();
@@ -55,6 +54,12 @@ export default function ConnexionPage() {
     const form = new FormData(e.currentTarget);
     const contact = String(form.get('contact') ?? '').trim();
 
+    if (method === 'phone' && !isValidPhone(contact)) {
+      setMessage('Veuillez saisir un numéro de téléphone valide.');
+      setLoading(false);
+      return;
+    }
+
     const credentials = method === 'email'
       ? { email: contact, password }
       : { phone: normalizePhone(contact), password };
@@ -79,8 +84,8 @@ export default function ConnexionPage() {
     <main className="flex min-h-screen items-center justify-center bg-gradient-to-b from-[#f3e9dc] to-[#fbf8f2] px-5 pt-[72px]">
       <div className="w-full max-w-[460px]">
         <div className="rounded-[28px] bg-[#fbf8f2] p-8 shadow-[0_20px_60px_rgba(83,46,32,.08)] sm:p-10">
-          <Link href="/" className="font-display text-3xl font-bold tracking-[-.06em] text-[#ec3b78]">
-            ARAS<span className="text-[#d89b52]">.</span>
+          <Link href="/" className="flex justify-center" aria-label="ARAS">
+            <Image src="/aras-logo.jpeg" alt="ARAS" width={180} height={72} className="h-14 w-auto object-contain sm:h-16" priority />
           </Link>
           <h1 className="mt-8 font-display text-4xl tracking-[-.04em]">Content de vous revoir</h1>
           <p className="mt-2 text-sm leading-6 text-[#756960]">Connectez-vous avec votre email ou votre téléphone et votre mot de passe.</p>
@@ -89,14 +94,14 @@ export default function ConnexionPage() {
             <button
               type="button"
               onClick={() => setMethod('email')}
-              className={`rounded-full px-4 py-3 text-sm font-extrabold transition ${method === 'email' ? 'bg-white text-[#241c18]' : 'text-[#756960]'}`}
+              className={`rounded-full px-4 py-3 text-sm font-extrabold transition ${method === 'email' ? 'bg-[#ec3b78] text-white shadow-[0_8px_20px_rgba(236,59,120,.22)]' : 'text-[#756960] hover:text-[#ec3b78]'}`}
             >
               <span className="inline-flex items-center gap-2"><Mail size={15} /> Email</span>
             </button>
             <button
               type="button"
               onClick={() => setMethod('phone')}
-              className={`rounded-full px-4 py-3 text-sm font-extrabold transition ${method === 'phone' ? 'bg-white text-[#241c18]' : 'text-[#756960]'}`}
+              className={`rounded-full px-4 py-3 text-sm font-extrabold transition ${method === 'phone' ? 'bg-[#ec3b78] text-white shadow-[0_8px_20px_rgba(236,59,120,.22)]' : 'text-[#756960] hover:text-[#ec3b78]'}`}
             >
               <span className="inline-flex items-center gap-2"><Phone size={15} /> Téléphone</span>
             </button>
@@ -105,13 +110,17 @@ export default function ConnexionPage() {
           <form onSubmit={handleSubmit} className="mt-8 space-y-4">
             <label className="block text-xs font-extrabold text-[#625852]">
               {method === 'email' ? 'Votre email' : 'Votre téléphone'}
-              <input
-                required
-                name="contact"
-                type={method === 'email' ? 'email' : 'tel'}
-                placeholder={method === 'email' ? 'vous@exemple.com' : '+221 77 123 45 67'}
-                className="mt-2 w-full rounded-xl border border-[#dfd2c6] bg-white px-4 py-3.5 text-sm outline-none transition focus:border-[#ec3b78]"
-              />
+              {method === 'email' ? (
+                <input
+                  required
+                  name="contact"
+                  type="email"
+                  placeholder="vous@exemple.com"
+                  className="mt-2 w-full rounded-xl border border-[#dfd2c6] bg-white px-4 py-3.5 text-sm outline-none transition focus:border-[#ec3b78]"
+                />
+              ) : (
+                <AuthPhoneInput key="phone" required name="contact" />
+              )}
             </label>
             <label className="block text-xs font-extrabold text-[#625852]">
               Mot de passe

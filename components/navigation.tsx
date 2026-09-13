@@ -186,9 +186,14 @@ export function Footer() {
             <a href="mailto:contact@aras.sn" className="mt-2 block text-sm font-bold text-white hover:text-[#f4c27a]">contact@aras.sn</a>
           </div>
         </div>
-        <div className="flex flex-col justify-between gap-3 border-t border-white/10 pt-6 text-[11px] text-white/35 sm:flex-row">
+        <div className="flex flex-col justify-between gap-4 border-t border-white/10 pt-6 text-[11px] text-white/35 sm:flex-row sm:items-center">
           <span>© 2026 ARAS. Tous droits réservés.</span>
-          <span>Fait avec intention à Dakar.</span>
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-white/50">
+            <Link href="/cgu" className="transition hover:text-white">
+              Conditions générales d&apos;utilisation
+            </Link>
+          </div>
+          <span className="sm:text-right">Fait avec intention à Dakar.</span>
         </div>
       </div>
     </footer>

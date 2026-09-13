@@ -148,7 +148,6 @@ export default function OnboardingPage() {
       photos,
       profile_status: 'completed',
       onboarding_completed: true,
-      is_verified: true,
       is_active: true,
     };
 
