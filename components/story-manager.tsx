@@ -93,7 +93,7 @@ export function StoryManager({ userId, stories, onStoriesChange }: StoryManagerP
         onStoriesChange((storiesData as StoryRow[]).map(toStory));
       }
     } catch (error) {
-      console.error('Erreur lors de l\'upload:', error);
+      console.error('Erreur lors de l&apos;upload:', error);
       alert('Erreur lors de l\'upload de la story. Veuillez réessayer.');
     } finally {
       setUploading(false);
@@ -131,7 +131,7 @@ export function StoryManager({ userId, stories, onStoriesChange }: StoryManagerP
       {stories.length === 0 ? (
         <div className="rounded-[26px] bg-white p-8 text-center shadow-[0_8px_30pxrgba(83,46,32,.05)]">
           <Camera size={36} className="mx-auto text-[#dfd2c6]" />
-          <p className="mt-4 font-display text-xl">Aucune story pour l'instant</p>
+          <p className="mt-4 font-display text-xl">Aucune story pour l&apos;instant</p>
           <p className="mt-2 text-sm text-[#756960]">Partagez des moments de votre journée avec vos matches.</p>
         </div>
       ) : (

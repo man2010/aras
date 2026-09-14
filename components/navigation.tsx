@@ -16,6 +16,7 @@ export function Navbar() {
   const { user, signOut, unreadCount } = useAuth();
   const router = useRouter();
   const { resolvedTheme, setTheme } = useTheme();
+  const isConnected = Boolean(user);
   // Le thème sauvegardé n'existe que dans le navigateur : conserver le rendu
   // clair jusqu'au montage évite une divergence serveur/client (icône SVG).
   const isDark = mounted && resolvedTheme === 'dark';
@@ -57,12 +58,15 @@ export function Navbar() {
         </Link>
 
         <div className="hidden items-center gap-7 text-[13px] font-bold text-[#625852] md:flex">
-          <Link href="/decouverte" className="transition hover:text-[#ec3b78]">Découverte</Link>
-          <Link href="/evenements" className="transition hover:text-[#ec3b78]">Événements</Link>
-          <Link href="/#how-it-works" className="transition hover:text-[#ec3b78]">Comment ça marche</Link>
-          <Link href="/tarifs" className="transition hover:text-[#ec3b78]">Tarifs</Link>
-          <Link href="/faq" className="transition hover:text-[#ec3b78]">FAQ</Link>
-          <Link href="/contact" className="transition hover:text-[#ec3b78]">Contact</Link>
+          {!isConnected && (
+            <>
+              <Link href="/evenements" className="transition hover:text-[#ec3b78]">Événements</Link>
+              <Link href="/#how-it-works" className="transition hover:text-[#ec3b78]">Comment ça marche</Link>
+              <Link href="/tarifs" className="transition hover:text-[#ec3b78]">Tarifs</Link>
+              <Link href="/faq" className="transition hover:text-[#ec3b78]">FAQ</Link>
+              <Link href="/contact" className="transition hover:text-[#ec3b78]">Contact</Link>
+            </>
+          )}
         </div>
 
         <div className="hidden items-center gap-3 md:flex">
@@ -109,12 +113,15 @@ export function Navbar() {
       {open && (
         <div className="border-t border-black/5 bg-[#fbf8f2] px-5 pb-5 pt-3 md:hidden animate-in slide-in-from-top-2 duration-300">
           <div className="flex flex-col gap-4 text-sm font-bold">
-            <Link href="/decouverte" onClick={() => setOpen(false)} className="hover:text-[#ec3b78] transition-colors">Découverte</Link>
-            <Link href="/evenements" onClick={() => setOpen(false)} className="hover:text-[#ec3b78] transition-colors">Événements</Link>
-            <Link href="/#how-it-works" onClick={() => setOpen(false)} className="hover:text-[#ec3b78] transition-colors">Comment ça marche</Link>
-            <Link href="/tarifs" onClick={() => setOpen(false)} className="hover:text-[#ec3b78] transition-colors">Tarifs</Link>
-            <Link href="/faq" onClick={() => setOpen(false)} className="hover:text-[#ec3b78] transition-colors">FAQ</Link>
-            <Link href="/contact" onClick={() => setOpen(false)} className="hover:text-[#ec3b78] transition-colors">Contact</Link>
+            {!isConnected && (
+              <>
+                <Link href="/evenements" onClick={() => setOpen(false)} className="hover:text-[#ec3b78] transition-colors">Événements</Link>
+                <Link href="/#how-it-works" onClick={() => setOpen(false)} className="hover:text-[#ec3b78] transition-colors">Comment ça marche</Link>
+                <Link href="/tarifs" onClick={() => setOpen(false)} className="hover:text-[#ec3b78] transition-colors">Tarifs</Link>
+                <Link href="/faq" onClick={() => setOpen(false)} className="hover:text-[#ec3b78] transition-colors">FAQ</Link>
+                <Link href="/contact" onClick={() => setOpen(false)} className="hover:text-[#ec3b78] transition-colors">Contact</Link>
+              </>
+            )}
             <button onClick={() => setTheme(isDark ? 'light' : 'dark')} className="flex items-center gap-2 text-left hover:text-[#ec3b78] transition-colors">
               {isDark ? <Sun size={16} /> : <Moon size={16} />} {isDark ? 'Mode clair' : 'Mode sombre'}
             </button>

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
@@ -63,7 +63,7 @@ export default function AdminPage() {
   useEffect(() => {
     if (!authLoading && !user) router.push('/connexion');
     checkAdminStatus();
-  }, [authLoading, user, router]);
+  }, [authLoading, user, router, checkAdminStatus]);
 
   useEffect(() => {
     if (isAdmin) {
@@ -85,7 +85,7 @@ export default function AdminPage() {
     }
   }, [isAdmin, tab, currentPage]);
 
-  const checkAdminStatus = async () => {
+  const checkAdminStatus = useCallback(async () => {
     if (!user) return;
     const { data: canAccessAdmin } = await supabase.rpc('is_admin');
     if (canAccessAdmin) {
@@ -93,7 +93,7 @@ export default function AdminPage() {
     } else {
       router.push('/espace');
     }
-  };
+  }, [router, user]);
 
   const loadStats = async () => {
     const [profilesCount, convsCount, eventsCount, reportsCount, likesCount, matchesCount, messagesCount] = await Promise.all([
@@ -123,11 +123,11 @@ export default function AdminPage() {
     // Charger l'activité récente pour le dashboard
   };
 
-  const loadProfiles = async () => {
+  const loadProfiles = useCallback(async () => {
     const { data, count } = await supabase.from('profiles').select('*', { count: 'exact' }).order('created_at', { ascending: false }).range((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage - 1);
     if (data) setProfiles((data as ProfileRow[]).map(toProfile));
     return count || 0;
-  };
+  }, [currentPage, itemsPerPage]);
 
   const loadReports = async () => {
     const { data } = await supabase.from('reports').select('*').order('created_at', { ascending: false }).limit(50);

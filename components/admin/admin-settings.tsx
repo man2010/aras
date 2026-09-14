@@ -28,7 +28,7 @@ export function AdminSettings({ settings, onSaveSettings }: AdminSettingsProps) 
           <div className="flex items-center justify-between rounded-xl border border-[#f3e9dc] p-4">
             <div>
               <p className="text-sm font-bold text-[#241c18]">Mode maintenance</p>
-              <p className="text-xs text-[#9a8b82]">Désactive l'accès au site pour les utilisateurs</p>
+              <p className="text-xs text-[#9a8b82]">Désactive l&apos;accès au site pour les utilisateurs</p>
             </div>
             <button
               onClick={() => setLocalSettings({ ...localSettings, maintenanceMode: !localSettings.maintenanceMode })}
@@ -41,7 +41,7 @@ export function AdminSettings({ settings, onSaveSettings }: AdminSettingsProps) 
           <div className="flex items-center justify-between rounded-xl border border-[#f3e9dc] p-4">
             <div>
               <p className="text-sm font-bold text-[#241c18]">Autoriser les inscriptions</p>
-              <p className="text-xs text-[#9a8b82]">Permet aux nouveaux utilisateurs de s'inscrire</p>
+              <p className="text-xs text-[#9a8b82]">Permet aux nouveaux utilisateurs de s&apos;inscrire</p>
             </div>
             <button
               onClick={() => setLocalSettings({ ...localSettings, allowRegistration: !localSettings.allowRegistration })}

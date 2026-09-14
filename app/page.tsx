@@ -23,10 +23,15 @@ const formatPrice = (p: number) => p === 0 ? 'Gratuit' : `${new Intl.NumberForma
 
 export default function Home() {
   const { resolvedTheme } = useTheme();
-  const isDark = resolvedTheme === 'dark';
+  const [mounted, setMounted] = useState(false);
+  const isDark = mounted && resolvedTheme === 'dark';
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [events, setEvents] = useState<EventItem[]>(fallbackEvents);
   const [testimonials, setTestimonials] = useState<Testimonial[]>([]);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     (async () => {
@@ -56,7 +61,7 @@ export default function Home() {
             </p>
             <div className="mt-6 flex flex-col items-start gap-3 sm:flex-row sm:gap-4">
               <Link href="/inscription" className="group flex items-center gap-2 rounded-full bg-[#ec3b78] px-5 py-3 text-xs font-extrabold text-white shadow-[0_14px_30px_rgba(233,81,95,.25)] transition hover:-translate-y-1 hover:bg-[#c92e63] sm:px-7 sm:py-4 sm:text-sm">
-                Commencer l'aventure <ArrowRight size={14} className="transition group-hover:translate-x-1 sm:size-[17px]" />
+                Commencer l&apos;aventure <ArrowRight size={14} className="transition group-hover:translate-x-1 sm:size-[17px]" />
               </Link>
               <Link href="/decouverte" className="flex items-center gap-2 px-3 py-3 text-xs font-bold text-[#625852] transition hover:text-[#ec3b78] sm:px-4 sm:py-4 sm:text-sm">
                 <Search size={14} /> Découvrir les profils
@@ -102,14 +107,14 @@ export default function Home() {
           <div className="animate-in slide-in-from-left-4 duration-700">
             <p className="text-xs font-extrabold uppercase tracking-[.2em] text-[#ec3b78]">Une autre façon de se rencontrer</p>
             <h2 className="font-display mt-5 text-5xl leading-[1.02] tracking-[-.045em] sm:text-6xl">Ici, on prend<br /><span className="italic text-[#1a6b68]">le temps.</span></h2>
-            <p className="mt-7 max-w-[430px] text-[15px] leading-7 text-[#756960]">Pas de swipe frénétique. Pas de conversations qui s'éteignent. ARAS vous accompagne vers des relations sincères, dans un cadre pensé pour l'humain.</p>
+            <p className="mt-7 max-w-[430px] text-[15px] leading-7 text-[#756960]">Pas de swipe frénétique. Pas de conversations qui s&apos;éteignent. ARAS vous accompagne vers des relations sincères, dans un cadre pensé pour l&apos;humain.</p>
             <Link href="#how-it-works" className="mt-8 inline-flex items-center gap-2 text-sm font-extrabold text-[#ec3b78]">Comment ça marche <ArrowUpRight size={16} /></Link>
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
             {[
               { icon: ShieldCheck, bg: '#ec3b78', title: 'Profils vérifiés', text: 'ARAS met en place des mesures de vérification pour favoriser des échanges plus fiables et authentiques.', cardBg: '#fbf8f2' },
               { icon: MessageCircle, bg: '#1a6b68', title: 'Confidentialité', text: 'Nous accordons une attention particulière à la confidentialité de vos échanges et de vos informations personnelles.', cardBg: '#e5f0ed' },
-              { icon: MapPin, bg: '#d89b52', title: 'Ancrée localement', text: 'Villes, langues et codes sociaux du Sénégal, au cœur du fonctionnement de l\'app.', cardBg: '#fae4e2' },
+              { icon: MapPin, bg: '#d89b52', title: 'Ancrée localement', text: 'Villes, langues et codes sociaux du Sénégal, au cœur du fonctionnement de l&apos;app.', cardBg: '#fae4e2' },
               { icon: Heart, bg: '#b93a63', title: 'Ouverte à toutes et tous', text: 'Chrétiens, musulmans, ou sans confession particulière — ARAS accueille toutes les personnes en recherche de mariage.', cardBg: '#fff1df' },
             ].map((c, index) => (
               <div key={c.title} className="rounded-[28px] p-7 transition duration-300 hover:-translate-y-1 hover:shadow-lg animate-in fade-in slide-in-from-bottom-4 duration-500" style={{ background: isDark ? '#252525' : c.cardBg, animationDelay: `${index * 150}ms` }}>
@@ -176,7 +181,7 @@ export default function Home() {
           <div className="mx-auto max-w-[1120px]">
             <div className="flex flex-col justify-between gap-6 sm:flex-row sm:items-end">
               <div className="animate-in slide-in-from-left-4 duration-700">
-                <p className="text-xs font-extrabold uppercase tracking-[.2em] text-[#ec3b78]">Ils font partie d'ARAS</p>
+                <p className="text-xs font-extrabold uppercase tracking-[.2em] text-[#ec3b78]">Ils font partie d&apos;ARAS</p>
                 <h2 className="font-display mt-4 text-5xl tracking-[-.045em]">Des personnes <span className="italic text-[#1a6b68]">exceptionnelles</span></h2>
               </div>
               <Link href="/decouverte" className="flex items-center gap-2 text-sm font-extrabold text-[#ec3b78] animate-in slide-in-from-right-4 duration-700 delay-100">Voir tous les profils <ArrowRight size={16} /></Link>

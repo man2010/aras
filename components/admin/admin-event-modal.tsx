@@ -96,7 +96,7 @@ export function AdminEventModal({ isOpen, onClose, onSubmit, editEvent }: AdminE
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
       <div className="w-full max-w-2xl rounded-[28px] bg-white p-6 shadow-[0_20px_60px_rgba(0,0,0,.3)] max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-6">
-          <h3 className="font-display text-2xl">{editEvent ? 'Modifier l\'événement' : 'Créer un événement'}</h3>
+          <h3 className="font-display text-2xl">{editEvent ? 'Modifier l&apos;événement' : 'Créer un événement'}</h3>
           <button onClick={onClose} className="rounded-full bg-[#f3e9dc] p-2 text-[#756960] transition hover:bg-[#e7cfc0]">
             <X size={20} />
           </button>
@@ -200,7 +200,7 @@ export function AdminEventModal({ isOpen, onClose, onSubmit, editEvent }: AdminE
           </div>
 
           <div>
-            <label className="block text-xs font-extrabold text-[#625852] mb-2">Image de l'événement</label>
+            <label className="block text-xs font-extrabold text-[#625852] mb-2">Image de l&apos;événement</label>
             <div className="space-y-3">
               <div className="relative">
                 <input

@@ -92,7 +92,7 @@ export default function EvenementsPage() {
                   </div>
                   <div className="mt-6 flex items-center justify-between border-t border-[#eadfd5] pt-5">
                     <span className="text-sm font-extrabold text-[#241c18]">{formatPrice(item.price_fcfa)}</span>
-                    <button onClick={() => { setModalEvent(item); setResMessage(''); }} className="rounded-full bg-[#ec3b78] px-5 py-2.5 text-xs font-extrabold text-white transition hover:bg-[#c92e63]">S'inscrire</button>
+                    <button onClick={() => { setModalEvent(item); setResMessage(''); }} className="rounded-full bg-[#ec3b78] px-5 py-2.5 text-xs font-extrabold text-white transition hover:bg-[#c92e63]">S&apos;inscrire</button>
                   </div>
                 </div>
               </article>

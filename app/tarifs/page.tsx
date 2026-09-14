@@ -1,12 +1,18 @@
 'use client';
 
 import Link from 'next/link';
+import { useEffect, useState } from 'react';
 import { Check, Crown, Sparkles, Heart, ShieldCheck } from 'lucide-react';
 import { useTheme } from 'next-themes';
 
 export default function TarifsPage() {
   const { resolvedTheme } = useTheme();
-  const isDark = resolvedTheme === 'dark';
+  const [mounted, setMounted] = useState(false);
+  const isDark = mounted && resolvedTheme === 'dark';
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
   const plans = [
     {
       name: 'Gratuit',
@@ -125,12 +131,12 @@ export default function TarifsPage() {
         <section className="mt-20 rounded-[28px] bg-[#f3e9dc] px-6 py-10 lg:px-10 lg:py-14">
           <div className="mx-auto grid max-w-[1080px] gap-12 lg:grid-cols-[.9fr_1.1fr] lg:items-start lg:gap-16">
             <div className="text-center lg:text-left">
-              <p className="text-[11px] font-extrabold uppercase tracking-[.28em] text-[#c88a27]">Je ne souhaite pas m'inscrire sur le site</p>
+              <p className="text-[11px] font-extrabold uppercase tracking-[.28em] text-[#c88a27]">Je ne souhaite pas m&apos;inscrire sur le site</p>
               <h2 className="mt-4 font-display text-[34px] leading-tight tracking-[-.04em] sm:text-[44px]">
                 Devenez membre <span className="text-[#c88a27]">Golden</span>
               </h2>
               <p className="mx-auto mt-4 max-w-[720px] text-[15px] leading-7 text-[#756960] lg:mx-0">
-                Vous cherchez l'amour mais préférez rester discret ? Remplissez un formulaire confidentiel : notre équipe recherche pour vous et vous recontacte en privé, sans profil visible ni photo en ligne.
+                Vous cherchez l&apos;amour mais préférez rester discret ? Remplissez un formulaire confidentiel : notre équipe recherche pour vous et vous recontacte en privé, sans profil visible ni photo en ligne.
               </p>
               <p className="mx-auto mt-4 max-w-[720px] text-[14px] leading-7 text-[#9a8b82] lg:mx-0">
               </p>
