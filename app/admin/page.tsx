@@ -60,6 +60,22 @@ export default function AdminPage() {
   const [itemsPerPage] = useState(10);
   const [totalProfiles, setTotalProfiles] = useState(0);
 
+  const checkAdminStatus = useCallback(async () => {
+    if (!user) return;
+    const { data: canAccessAdmin } = await supabase.rpc('is_admin');
+    if (canAccessAdmin) {
+      setIsAdmin(true);
+    } else {
+      router.push('/espace');
+    }
+  }, [router, user]);
+
+  const loadProfiles = useCallback(async () => {
+    const { data, count } = await supabase.from('profiles').select('*', { count: 'exact' }).order('created_at', { ascending: false }).range((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage - 1);
+    if (data) setProfiles((data as ProfileRow[]).map(toProfile));
+    return count || 0;
+  }, [currentPage, itemsPerPage]);
+
   useEffect(() => {
     if (!authLoading && !user) router.push('/connexion');
     checkAdminStatus();
@@ -84,16 +100,6 @@ export default function AdminPage() {
       }
     }
   }, [isAdmin, tab, currentPage]);
-
-  const checkAdminStatus = useCallback(async () => {
-    if (!user) return;
-    const { data: canAccessAdmin } = await supabase.rpc('is_admin');
-    if (canAccessAdmin) {
-      setIsAdmin(true);
-    } else {
-      router.push('/espace');
-    }
-  }, [router, user]);
 
   const loadStats = async () => {
     const [profilesCount, convsCount, eventsCount, reportsCount, likesCount, matchesCount, messagesCount] = await Promise.all([
@@ -122,12 +128,6 @@ export default function AdminPage() {
   const loadRecentActivity = async () => {
     // Charger l'activité récente pour le dashboard
   };
-
-  const loadProfiles = useCallback(async () => {
-    const { data, count } = await supabase.from('profiles').select('*', { count: 'exact' }).order('created_at', { ascending: false }).range((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage - 1);
-    if (data) setProfiles((data as ProfileRow[]).map(toProfile));
-    return count || 0;
-  }, [currentPage, itemsPerPage]);
 
   const loadReports = async () => {
     const { data } = await supabase.from('reports').select('*').order('created_at', { ascending: false }).limit(50);
