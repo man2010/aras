@@ -4,16 +4,30 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { Menu, X, Heart, LogOut, LayoutDashboard, Bell, Moon, Sun } from 'lucide-react';
+import { Menu, X, Heart, LogOut, LayoutDashboard, Bell, Moon, Sun, MessageCircle, CalendarDays, ChevronRight } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
+
+type NotificationPreview = {
+  id: string;
+  type: 'message' | 'event';
+  title: string;
+  message: string;
+  href: string;
+  createdAt: string;
+  avatarUrl?: string;
+  unread: boolean;
+};
 
 export function Navbar() {
   const [open, setOpen] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [mounted, setMounted] = useState(false);
-  const { user, signOut, unreadCount } = useAuth();
+  const [notificationOpen, setNotificationOpen] = useState(false);
+  const [notifications, setNotifications] = useState<NotificationPreview[]>([]);
+  const [unreadEventCount, setUnreadEventCount] = useState(0);
+  const { user, signOut, unreadCount, setUnreadCount } = useAuth();
   const router = useRouter();
   const { resolvedTheme, setTheme } = useTheme();
   const isConnected = Boolean(user);
@@ -44,6 +58,118 @@ export function Navbar() {
       cancelled = true;
     };
   }, [user]);
+
+  useEffect(() => {
+    if (!user) {
+      setNotifications([]);
+      setUnreadEventCount(0);
+      return;
+    }
+
+    let cancelled = false;
+    const readEventsKey = `aras-read-events-${user.id}`;
+    const loadNotifications = async () => {
+      const [{ data: messageRows }, { data: eventRows }] = await Promise.all([
+        supabase
+          .from('messages')
+          .select('id, sender_id, content, created_at, match_id')
+          .eq('receiver_id', user.id)
+          .eq('is_read', false)
+          .order('created_at', { ascending: false })
+          .limit(6),
+        supabase
+          .from('events')
+          .select('id, title, description, date, location, city, image_url')
+          .eq('is_active', true)
+          .gte('date', new Date().toISOString())
+          .order('date', { ascending: true })
+          .limit(5),
+      ]);
+
+      const senderIds = Array.from(new Set((messageRows ?? []).map((row: { sender_id: string }) => row.sender_id)));
+      const { data: senderRows } = senderIds.length > 0
+        ? await supabase.from('profiles').select('id, full_name, avatar_urls').in('id', senderIds)
+        : { data: [] };
+      const senderMap = new Map((senderRows ?? []).map((row: { id: string; full_name: string | null; avatar_urls: string[] | null }) => [
+        row.id,
+        { name: row.full_name || 'Nouveau message', avatarUrl: row.avatar_urls?.[0] },
+      ]));
+      let readEventIds: string[] = [];
+      try {
+        readEventIds = JSON.parse(window.localStorage.getItem(readEventsKey) || '[]') as string[];
+      } catch {
+        readEventIds = [];
+      }
+      const readEventSet = new Set(readEventIds);
+
+      const messageNotifications: NotificationPreview[] = (messageRows ?? []).map((row: { id: string; sender_id: string; content: string; created_at: string; match_id: string }) => {
+        const sender = senderMap.get(row.sender_id);
+        return {
+          id: `message-${row.id}`,
+          type: 'message',
+          title: sender?.name || 'Nouveau message',
+          message: row.content,
+          href: `/espace?tab=messages&conv=${row.match_id}`,
+          createdAt: row.created_at,
+          avatarUrl: sender?.avatarUrl,
+          unread: true,
+        };
+      });
+      const eventNotifications: NotificationPreview[] = (eventRows ?? []).map((row: { id: string; title: string; description: string | null; date: string; location: string; city: string | null }) => ({
+        id: `event-${row.id}`,
+        type: 'event',
+        title: row.title,
+        message: `${new Date(row.date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })} · ${row.location}${row.city ? `, ${row.city}` : ''}`,
+        href: '/espace?tab=events',
+        createdAt: row.date,
+        unread: !readEventSet.has(row.id),
+      }));
+
+      if (!cancelled) {
+        setNotifications([...messageNotifications, ...eventNotifications].sort((first, second) => new Date(second.createdAt).getTime() - new Date(first.createdAt).getTime()).slice(0, 8));
+        setUnreadEventCount(eventNotifications.filter((notification) => notification.unread).length);
+      }
+    };
+
+    void loadNotifications();
+    const channel = supabase
+      .channel(`navbar-notifications-${user.id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'messages', filter: `receiver_id=eq.${user.id}` }, () => void loadNotifications())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'events' }, () => void loadNotifications())
+      .subscribe();
+
+    return () => {
+      cancelled = true;
+      void supabase.removeChannel(channel);
+    };
+  }, [user]);
+
+  const handleNotificationClick = async (notification: NotificationPreview) => {
+    if (notification.type === 'message') {
+      const messageId = notification.id.replace('message-', '');
+      await supabase.from('messages').update({ is_read: true }).eq('id', messageId).eq('receiver_id', user?.id);
+      setUnreadCount(Math.max(0, unreadCount - 1));
+    } else if (user) {
+      const eventId = notification.id.replace('event-', '');
+      const key = `aras-read-events-${user.id}`;
+      let readEventIds: string[] = [];
+      try {
+        readEventIds = JSON.parse(window.localStorage.getItem(key) || '[]') as string[];
+      } catch {
+        readEventIds = [];
+      }
+      if (!readEventIds.includes(eventId)) {
+        window.localStorage.setItem(key, JSON.stringify([...readEventIds, eventId]));
+        setUnreadEventCount((count) => Math.max(0, count - 1));
+      }
+    }
+    setNotifications((current) => current
+      .filter((item) => item.id !== notification.id || item.type === 'event')
+      .map((item) => item.id === notification.id ? { ...item, unread: false } : item));
+    setNotificationOpen(false);
+    setOpen(false);
+    router.push(notification.href);
+  };
 
   const handleSignOut = async () => {
     await signOut();
@@ -76,14 +202,73 @@ export function Navbar() {
           </button>
           {user ? (
             <>
-              <Link href="/espace?tab=messages" className="relative flex items-center gap-2 px-4 py-2.5 text-[13px] font-bold text-[#625852] transition hover:text-[#ec3b78]">
-                <Bell size={16} />
-                {unreadCount > 0 && (
-                  <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-[#ec3b78] text-[10px] font-extrabold text-white">
-                    {unreadCount > 9 ? '9+' : unreadCount}
-                  </span>
-                )}
-              </Link>
+                <div
+                  className="relative"
+                  onMouseEnter={() => setNotificationOpen(true)}
+                  onMouseLeave={() => setNotificationOpen(false)}
+                >
+                  <button
+                    type="button"
+                    onClick={() => setNotificationOpen((openState) => !openState)}
+                    aria-label="Ouvrir les notifications"
+                    aria-expanded={notificationOpen}
+                    className="relative flex items-center gap-2 px-4 py-2.5 text-[13px] font-bold text-[#625852] transition hover:text-[#ec3b78]"
+                  >
+                    <Bell size={16} />
+                    {(unreadCount + unreadEventCount) > 0 && (
+                      <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-[#ec3b78] px-1 text-[10px] font-extrabold text-white">
+                        {(unreadCount + unreadEventCount) > 9 ? '9+' : unreadCount + unreadEventCount}
+                      </span>
+                    )}
+                  </button>
+
+                  {notificationOpen && (
+                    <div className="absolute right-0 top-full z-50 mt-2 w-[min(360px,calc(100vw-2rem))] overflow-hidden rounded-2xl border border-[#dfd2c6] bg-white shadow-[0_18px_50px_rgba(83,46,32,.18)]">
+                      <div className="flex items-center justify-between border-b border-[#f0e5dc] px-4 py-3">
+                        <p className="text-sm font-extrabold text-[#241c18]">Notifications</p>
+                        {(unreadCount + unreadEventCount) > 0 && (
+                          <span className="text-[10px] font-extrabold uppercase tracking-[.12em] text-[#ec3b78]">
+                            {unreadCount + unreadEventCount} nouvelle{unreadCount + unreadEventCount > 1 ? 's' : ''}
+                          </span>
+                        )}
+                      </div>
+                      {notifications.length === 0 ? (
+                        <div className="px-4 py-8 text-center">
+                          <Bell size={22} className="mx-auto text-[#d9c9ba]" />
+                          <p className="mt-3 text-sm font-bold text-[#756960]">Aucune notification</p>
+                          <p className="mt-1 text-xs text-[#9a8b82]">Tout est à jour.</p>
+                        </div>
+                      ) : (
+                        <div className="max-h-[min(440px,70vh)] overflow-y-auto p-2">
+                          {notifications.map((notification) => (
+                            <button
+                              key={notification.id}
+                              type="button"
+                              onClick={() => void handleNotificationClick(notification)}
+                              className={`flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left transition hover:bg-[#fbf3ee] ${notification.unread ? 'bg-[#fff7f4]' : ''}`}
+                            >
+                              <div className="relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[#f3e9dc] text-[#1a6b68]">
+                                {notification.avatarUrl ? (
+                                  <img src={notification.avatarUrl} alt="" className="h-full w-full object-cover" />
+                                ) : notification.type === 'message' ? (
+                                  <MessageCircle size={17} />
+                                ) : (
+                                  <CalendarDays size={17} />
+                                )}
+                                {notification.unread && <span className="absolute right-0 top-0 h-2.5 w-2.5 rounded-full border-2 border-white bg-[#ec3b78]" />}
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <p className="truncate text-xs font-extrabold text-[#241c18]">{notification.title}</p>
+                                <p className="mt-0.5 line-clamp-2 text-xs leading-4 text-[#756960]">{notification.message}</p>
+                              </div>
+                              <ChevronRight size={15} className="shrink-0 text-[#b8aaa1]" />
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
               <Link href="/espace" className="flex items-center gap-2 px-4 py-2.5 text-[13px] font-bold text-[#625852] transition hover:text-[#ec3b78]">
                 <LayoutDashboard size={16} /> Mon espace
               </Link>
@@ -129,6 +314,48 @@ export function Navbar() {
             </button>
             {user ? (
               <>
+                <div className="rounded-2xl border border-[#dfd2c6] bg-white">
+                  <button
+                    type="button"
+                    onClick={() => setNotificationOpen((openState) => !openState)}
+                    className="flex w-full items-center justify-between px-4 py-3 text-left"
+                    aria-expanded={notificationOpen}
+                  >
+                    <span className="flex items-center gap-2">
+                      <Bell size={16} /> Notifications
+                    </span>
+                    {(unreadCount + unreadEventCount) > 0 && (
+                      <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-[#ec3b78] px-1 text-[10px] text-white">
+                        {(unreadCount + unreadEventCount) > 9 ? '9+' : unreadCount + unreadEventCount}
+                      </span>
+                    )}
+                  </button>
+                  {notificationOpen && (
+                    <div className="border-t border-[#f0e5dc] p-2">
+                      {notifications.length === 0 ? (
+                        <p className="px-2 py-4 text-center text-xs font-bold text-[#9a8b82]">Aucune notification</p>
+                      ) : (
+                        notifications.map((notification) => (
+                          <button
+                            key={notification.id}
+                            type="button"
+                            onClick={() => void handleNotificationClick(notification)}
+                            className={`flex w-full items-center gap-3 rounded-xl px-2 py-2.5 text-left ${notification.unread ? 'bg-[#fff7f4]' : ''}`}
+                          >
+                            <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[#f3e9dc] text-[#1a6b68]">
+                              {notification.avatarUrl ? <img src={notification.avatarUrl} alt="" className="h-full w-full object-cover" /> : notification.type === 'message' ? <MessageCircle size={16} /> : <CalendarDays size={16} />}
+                            </div>
+                            <span className="min-w-0 flex-1">
+                              <span className="block truncate text-xs font-extrabold text-[#241c18]">{notification.title}</span>
+                              <span className="mt-0.5 block line-clamp-2 text-[11px] font-normal leading-4 text-[#756960]">{notification.message}</span>
+                            </span>
+                            <ChevronRight size={14} className="shrink-0 text-[#b8aaa1]" />
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  )}
+                </div>
                 <Link href="/espace" onClick={() => setOpen(false)} className="flex items-center gap-2 hover:text-[#ec3b78] transition-colors">
                   <LayoutDashboard size={16} /> Mon espace
                 </Link>

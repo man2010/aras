@@ -93,6 +93,12 @@ function ageFromBirthdate(birthdate: string | null) {
   return age;
 }
 
+function isRecentlyOnline(isOnline: boolean | null, lastSeenAt: string | null) {
+  if (!isOnline || !lastSeenAt) return false;
+  const lastSeen = new Date(lastSeenAt).getTime();
+  return Number.isFinite(lastSeen) && Date.now() - lastSeen < 2 * 60 * 1000;
+}
+
 export function toProfile(row: ProfileRow): Profile {
   return {
     id: row.id,
@@ -111,7 +117,7 @@ export function toProfile(row: ProfileRow): Profile {
     birthdate: row.birthdate,
     zone: row.zone,
     avatar_urls: row.avatar_urls || [],
-    is_online: Boolean(row.is_online),
+    is_online: isRecentlyOnline(row.is_online, row.last_seen_at),
     is_premium: Boolean(row.is_premium),
     last_seen_at: row.last_seen_at,
     height: row.height,

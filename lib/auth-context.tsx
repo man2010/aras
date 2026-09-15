@@ -39,7 +39,72 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => listener.subscription.unsubscribe();
   }, []);
 
+  useEffect(() => {
+    const user = session?.user;
+    if (!user) {
+      setUnreadCount(0);
+      return;
+    }
+
+    let cancelled = false;
+    const refreshUnreadCount = async () => {
+      const { count } = await supabase
+        .from('messages')
+        .select('id', { count: 'exact', head: true })
+        .eq('receiver_id', user.id)
+        .eq('is_read', false);
+
+      if (!cancelled) setUnreadCount(count ?? 0);
+    };
+
+    const updatePresence = async (online: boolean) => {
+      await supabase
+        .from('profiles')
+        .update({ is_online: online, last_seen_at: new Date().toISOString() })
+        .eq('id', user.id);
+    };
+
+    void refreshUnreadCount();
+    void updatePresence(true);
+
+    const heartbeat = window.setInterval(() => {
+      if (document.visibilityState === 'visible') void updatePresence(true);
+    }, 60_000);
+
+    const handleVisibilityChange = () => {
+      void updatePresence(document.visibilityState === 'visible');
+      if (document.visibilityState === 'visible') void refreshUnreadCount();
+    };
+    const handleBeforeUnload = () => {
+      void updatePresence(false);
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
+    const channel = supabase
+      .channel(`notifications-${user.id}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'messages', filter: `receiver_id=eq.${user.id}` },
+        () => void refreshUnreadCount(),
+      )
+      .subscribe();
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(heartbeat);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      void supabase.removeChannel(channel);
+      void updatePresence(false);
+    };
+  }, [session]);
+
   const signOut = async () => {
+    if (session?.user) {
+      await supabase.from('profiles').update({ is_online: false, last_seen_at: new Date().toISOString() }).eq('id', session.user.id);
+    }
     await supabase.auth.signOut();
     setSession(null);
   };

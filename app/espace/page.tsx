@@ -3,13 +3,26 @@
 import { FormEvent, useEffect, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { User, MessageCircle, Heart, CalendarDays, ArrowRight, ShieldCheck, Send, Plus, Check, Upload, X, Bell, CheckCheck, Search, MapPin } from 'lucide-react';
+import { User, MessageCircle, Heart, CalendarDays, ArrowRight, ArrowLeft, ShieldCheck, Send, Plus, Check, Upload, X, Bell, CheckCheck, Search, MapPin } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
 import type { Profile, Conversation, Message, Story } from '@/lib/types';
 import { toConversation, toEvent, toMessage, toProfile, toStory, type EventRow, type MatchRow, type MessageRow, type ProfileRow, type StoryRow } from '@/lib/adapters';
 
 type Tab = 'decouverte' | 'profile' | 'messages' | 'likes' | 'matches' | 'events';
+
+function uniqueConversations(rows: MatchRow[], userId: string): Conversation[] {
+  const uniqueByPartner = new Map<string, Conversation>();
+
+  rows.map(toConversation).forEach((conversation) => {
+    const partnerId = conversation.user_a === userId ? conversation.user_b : conversation.user_a;
+    if (!uniqueByPartner.has(partnerId)) {
+      uniqueByPartner.set(partnerId, conversation);
+    }
+  });
+
+  return Array.from(uniqueByPartner.values());
+}
 
 export default function EspacePage() {
   const { user, loading: authLoading, setUnreadCount } = useAuth();
@@ -106,7 +119,7 @@ export default function EspacePage() {
 
       const { data: convs } = await supabase.from('matches').select('*').or(`user_1_id.eq.${user.id},user_2_id.eq.${user.id}`).order('updated_at', { ascending: false });
       if (convs) {
-        const mappedConversations = (convs as MatchRow[]).map(toConversation);
+        const mappedConversations = uniqueConversations(convs as MatchRow[], user.id);
         setConversations(mappedConversations);
         const partnerIds = mappedConversations.map((c) => c.user_a === user.id ? c.user_b : c.user_a);
         const { data: partnerProfiles } = await supabase.from('profiles').select('*').in('id', partnerIds);
@@ -352,7 +365,7 @@ export default function EspacePage() {
           // Recharger les conversations
           const { data: convs } = await supabase.from('matches').select('*').or(`user_1_id.eq.${user.id},user_2_id.eq.${user.id}`).order('updated_at', { ascending: false });
           if (convs) {
-            const mappedConversations = (convs as MatchRow[]).map(toConversation);
+            const mappedConversations = uniqueConversations(convs as MatchRow[], user.id);
             setConversations(mappedConversations);
           }
         }
@@ -485,6 +498,11 @@ export default function EspacePage() {
     (safeDiscoveryPage - 1) * discoveryPageSize,
     safeDiscoveryPage * discoveryPageSize,
   );
+  const activeConversation = conversations.find((conversation) => conversation.id === activeConv);
+  const activeConversationPartnerId = activeConversation
+    ? activeConversation.user_a === user?.id ? activeConversation.user_b : activeConversation.user_a
+    : null;
+  const activeConversationProfile = activeConversationPartnerId ? conversationProfiles[activeConversationPartnerId] : null;
 
   return (
     <main className="min-h-screen bg-[#fbf8f2] px-5 pb-24 pt-[100px] lg:px-8 lg:pt-[120px]">
@@ -778,7 +796,7 @@ export default function EspacePage() {
         {tab === 'messages' && (
           <div className="mt-8">
             <div className="grid gap-6 lg:grid-cols-[340px_1fr]">
-            <div className="rounded-[26px] border border-[#dfd2c6] bg-white p-4 shadow-[0_8px_30pxrgba(83,46,32,.05)]">
+            <div className={`${activeConv ? 'hidden lg:block' : 'block'} rounded-[26px] border border-[#dfd2c6] bg-white p-4 shadow-[0_8px_30px_rgba(83,46,32,.05)]`}>
               <p className="px-2 pb-3 font-display text-xl">Conversations</p>
               {conversations.length === 0 ? (
                 <div className="px-2 py-8 text-center">
@@ -833,9 +851,35 @@ export default function EspacePage() {
                 </div>
               )}
             </div>
-            <div className="flex h-[460px] flex-col rounded-[26px] bg-white p-4 shadow-[0_8px_30px_rgba(83,46,32,.05)]">
+            <div className={`${activeConv ? 'flex' : 'hidden lg:flex'} h-[calc(100vh-220px)] min-h-[460px] flex-col rounded-[26px] bg-white p-4 shadow-[0_8px_30px_rgba(83,46,32,.05)]`}>
               {activeConv ? (
                 <>
+                  <div className="mb-3 flex items-center gap-3 border-b border-[#eadfd5] pb-3">
+                    <button
+                      type="button"
+                      onClick={() => setActiveConv(null)}
+                      className="flex h-9 w-9 items-center justify-center rounded-full border border-[#dfd2c6] text-[#625852] lg:hidden"
+                      aria-label="Retour aux conversations"
+                    >
+                      <ArrowLeft size={17} />
+                    </button>
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full border border-[#f3e9dc] bg-[#f3e9dc] text-sm font-bold text-[#1a6b68]">
+                      {activeConversationProfile?.photo_url ? (
+                        <img src={activeConversationProfile.photo_url} alt="" className="h-full w-full object-cover" />
+                      ) : (
+                        activeConversationProfile?.display_name?.charAt(0).toUpperCase() || '?'
+                      )}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-extrabold text-[#241c18]">
+                        {activeConversationProfile?.display_name || 'Utilisateur'}
+                      </p>
+                      <p className="flex items-center gap-1.5 text-xs text-[#9a8b82]">
+                        <span className={`h-2 w-2 rounded-full ${activeConversationProfile?.is_online ? 'bg-[#1a6b68]' : 'bg-[#b8aaa1]'}`} />
+                        {activeConversationProfile?.is_online ? 'En ligne' : 'Hors ligne'}
+                      </p>
+                    </div>
+                  </div>
                   <div className="flex-1 space-y-3 overflow-y-auto rounded-xl bg-[#fbf8f2] p-4">
                     {messages.map((m) => (
                       <div key={m.id} className={`flex ${m.sender_id === user.id ? 'justify-end' : 'justify-start'}`}>
