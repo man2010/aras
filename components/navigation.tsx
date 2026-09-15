@@ -60,6 +60,7 @@ export function Navbar() {
         <div className="hidden items-center gap-7 text-[13px] font-bold text-[#625852] md:flex">
           {!isConnected && (
             <>
+              <Link href="/decouverte" className="transition hover:text-[#ec3b78]">Découverte</Link>
               <Link href="/evenements" className="transition hover:text-[#ec3b78]">Événements</Link>
               <Link href="/#how-it-works" className="transition hover:text-[#ec3b78]">Comment ça marche</Link>
               <Link href="/tarifs" className="transition hover:text-[#ec3b78]">Tarifs</Link>
@@ -115,6 +116,7 @@ export function Navbar() {
           <div className="flex flex-col gap-4 text-sm font-bold">
             {!isConnected && (
               <>
+                <Link href="/decouverte" onClick={() => setOpen(false)} className="hover:text-[#ec3b78] transition-colors">Découverte</Link>
                 <Link href="/evenements" onClick={() => setOpen(false)} className="hover:text-[#ec3b78] transition-colors">Événements</Link>
                 <Link href="/#how-it-works" onClick={() => setOpen(false)} className="hover:text-[#ec3b78] transition-colors">Comment ça marche</Link>
                 <Link href="/tarifs" onClick={() => setOpen(false)} className="hover:text-[#ec3b78] transition-colors">Tarifs</Link>
