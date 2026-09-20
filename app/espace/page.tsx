@@ -1,15 +1,26 @@
 'use client';
 
-import { FormEvent, useEffect, useRef, useState } from 'react';
+import { Dispatch, FormEvent, SetStateAction, useEffect, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { User, MessageCircle, Heart, CalendarDays, ArrowRight, ArrowLeft, ShieldCheck, Send, Plus, Check, Upload, X, Bell, CheckCheck, Search, MapPin } from 'lucide-react';
+import { User, MessageCircle, Heart, CalendarDays, ArrowRight, ArrowLeft, ShieldCheck, Send, Plus, Check, Upload, X, CheckCheck, Search, MapPin, Eye, EyeOff, ChevronRight } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
 import type { Profile, Conversation, Message, Story } from '@/lib/types';
 import { toConversation, toEvent, toMessage, toProfile, toStory, type EventRow, type MatchRow, type MessageRow, type ProfileRow, type StoryRow } from '@/lib/adapters';
+import { AppSidebar, type EspaceTab } from '@/components/app-sidebar';
 
-type Tab = 'decouverte' | 'profile' | 'messages' | 'likes' | 'matches' | 'events';
+type Tab = EspaceTab;
+
+type PrivacyState = {
+  show_age: boolean;
+  show_online_status: boolean;
+  show_distance: boolean;
+  notif_messages: boolean;
+  notif_likes: boolean;
+  notif_matches: boolean;
+  notif_events: boolean;
+};
 
 function uniqueConversations(rows: MatchRow[], userId: string): Conversation[] {
   const uniqueByPartner = new Map<string, Conversation>();
@@ -22,6 +33,201 @@ function uniqueConversations(rows: MatchRow[], userId: string): Conversation[] {
   });
 
   return Array.from(uniqueByPartner.values());
+}
+
+function Toggle({ checked, onChange, label, hint }: { checked: boolean; onChange: () => void; label: string; hint?: string }) {
+  return (
+    <div className="flex items-center justify-between rounded-xl border border-[#f3e9dc] p-4">
+      <div>
+        <p className="text-sm font-bold text-[#241c18]">{label}</p>
+        {hint && <p className="mt-0.5 text-xs text-[#9a8b82]">{hint}</p>}
+      </div>
+      <button
+        type="button"
+        onClick={onChange}
+        aria-pressed={checked}
+        className={`h-6 w-12 shrink-0 rounded-full transition ${checked ? 'bg-[#ec3b78]' : 'bg-[#e5dcd1]'}`}
+      >
+        <span className={`block h-5 w-5 translate-y-0.5 rounded-full bg-white shadow transition-transform ${checked ? 'translate-x-[26px]' : 'translate-x-0.5'}`} />
+      </button>
+    </div>
+  );
+}
+
+function SettingsPanels({
+  tab,
+  profile,
+  privacySettings,
+  setPrivacySettings,
+  savePrivacy,
+  privacySaved,
+  securityForm,
+  setSecurityForm,
+  changePassword,
+  securityMessage,
+  securityLoading,
+  showNewPw,
+  setShowNewPw,
+  onGoToProfileTab,
+}: {
+  tab: Tab;
+  profile: Profile | null;
+  privacySettings: PrivacyState;
+  setPrivacySettings: Dispatch<SetStateAction<PrivacyState>>;
+  savePrivacy: () => void;
+  privacySaved: boolean;
+  securityForm: { newPassword: string; confirmPassword: string };
+  setSecurityForm: Dispatch<SetStateAction<{ newPassword: string; confirmPassword: string }>>;
+  changePassword: (e: FormEvent<HTMLFormElement>) => void;
+  securityMessage: string;
+  securityLoading: boolean;
+  showNewPw: boolean;
+  setShowNewPw: Dispatch<SetStateAction<boolean>>;
+  onGoToProfileTab: () => void;
+}) {
+  const subTabs: { id: Tab; label: string }[] = [
+    { id: 'settings-profile', label: 'Mon profil' },
+    { id: 'settings-privacy', label: 'Confidentialité' },
+    { id: 'settings-security', label: 'Sécurité' },
+    { id: 'settings-subscription', label: 'Abonnement' },
+    { id: 'settings-help', label: "Centre d'aide" },
+  ];
+
+  return (
+    <div className="space-y-6">
+      <div className="flex gap-2 overflow-x-auto rounded-2xl bg-white p-2 shadow-[0_6px_20px_rgba(83,46,32,.04)]">
+        {subTabs.map((item) => (
+          <span
+            key={item.id}
+            className={`whitespace-nowrap rounded-xl px-4 py-2 text-xs font-extrabold ${tab === item.id ? 'bg-[#ec3b78] text-white' : 'text-[#9a8b82]'}`}
+          >
+            {item.label}
+          </span>
+        ))}
+      </div>
+
+      {tab === 'settings-profile' && (
+        <div className="rounded-[26px] bg-white p-6 shadow-[0_8px_30px_rgba(83,46,32,.05)] sm:p-8">
+          <h2 className="font-display text-2xl">Mon profil</h2>
+          <p className="mt-2 text-sm leading-6 text-[#756960]">
+            Photo, bio, ville, centres d&apos;intérêt : gérez ces informations depuis l&apos;onglet dédié.
+          </p>
+          <button
+            onClick={onGoToProfileTab}
+            className="mt-5 inline-flex items-center gap-2 rounded-full bg-[#ec3b78] px-5 py-3 text-xs font-extrabold text-white transition hover:bg-[#c92e63]"
+          >
+            Modifier mon profil <ChevronRight size={14} />
+          </button>
+          {profile && (
+            <div className="mt-6 rounded-xl border border-[#f3e9dc] p-4 text-sm text-[#756960]">
+              <p><strong className="text-[#241c18]">Nom affiché :</strong> {profile.display_name}</p>
+              <p className="mt-1"><strong className="text-[#241c18]">Ville :</strong> {profile.city}</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {tab === 'settings-privacy' && (
+        <div className="space-y-4">
+          <div className="rounded-[26px] bg-white p-6 shadow-[0_8px_30px_rgba(83,46,32,.05)] sm:p-8">
+            <h2 className="font-display text-2xl">Confidentialité</h2>
+            <p className="mt-2 text-sm leading-6 text-[#756960]">Contrôlez ce que les autres membres peuvent voir.</p>
+            <div className="mt-5 space-y-3">
+              <Toggle checked={privacySettings.show_age} onChange={() => setPrivacySettings((s) => ({ ...s, show_age: !s.show_age }))} label="Afficher mon âge" />
+              <Toggle checked={privacySettings.show_online_status} onChange={() => setPrivacySettings((s) => ({ ...s, show_online_status: !s.show_online_status }))} label="Afficher mon statut en ligne" />
+              <Toggle checked={privacySettings.show_distance} onChange={() => setPrivacySettings((s) => ({ ...s, show_distance: !s.show_distance }))} label="Afficher ma ville" />
+            </div>
+          </div>
+
+          <div className="rounded-[26px] bg-white p-6 shadow-[0_8px_30px_rgba(83,46,32,.05)] sm:p-8">
+            <h2 className="font-display text-2xl">Notifications</h2>
+            <div className="mt-5 space-y-3">
+              <Toggle checked={privacySettings.notif_messages} onChange={() => setPrivacySettings((s) => ({ ...s, notif_messages: !s.notif_messages }))} label="Nouveaux messages" />
+              <Toggle checked={privacySettings.notif_likes} onChange={() => setPrivacySettings((s) => ({ ...s, notif_likes: !s.notif_likes }))} label="Nouveaux likes" />
+              <Toggle checked={privacySettings.notif_matches} onChange={() => setPrivacySettings((s) => ({ ...s, notif_matches: !s.notif_matches }))} label="Nouveaux matches" />
+              <Toggle checked={privacySettings.notif_events} onChange={() => setPrivacySettings((s) => ({ ...s, notif_events: !s.notif_events }))} label="Événements à venir" />
+            </div>
+          </div>
+
+          <div className="flex items-center gap-4">
+            <button onClick={savePrivacy} className="rounded-full bg-[#ec3b78] px-6 py-3.5 text-sm font-extrabold text-white transition hover:bg-[#c92e63]">
+              Enregistrer
+            </button>
+            {privacySaved && <span className="flex items-center gap-2 text-sm font-bold text-[#1a6b68]"><Check size={16} /> Préférences mises à jour !</span>}
+          </div>
+        </div>
+      )}
+
+      {tab === 'settings-security' && (
+        <div className="rounded-[26px] bg-white p-6 shadow-[0_8px_30px_rgba(83,46,32,.05)] sm:p-8">
+          <h2 className="font-display text-2xl">Sécurité</h2>
+          <p className="mt-2 text-sm leading-6 text-[#756960]">
+            Changez votre mot de passe. Vos connexions sont protégées par une double vérification (mot de passe + code envoyé par email ou SMS).
+          </p>
+          <form onSubmit={changePassword} className="mt-6 max-w-md space-y-4">
+            <label className="block text-xs font-extrabold text-[#625852]">
+              Nouveau mot de passe
+              <div className="relative mt-2">
+                <input
+                  required
+                  minLength={8}
+                  type={showNewPw ? 'text' : 'password'}
+                  value={securityForm.newPassword}
+                  onChange={(e) => setSecurityForm((s) => ({ ...s, newPassword: e.target.value }))}
+                  className="w-full rounded-xl border border-[#dfd2c6] bg-[#fbf8f2] px-4 py-3 pr-11 text-sm outline-none focus:border-[#ec3b78]"
+                />
+                <button type="button" onClick={() => setShowNewPw((v) => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-[#9a8b82]">
+                  {showNewPw ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
+            </label>
+            <label className="block text-xs font-extrabold text-[#625852]">
+              Confirmer le mot de passe
+              <input
+                required
+                minLength={8}
+                type={showNewPw ? 'text' : 'password'}
+                value={securityForm.confirmPassword}
+                onChange={(e) => setSecurityForm((s) => ({ ...s, confirmPassword: e.target.value }))}
+                className="mt-2 w-full rounded-xl border border-[#dfd2c6] bg-[#fbf8f2] px-4 py-3 text-sm outline-none focus:border-[#ec3b78]"
+              />
+            </label>
+            {securityMessage && (
+              <p className={`text-sm font-bold ${securityMessage.includes('succès') ? 'text-[#1a6b68]' : 'text-[#c92e63]'}`}>{securityMessage}</p>
+            )}
+            <button disabled={securityLoading} className="rounded-full bg-[#1a6b68] px-6 py-3.5 text-sm font-extrabold text-white transition hover:bg-[#125552] disabled:opacity-60">
+              {securityLoading ? 'Mise à jour...' : 'Mettre à jour le mot de passe'}
+            </button>
+          </form>
+        </div>
+      )}
+
+      {tab === 'settings-subscription' && (
+        <div className="rounded-[26px] bg-white p-6 shadow-[0_8px_30px_rgba(83,46,32,.05)] sm:p-8">
+          <h2 className="font-display text-2xl">Abonnement</h2>
+          <p className="mt-2 text-sm leading-6 text-[#756960]">Vous êtes actuellement sur la formule Gratuite.</p>
+          <Link href="/tarifs" className="mt-5 inline-flex items-center gap-2 rounded-full bg-[#ec3b78] px-5 py-3 text-xs font-extrabold text-white transition hover:bg-[#c92e63]">
+            Voir les formules Premium et Elite <ChevronRight size={14} />
+          </Link>
+        </div>
+      )}
+
+      {tab === 'settings-help' && (
+        <div className="rounded-[26px] bg-white p-6 shadow-[0_8px_30px_rgba(83,46,32,.05)] sm:p-8">
+          <h2 className="font-display text-2xl">Centre d&apos;aide</h2>
+          <p className="mt-2 text-sm leading-6 text-[#756960]">Une question ? Consultez la FAQ ou écrivez-nous directement.</p>
+          <div className="mt-5 flex flex-wrap gap-3">
+            <Link href="/faq" className="rounded-full bg-[#f3e9dc] px-5 py-3 text-xs font-extrabold text-[#625852] transition hover:bg-[#e7cfc0]">
+              Voir la FAQ
+            </Link>
+            <Link href="/contact" className="rounded-full bg-[#1a6b68] px-5 py-3 text-xs font-extrabold text-white transition hover:bg-[#125552]">
+              Nous contacter
+            </Link>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
 
 export default function EspacePage() {
@@ -49,6 +255,7 @@ export default function EspacePage() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [conversationProfiles, setConversationProfiles] = useState<Record<string, Profile>>({});
   const [newMessage, setNewMessage] = useState('');
+  const [messageSearch, setMessageSearch] = useState('');
   const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({});
   const [lastMessages, setLastMessages] = useState<Record<string, { content: string; time: string }>>({});
   const [totalUnread, setTotalUnread] = useState(0);
@@ -64,6 +271,22 @@ export default function EspacePage() {
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [infoModal, setInfoModal] = useState<{ title: string; message: string; confirmLabel?: string } | null>(null);
 
+  // --- Paramètres ---
+  const [privacySettings, setPrivacySettings] = useState<PrivacyState>({
+    show_age: true,
+    show_online_status: true,
+    show_distance: true,
+    notif_messages: true,
+    notif_likes: true,
+    notif_matches: true,
+    notif_events: true,
+  });
+  const [privacySaved, setPrivacySaved] = useState(false);
+  const [securityForm, setSecurityForm] = useState({ newPassword: '', confirmPassword: '' });
+  const [securityMessage, setSecurityMessage] = useState('');
+  const [securityLoading, setSecurityLoading] = useState(false);
+  const [showNewPw, setShowNewPw] = useState(false);
+
   useEffect(() => {
     if (!authLoading && !user) router.push('/connexion');
   }, [authLoading, user, router]);
@@ -72,11 +295,16 @@ export default function EspacePage() {
     // Handle URL parameters for tab and conversation
     const tabParam = searchParams.get('tab');
     const convParam = searchParams.get('conv');
-    if (tabParam && ['profile', 'messages', 'events', 'likes'].includes(tabParam)) {
+    const validTabs: Tab[] = [
+      'decouverte', 'profile', 'messages', 'likes', 'matches', 'events',
+      'settings-profile', 'settings-privacy', 'settings-security', 'settings-subscription', 'settings-help',
+    ];
+    if (tabParam && (validTabs as string[]).includes(tabParam)) {
       setTab(tabParam as Tab);
     }
     if (convParam) {
       setActiveConv(convParam);
+      setTab('messages');
     }
   }, [searchParams]);
 
@@ -94,6 +322,16 @@ export default function EspacePage() {
         setProfile(p);
         setProfileForm({ display_name: p.display_name, age: String(p.age), city: p.city, bio: p.bio, profession: p.profession, photo_url: p.photo_url, interests: p.interests.join(', ') });
         setGalleryPhotos(Array.from({ length: 6 }, (_, index) => p.avatar_urls?.[index] ?? (index === 0 ? p.photo_url : null)));
+        const raw = existing as Record<string, unknown>;
+        setPrivacySettings({
+          show_age: (raw.show_age as boolean) ?? true,
+          show_online_status: (raw.show_online_status as boolean) ?? true,
+          show_distance: (raw.show_distance as boolean) ?? true,
+          notif_messages: (raw.notif_messages as boolean) ?? true,
+          notif_likes: (raw.notif_likes as boolean) ?? true,
+          notif_matches: (raw.notif_matches as boolean) ?? true,
+          notif_events: (raw.notif_events as boolean) ?? true,
+        });
       }
 
       const { data: discoveryData } = await supabase
@@ -259,6 +497,37 @@ export default function EspacePage() {
       if (!error && data) { setProfile(toProfile(data as ProfileRow)); setProfileSaved(true); }
     }
     setTimeout(() => setProfileSaved(false), 3000);
+  };
+
+  const savePrivacy = async () => {
+    if (!user) return;
+    const { error } = await supabase.from('profiles').update(privacySettings).eq('id', user.id);
+    if (!error) {
+      setPrivacySaved(true);
+      setTimeout(() => setPrivacySaved(false), 2500);
+    }
+  };
+
+  const changePassword = async (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setSecurityMessage('');
+    if (securityForm.newPassword.length < 8) {
+      setSecurityMessage('Le mot de passe doit contenir au moins 8 caractères.');
+      return;
+    }
+    if (securityForm.newPassword !== securityForm.confirmPassword) {
+      setSecurityMessage('Les mots de passe ne correspondent pas.');
+      return;
+    }
+    setSecurityLoading(true);
+    const { error } = await supabase.auth.updateUser({ password: securityForm.newPassword });
+    setSecurityLoading(false);
+    if (error) {
+      setSecurityMessage(error.message);
+      return;
+    }
+    setSecurityMessage('Mot de passe mis à jour avec succès.');
+    setSecurityForm({ newPassword: '', confirmPassword: '' });
   };
 
   const sendMessage = async (e: FormEvent) => {
@@ -449,15 +718,6 @@ export default function EspacePage() {
     }
   };
 
-  const tabs: { id: Tab; label: string; icon: typeof User }[] = [
-    { id: 'decouverte', label: 'Découverte', icon: Search },
-    { id: 'profile', label: 'Mon profil', icon: User },
-    { id: 'messages', label: 'Messages', icon: MessageCircle },
-    { id: 'likes', label: 'Likes', icon: Heart },
-    { id: 'matches', label: 'Matches', icon: Heart },
-    { id: 'events', label: 'Événements', icon: CalendarDays },
-  ];
-
   const handleDiscoveryMessage = (profileItem: Profile) => {
     const isMatched = matches.some((matchProfile) => matchProfile.id === profileItem.id);
 
@@ -503,579 +763,609 @@ export default function EspacePage() {
     ? activeConversation.user_a === user?.id ? activeConversation.user_b : activeConversation.user_a
     : null;
   const activeConversationProfile = activeConversationPartnerId ? conversationProfiles[activeConversationPartnerId] : null;
+  const filteredConversations = conversations.filter((c) => {
+    const otherId = c.user_a === user.id ? c.user_b : c.user_a;
+    const name = conversationProfiles[otherId]?.display_name || '';
+    return name.toLowerCase().includes(messageSearch.trim().toLowerCase());
+  });
 
   return (
-    <main className="min-h-screen bg-[#fbf8f2] px-5 pb-24 pt-[100px] lg:px-8 lg:pt-[120px]">
-      <div className="mx-auto max-w-[1120px]">
-        <div className="mb-8">
-          <p className="text-xs font-extrabold uppercase tracking-[.2em] text-[#ec3b78]">Bienvenue dans votre espace</p>
-          <h1 className="font-display mt-3 text-4xl tracking-[-.04em] sm:text-5xl">Bonjour{profile ? `, ${profile.display_name}` : ''} <span className="italic text-[#1a6b68]">!</span></h1>
-        </div>
+    <main className="min-h-screen bg-[#fbf8f2] pt-[60px]">
+      <div className="flex min-h-[calc(100vh-60px)] w-full items-stretch">
+        <AppSidebar
+          active={tab}
+          onChange={setTab}
+          badges={{ messages: totalUnread, likes: receivedLikes.length }}
+        />
 
-        {/* TABS */}
-        <div className="flex gap-2 overflow-x-auto rounded-2xl bg-white p-2 shadow-[0_6px_20px_rgba(83,46,32,.04)]">
-          {tabs.map((t) => (
-            <button key={t.id} onClick={() => setTab(t.id)} className={`flex items-center gap-2 whitespace-nowrap rounded-xl px-5 py-3 text-sm font-extrabold transition ${tab === t.id ? 'bg-[#ec3b78] text-white' : 'text-[#756960] hover:bg-[#f3e9dc]'}`}>
-              <t.icon size={16} /> {t.label}
-            </button>
-          ))}
-        </div>
-
-        {/* DISCOVERY TAB */}
-        {tab === 'decouverte' && (
-          <div className="mt-8 space-y-6">
-            <div className="rounded-[30px] bg-white p-5 shadow-[0_8px_30px_rgba(83,46,32,.05)] sm:p-6">
-              <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#fbe8ec] text-[#ec3b78]">
-                    <Search size={20} />
-                  </div>
-                  <div>
-                    <p className="text-[11px] font-extrabold uppercase tracking-[.18em] text-[#ec3b78]">Découverte</p>
-                    <h2 className="font-display text-2xl text-[#24171b]">Des profils qui correspondent à toi</h2>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-3 self-start xl:self-auto">
-                  <span className="rounded-full bg-[#f3e9dc] px-3 py-1.5 text-xs font-extrabold text-[#756960]">
-                    {filteredDiscoveryProfiles.length} profils
-                  </span>
-                  <button
-                    onClick={() => setShowDiscoveryFilters((value) => !value)}
-                    className="rounded-full border border-[#dfd2c6] bg-[#fbf8f2] px-4 py-2 text-xs font-extrabold text-[#625852]"
-                  >
-                    {showDiscoveryFilters ? 'Masquer les filtres' : 'Afficher les filtres'}
-                  </button>
-                </div>
-              </div>
-
-              {showDiscoveryFilters && (
-                <div className="mt-5 space-y-4 border-t border-[#f3e9dc] pt-5">
-                  <div className="relative">
-                    <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-[#9a8b82]" />
-                    <input
-                      value={discoverySearch}
-                      onChange={(event) => setDiscoverySearch(event.target.value)}
-                      placeholder="Rechercher par nom, ville, profession, intérêt…"
-                      className="w-full rounded-full border border-[#dfd2c6] bg-[#fbf8f2] py-3.5 pl-11 pr-4 text-sm outline-none transition focus:border-[#ec3b78]"
-                    />
-                  </div>
-
-                  <div>
-                    <p className="mb-2 text-xs font-extrabold uppercase tracking-[.18em] text-[#756960]">Ville</p>
-                    <div className="flex flex-wrap gap-2">
-                      {discoveryCities.map((city) => (
-                        <button
-                          key={city}
-                          onClick={() => setDiscoveryCityFilter(city)}
-                          className={`rounded-full px-4 py-2 text-xs font-extrabold transition ${
-                            discoveryCityFilter === city
-                              ? 'bg-[#ec3b78] text-white'
-                              : 'bg-[#f3e9dc] text-[#756960] hover:bg-[#e7cfc0]'
-                          }`}
-                        >
-                          {city === 'all' ? 'Toutes les villes' : city}
-                        </button>
-                      ))}
+        <div className="min-w-0 flex-1 px-5 pb-28 pt-6 sm:px-7 sm:pt-8 lg:px-10 lg:pt-10 md:pb-12">
+          {/* DISCOVERY TAB */}
+          {tab === 'decouverte' && (
+            <div className="space-y-6">
+              <div className="rounded-[30px] bg-white p-5 shadow-[0_8px_30px_rgba(83,46,32,.05)] sm:p-6">
+                <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#fbe8ec] text-[#ec3b78]">
+                      <Search size={20} />
+                    </div>
+                    <div>
+                      <p className="text-[11px] font-extrabold uppercase tracking-[.18em] text-[#ec3b78]">Découverte</p>
+                      <h2 className="font-display text-2xl text-[#24171b]">Des profils qui correspondent à toi</h2>
                     </div>
                   </div>
-                </div>
-              )}
-            </div>
 
-            {discoveryLoading ? (
-              <div className="rounded-[24px] bg-white p-8 text-center text-sm font-bold text-[#9a8b82] shadow-[0_8px_30px_rgba(83,46,32,.05)] animate-pulse">
-                Chargement de la découverte…
-              </div>
-            ) : filteredDiscoveryProfiles.length === 0 ? (
-              <div className="rounded-[24px] bg-white p-8 text-center text-sm font-bold text-[#756960] shadow-[0_8px_30px_rgba(83,46,32,.05)]">
-                Aucun profil ne correspond à ces filtres pour le moment.
-              </div>
-            ) : (
-              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                {visibleDiscoveryProfiles.map((profileItem, index) => (
-                  <article
-                    key={profileItem.id}
-                    className="group overflow-hidden rounded-[22px] border border-[#dfd2c6] bg-white shadow-[0_8px_30px_rgba(83,46,32,.05)] transition duration-300 hover:-translate-y-1 hover:shadow-[0_16px_40px_rgba(83,46,32,.12)]"
-                    style={{ animationDelay: `${index * 50}ms` }}
-                  >
-                    <div className="relative h-[160px] overflow-hidden">
-                      {profileItem.photo_url ? (
-                        <img src={profileItem.photo_url} alt={profileItem.display_name} className="h-full w-full object-cover transition duration-500 group-hover:scale-105" />
-                      ) : (
-                        <div className="flex h-full w-full items-center justify-center bg-[#f4e9dc] text-4xl font-black text-[#1a6b68]">
-                          {profileItem.display_name.charAt(0).toUpperCase()}
-                        </div>
-                      )}
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-transparent to-transparent" />
-                      <div className="absolute bottom-3 left-3 right-3 flex items-end justify-between gap-2">
-                        <div>
-                          <h3 className="font-display text-xl leading-none text-white">
-                            {profileItem.display_name}, <span className="text-white/80">{profileItem.age}</span>
-                          </h3>
-                        </div>
-                        <button
-                          onClick={() => toggleDiscoveryLike(profileItem.id)}
-                          className={`flex h-10 w-10 items-center justify-center rounded-full border transition ${
-                            discoveryLikedIds.has(profileItem.id)
-                              ? 'border-[#ec3b78] bg-[#ec3b78] text-white'
-                              : 'border-white/60 bg-white/15 text-white backdrop-blur-sm'
-                          }`}
-                        >
-                          <Heart size={16} fill={discoveryLikedIds.has(profileItem.id) ? 'currentColor' : 'none'} />
-                        </button>
+                  <div className="flex items-center gap-3 self-start xl:self-auto">
+                    <span className="rounded-full bg-[#f3e9dc] px-3 py-1.5 text-xs font-extrabold text-[#756960]">
+                      {filteredDiscoveryProfiles.length} profils
+                    </span>
+                    <button
+                      onClick={() => setShowDiscoveryFilters((value) => !value)}
+                      className="rounded-full border border-[#dfd2c6] bg-[#fbf8f2] px-4 py-2 text-xs font-extrabold text-[#625852]"
+                    >
+                      {showDiscoveryFilters ? 'Masquer les filtres' : 'Afficher les filtres'}
+                    </button>
+                  </div>
+                </div>
+
+                {showDiscoveryFilters && (
+                  <div className="mt-5 space-y-4 border-t border-[#f3e9dc] pt-5">
+                    <div className="relative">
+                      <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-[#9a8b82]" />
+                      <input
+                        value={discoverySearch}
+                        onChange={(event) => setDiscoverySearch(event.target.value)}
+                        placeholder="Rechercher par nom, ville, profession, intérêt…"
+                        className="w-full rounded-full border border-[#dfd2c6] bg-[#fbf8f2] py-3.5 pl-11 pr-4 text-sm outline-none transition focus:border-[#ec3b78]"
+                      />
+                    </div>
+
+                    <div>
+                      <p className="mb-2 text-xs font-extrabold uppercase tracking-[.18em] text-[#756960]">Ville</p>
+                      <div className="flex flex-wrap gap-2">
+                        {discoveryCities.map((city) => (
+                          <button
+                            key={city}
+                            onClick={() => setDiscoveryCityFilter(city)}
+                            className={`rounded-full px-4 py-2 text-xs font-extrabold transition ${
+                              discoveryCityFilter === city
+                                ? 'bg-[#ec3b78] text-white'
+                                : 'bg-[#f3e9dc] text-[#756960] hover:bg-[#e7cfc0]'
+                            }`}
+                          >
+                            {city === 'all' ? 'Toutes les villes' : city}
+                          </button>
+                        ))}
                       </div>
                     </div>
-
-                    <div className="space-y-2.5 p-3.5">
-                      <p className="flex items-center gap-2 text-xs font-semibold text-[#756960]">
-                        <MapPin size={13} /> {profileItem.city || 'Ville non renseignée'}
-                      </p>
-
-                      {profileItem.profession && (
-                        <p className="text-[10px] font-bold uppercase tracking-[.1em] text-[#1a6b68]">{profileItem.profession}</p>
-                      )}
-
-                      {profileItem.bio && <p className="line-clamp-2 text-xs leading-5 text-[#756960]">{profileItem.bio}</p>}
-
-                      {profileItem.interests?.length ? (
-                        <div className="flex flex-wrap gap-1.5">
-                          {profileItem.interests.slice(0, 2).map((interest) => (
-                            <span key={interest} className="rounded-full bg-[#f6efe6] px-2 py-1 text-[9px] font-extrabold uppercase tracking-[.08em] text-[#b58f7d]">
-                              {interest}
-                            </span>
-                          ))}
-                        </div>
-                      ) : null}
-
-                      <div className="flex items-center justify-between gap-3 border-t border-[#f3e9dc] pt-3">
-                        <div className="flex items-center gap-1 text-[9px] font-extrabold uppercase tracking-[.08em] text-[#1a6b68]">
-                          <ShieldCheck size={12} /> Vérifié
-                        </div>
-                        <button
-                          onClick={() => handleDiscoveryMessage(profileItem)}
-                          className="rounded-full bg-[#1a6b68] px-2.5 py-1.5 text-[10px] font-extrabold text-white transition hover:bg-[#125552]"
-                        >
-                          Message
-                        </button>
-                      </div>
-                    </div>
-                  </article>
-                ))}
-              </div>
-            )}
-
-            {filteredDiscoveryProfiles.length > discoveryPageSize && (
-              <div className="flex flex-col items-center justify-between gap-3 rounded-[24px] bg-white p-4 shadow-[0_8px_30px_rgba(83,46,32,.05)] sm:flex-row">
-                <p className="text-xs font-bold uppercase tracking-[.14em] text-[#756960]">
-                  Page {safeDiscoveryPage} / {discoveryTotalPages}
-                </p>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => setDiscoveryPage((currentPage) => Math.max(1, currentPage - 1))}
-                    disabled={safeDiscoveryPage === 1}
-                    className="rounded-full border border-[#dfd2c6] bg-[#fbf8f2] px-4 py-2 text-xs font-extrabold text-[#625852] transition disabled:cursor-not-allowed disabled:opacity-40"
-                  >
-                    Précédent
-                  </button>
-                  <button
-                    onClick={() => setDiscoveryPage((currentPage) => Math.min(discoveryTotalPages, currentPage + 1))}
-                    disabled={safeDiscoveryPage === discoveryTotalPages}
-                    className="rounded-full bg-[#ec3b78] px-4 py-2 text-xs font-extrabold text-white transition disabled:cursor-not-allowed disabled:opacity-40"
-                  >
-                    Suivant
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* PROFILE TAB */}
-        {tab === 'profile' && (
-          <div className="mt-8 grid gap-6 lg:grid-cols-[300px_1fr]">
-            <div className="rounded-[26px] bg-white p-6 text-center shadow-[0_8px_30px_rgba(83,46,32,.05)]">
-              <div className="relative mx-auto h-32 w-32 overflow-hidden rounded-full border-4 border-[#f3e9dc]">
-                <img src={imagePreview || profileForm.photo_url || 'https://images.pexels.com/photos/733872/pexels-photo-733872.jpeg?auto=compress&cs=tinysrgb&w=300'} alt="Photo" className="h-full w-full object-cover" />
-                <label className="absolute inset-0 flex cursor-pointer items-center justify-center bg-black/40 opacity-0 transition hover:opacity-100">
-                  <Upload size={20} className="text-white" />
-                  <input
-                    type="file"
-                    accept="image/png,image/jpeg,image/jpg"
-                    className="hidden"
-                    onChange={(e) => handleProfileImageSelection(e.target.files?.[0], null)}
-                  />
-                </label>
-                {uploadingImage && (
-                  <div className="absolute inset-0 flex items-center justify-center bg-black/50">
-                    <div className="h-6 w-6 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
                   </div>
                 )}
               </div>
-              <p className="mt-4 font-display text-2xl">{profileForm.display_name || 'Votre nom'}</p>
-              <p className="mt-1 text-sm text-[#756960]">{profileForm.profession || 'Votre profession'}</p>
-              <p className="mt-1 text-sm text-[#756960]">{profileForm.city}</p>
-              {profile?.is_verified && <span className="mt-3 inline-flex items-center gap-1 rounded-full bg-[#e5f0ed] px-3 py-1.5 text-[10px] font-extrabold uppercase text-[#1a6b68]"><ShieldCheck size={12} /> Vérifié</span>}
-              {!profile?.is_verified && <p className="mt-3 text-xs text-[#9a8b82]">Profil non vérifié</p>}
-            </div>
-            <form onSubmit={saveProfile} className="rounded-[26px] bg-white p-6 shadow-[0_8px_30px_rgba(83,46,32,.05)] lg:p-8">
-              <h2 className="font-display text-2xl">Mes informations</h2>
-              <p className="mt-1 text-sm text-[#756960]">Renseignez votre profil pour augmenter vos chances de match.</p>
-              <div className="mt-6 grid gap-4 sm:grid-cols-2">
-                <label className="block text-xs font-extrabold text-[#625852]">Nom affiché<input value={profileForm.display_name} onChange={(e) => setProfileForm({ ...profileForm, display_name: e.target.value })} required placeholder="Votre nom" className="mt-2 w-full rounded-xl border border-[#dfd2c6] bg-[#fbf8f2] px-4 py-3 text-sm outline-none focus:border-[#ec3b78]" /></label>
-                <label className="block text-xs font-extrabold text-[#625852]">Âge<input value={profileForm.age} onChange={(e) => setProfileForm({ ...profileForm, age: e.target.value })} type="number" min="18" max="99" required className="mt-2 w-full rounded-xl border border-[#dfd2c6] bg-[#fbf8f2] px-4 py-3 text-sm outline-none focus:border-[#ec3b78]" /></label>
-                <label className="block text-xs font-extrabold text-[#625852]">Ville<input value={profileForm.city} onChange={(e) => setProfileForm({ ...profileForm, city: e.target.value })} required className="mt-2 w-full rounded-xl border border-[#dfd2c6] bg-[#fbf8f2] px-4 py-3 text-sm outline-none focus:border-[#ec3b78]" /></label>
-                <label className="block text-xs font-extrabold text-[#625852]">Profession<input value={profileForm.profession} onChange={(e) => setProfileForm({ ...profileForm, profession: e.target.value })} className="mt-2 w-full rounded-xl border border-[#dfd2c6] bg-[#fbf8f2] px-4 py-3 text-sm outline-none focus:border-[#ec3b78]" /></label>
-                <div className="sm:col-span-2">
-                  <p className="text-xs font-extrabold text-[#625852]">Photo de profil</p>
-                  <p className="mt-1 text-xs text-[#9a8b82]">Cliquez sur l&apos;image pour changer (PNG, JPG, max 5MB)</p>
+
+              {discoveryLoading ? (
+                <div className="rounded-[24px] bg-white p-8 text-center text-sm font-bold text-[#9a8b82] shadow-[0_8px_30px_rgba(83,46,32,.05)] animate-pulse">
+                  Chargement de la découverte…
                 </div>
-                <label className="block text-xs font-extrabold text-[#625852] sm:col-span-2">Centres d&apos;intérêt (séparés par des virgules)<input value={profileForm.interests} onChange={(e) => setProfileForm({ ...profileForm, interests: e.target.value })} placeholder="Voyage, Cuisine, Musique..." className="mt-2 w-full rounded-xl border border-[#dfd2c6] bg-[#fbf8f2] px-4 py-3 text-sm outline-none focus:border-[#ec3b78]" /></label>
-                <label className="block text-xs font-extrabold text-[#625852] sm:col-span-2">Bio<textarea value={profileForm.bio} onChange={(e) => setProfileForm({ ...profileForm, bio: e.target.value })} rows={4} placeholder="Parlez de vous..." className="mt-2 w-full rounded-xl border border-[#dfd2c6] bg-[#fbf8f2] px-4 py-3 text-sm outline-none focus:border-[#ec3b78]" /></label>
-              </div>
-
-              <div className="mt-8 rounded-[22px] border border-[#dfd2c6] bg-[#fdf9f4] p-4 transition dark:border-[#3a3a3a] dark:bg-[#1d1f24]">
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <p className="text-[10px] font-extrabold uppercase tracking-[0.18em] text-[#625852] dark:text-[#d8d5d2]">Mes Gallery</p>
-                    <h3 className="mt-1 font-display text-xl text-[#241c18] dark:text-white">Photos optionnelles</h3>
-                  </div>
-                  <span className="rounded-full bg-[#fce6ee] px-3 py-1 text-[10px] font-extrabold uppercase tracking-[0.14em] text-[#ec3b78] dark:bg-[#3a1e2a] dark:text-[#f9bfd2]">
-                    {galleryPhotos.filter(Boolean).length}/6
-                  </span>
-                </div>
-                <p className="mt-2 text-xs text-[#9a8b82] dark:text-[#c9c3bf]">Ajoutez jusqu’à 6 photos supplémentaires pour enrichir votre profil. C’est 100% optionnel.</p>
-
-                <div className="mt-4 grid gap-3 sm:grid-cols-3">
-                  {Array.from({ length: 6 }, (_, index) => (
-                    <button
-                      key={`gallery-slot-${index}`}
-                      type="button"
-                      onClick={() => {
-                        setGalleryUploadIndex(index);
-                        galleryFileInputRef.current?.click();
-                      }}
-                      className="group relative flex aspect-[4/5] w-full items-center justify-center overflow-hidden rounded-[20px] border border-dashed border-[#d9c9ba] bg-white transition hover:border-[#ec3b78] dark:border-[#4a4a4a] dark:bg-[#27272a] dark:hover:border-[#ff7ab3]"
-                    >
-                      {galleryPhotos[index] ? (
-                        <>
-                          <img src={galleryPhotos[index]!} alt={`Photo ${index + 1}`} className="h-full w-full object-cover" />
-                          <div className="absolute inset-0 bg-black/20 opacity-0 transition group-hover:opacity-100" />
-                          <div className="absolute bottom-2 left-2 right-2 rounded-full bg-black/45 px-2 py-1 text-[9px] font-extrabold uppercase tracking-[0.16em] text-white opacity-0 transition group-hover:opacity-100">
-                            Remplacer
-                          </div>
-                        </>
-                      ) : (
-                        <div className="flex flex-col items-center justify-center gap-2 text-[#9a8b82] dark:text-[#c9c3bf]">
-                          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#fce6ee] text-[#ec3b78] dark:bg-[#3a1e2a] dark:text-[#f9bfd2]">
-                            <Plus size={20} />
-                          </div>
-                          <span className="text-[10px] font-extrabold uppercase tracking-[0.18em]">Ajouter</span>
-                        </div>
-                      )}
-
-                      {galleryUploadingIndex === index && (
-                        <div className="absolute inset-0 flex items-center justify-center bg-black/35">
-                          <div className="h-6 w-6 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
-                        </div>
-                      )}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="mt-6 flex items-center gap-4">
-                <button type="submit" className="rounded-full bg-[#ec3b78] px-6 py-3.5 text-sm font-extrabold text-white transition hover:bg-[#c92e63]">Enregistrer</button>
-                {profileSaved && <span className="flex items-center gap-2 text-sm font-bold text-[#1a6b68]"><Check size={16} /> Profil mis à jour !</span>}
-              </div>
-            </form>
-          </div>
-        )}
-
-        {/* MESSAGES TAB */}
-        {tab === 'messages' && (
-          <div className="mt-8">
-            <div className="grid gap-6 lg:grid-cols-[340px_1fr]">
-            <div className={`${activeConv ? 'hidden lg:block' : 'block'} rounded-[26px] border border-[#dfd2c6] bg-white p-4 shadow-[0_8px_30px_rgba(83,46,32,.05)]`}>
-              <p className="px-2 pb-3 font-display text-xl">Conversations</p>
-              {conversations.length === 0 ? (
-                <div className="px-2 py-8 text-center">
-                  <MessageCircle size={28} className="mx-auto text-[#dfd2c6]" />
-                  <p className="mt-3 text-sm text-[#756960]">Aucune conversation pour l&apos;instant.</p>
-                  <p className="mt-1 text-xs text-[#9a8b82]">Quand vous ferez un match, vos conversations apparaîtront ici.</p>
-                  <Link href="/decouverte" className="mt-4 inline-block rounded-full bg-[#ec3b78] px-5 py-2.5 text-xs font-extrabold text-white">Découvrir des profils</Link>
+              ) : filteredDiscoveryProfiles.length === 0 ? (
+                <div className="rounded-[24px] bg-white p-8 text-center text-sm font-bold text-[#756960] shadow-[0_8px_30px_rgba(83,46,32,.05)]">
+                  Aucun profil ne correspond à ces filtres pour le moment.
                 </div>
               ) : (
-                <div className="space-y-1">
-                  {conversations.map((c) => {
-                    const otherId = c.user_a === user.id ? c.user_b : c.user_a;
-                    const otherProfile = conversationProfiles[otherId];
-                    const lastMsg = lastMessages[c.id];
-                    const unreadCount = unreadCounts[c.id] || 0;
-                    return (
-                      <button 
-                        key={c.id} 
-                        onClick={() => {
-                          setActiveConv(c.id);
-                          // Marquer comme lu
-                          if (unreadCounts[c.id] > 0) {
-                            setUnreadCounts((prev) => ({ ...prev, [c.id]: 0 }));
-                            setTotalUnread((prev) => Math.max(0, prev - unreadCounts[c.id]));
-                            setUnreadCount(Math.max(0, totalUnread - unreadCounts[c.id]));
-                          }
-                        }} 
-                        className={`w-full flex items-center gap-3 rounded-xl border border-[#dfd2c6] px-3 py-3 text-left transition ${activeConv === c.id ? 'bg-[#fae4e2]' : 'hover:bg-[#f3e9dc]'}`}
-                      >
-                        <div className="relative shrink-0">
-                          <div className="h-12 w-12 overflow-hidden rounded-full border-2 border-[#f3e9dc]">
-                            <img src={otherProfile?.photo_url} alt={otherProfile?.display_name} className="h-full w-full object-cover" />
-                          </div>
-                          {unreadCount > 0 && (
-                            <span className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-[#ec3b78] text-[10px] font-extrabold text-white">
-                              {unreadCount > 9 ? '9+' : unreadCount}
-                            </span>
-                          )}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center justify-between">
-                            <p className="text-sm font-bold text-[#241c18] truncate">{otherProfile?.display_name || 'Utilisateur'}</p>
-                            {lastMsg && <p className="text-[10px] text-[#9a8b82]">{lastMsg.time}</p>}
-                          </div>
-                          <p className="mt-0.5 text-xs text-[#9a8b82] truncate">
-                            {lastMsg ? lastMsg.content : 'Aucun message'}
-                          </p>
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-            <div className={`${activeConv ? 'flex' : 'hidden lg:flex'} h-[calc(100vh-220px)] min-h-[460px] flex-col rounded-[26px] bg-white p-4 shadow-[0_8px_30px_rgba(83,46,32,.05)]`}>
-              {activeConv ? (
-                <>
-                  <div className="mb-3 flex items-center gap-3 border-b border-[#eadfd5] pb-3">
-                    <button
-                      type="button"
-                      onClick={() => setActiveConv(null)}
-                      className="flex h-9 w-9 items-center justify-center rounded-full border border-[#dfd2c6] text-[#625852] lg:hidden"
-                      aria-label="Retour aux conversations"
+                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+                  {visibleDiscoveryProfiles.map((profileItem, index) => (
+                    <article
+                      key={profileItem.id}
+                      className="group overflow-hidden rounded-[22px] border border-[#dfd2c6] bg-white shadow-[0_8px_30px_rgba(83,46,32,.05)] transition duration-300 hover:-translate-y-1 hover:shadow-[0_16px_40px_rgba(83,46,32,.12)]"
+                      style={{ animationDelay: `${index * 50}ms` }}
                     >
-                      <ArrowLeft size={17} />
-                    </button>
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full border border-[#f3e9dc] bg-[#f3e9dc] text-sm font-bold text-[#1a6b68]">
-                      {activeConversationProfile?.photo_url ? (
-                        <img src={activeConversationProfile.photo_url} alt="" className="h-full w-full object-cover" />
-                      ) : (
-                        activeConversationProfile?.display_name?.charAt(0).toUpperCase() || '?'
-                      )}
-                    </div>
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-extrabold text-[#241c18]">
-                        {activeConversationProfile?.display_name || 'Utilisateur'}
-                      </p>
-                      <p className="flex items-center gap-1.5 text-xs text-[#9a8b82]">
-                        <span className={`h-2 w-2 rounded-full ${activeConversationProfile?.is_online ? 'bg-[#1a6b68]' : 'bg-[#b8aaa1]'}`} />
-                        {activeConversationProfile?.is_online ? 'En ligne' : 'Hors ligne'}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex-1 space-y-3 overflow-y-auto rounded-xl bg-[#fbf8f2] p-4">
-                    {messages.map((m) => (
-                      <div key={m.id} className={`flex ${m.sender_id === user.id ? 'justify-end' : 'justify-start'}`}>
-                        <div className={`max-w-[75%] rounded-2xl px-4 py-2.5 text-sm ${m.sender_id === user.id ? 'bg-[#ec3b78] text-white' : 'bg-white text-[#241c18] shadow-sm'}`}>
-                          <p>{m.content}</p>
-                          {m.sender_id === user.id && (
-                            <div className="mt-1 flex items-center justify-end gap-1">
-                              <span className="text-[10px] opacity-70">
-                                {new Date(m.created_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+                      <div className="relative h-[160px] overflow-hidden">
+                        {profileItem.photo_url ? (
+                          <img src={profileItem.photo_url} alt={profileItem.display_name} className="h-full w-full object-cover transition duration-500 group-hover:scale-105" />
+                        ) : (
+                          <div className="flex h-full w-full items-center justify-center bg-[#f4e9dc] text-4xl font-black text-[#1a6b68]">
+                            {profileItem.display_name.charAt(0).toUpperCase()}
+                          </div>
+                        )}
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-transparent to-transparent" />
+                        <div className="absolute bottom-3 left-3 right-3 flex items-end justify-between gap-2">
+                          <div>
+                            <h3 className="font-display text-xl leading-none text-white">
+                              {profileItem.display_name}, <span className="text-white/80">{profileItem.age}</span>
+                            </h3>
+                          </div>
+                          <button
+                            onClick={() => toggleDiscoveryLike(profileItem.id)}
+                            className={`flex h-10 w-10 items-center justify-center rounded-full border transition ${
+                              discoveryLikedIds.has(profileItem.id)
+                                ? 'border-[#ec3b78] bg-[#ec3b78] text-white'
+                                : 'border-white/60 bg-white/15 text-white backdrop-blur-sm'
+                            }`}
+                          >
+                            <Heart size={16} fill={discoveryLikedIds.has(profileItem.id) ? 'currentColor' : 'none'} />
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="space-y-2.5 p-3.5">
+                        <p className="flex items-center gap-2 text-xs font-semibold text-[#756960]">
+                          <MapPin size={13} /> {profileItem.city || 'Ville non renseignée'}
+                        </p>
+
+                        {profileItem.profession && (
+                          <p className="text-[10px] font-bold uppercase tracking-[.1em] text-[#1a6b68]">{profileItem.profession}</p>
+                        )}
+
+                        {profileItem.bio && <p className="line-clamp-2 text-xs leading-5 text-[#756960]">{profileItem.bio}</p>}
+
+                        {profileItem.interests?.length ? (
+                          <div className="flex flex-wrap gap-1.5">
+                            {profileItem.interests.slice(0, 2).map((interest) => (
+                              <span key={interest} className="rounded-full bg-[#f6efe6] px-2 py-1 text-[9px] font-extrabold uppercase tracking-[.08em] text-[#b58f7d]">
+                                {interest}
                               </span>
-                              {m.is_read ? (
-                                <CheckCheck size={14} className="text-[#53bdeb]" />
-                              ) : (
-                                <Check size={14} className="opacity-50" />
-                              )}
-                            </div>
-                          )}
+                            ))}
+                          </div>
+                        ) : null}
+
+                        <div className="flex items-center justify-between gap-3 border-t border-[#f3e9dc] pt-3">
+                          <div className="flex items-center gap-1 text-[9px] font-extrabold uppercase tracking-[.08em] text-[#1a6b68]">
+                            <ShieldCheck size={12} /> Vérifié
+                          </div>
+                          <button
+                            onClick={() => handleDiscoveryMessage(profileItem)}
+                            className="rounded-full bg-[#1a6b68] px-2.5 py-1.5 text-[10px] font-extrabold text-white transition hover:bg-[#125552]"
+                          >
+                            Message
+                          </button>
                         </div>
                       </div>
-                    ))}
-                    {messages.length === 0 && <p className="py-8 text-center text-sm text-[#9a8b82]">Démarrez la conversation.</p>}
+                    </article>
+                  ))}
+                </div>
+              )}
+
+              {filteredDiscoveryProfiles.length > discoveryPageSize && (
+                <div className="flex flex-col items-center justify-between gap-3 rounded-[24px] bg-white p-4 shadow-[0_8px_30px_rgba(83,46,32,.05)] sm:flex-row">
+                  <p className="text-xs font-bold uppercase tracking-[.14em] text-[#756960]">
+                    Page {safeDiscoveryPage} / {discoveryTotalPages}
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setDiscoveryPage((currentPage) => Math.max(1, currentPage - 1))}
+                      disabled={safeDiscoveryPage === 1}
+                      className="rounded-full border border-[#dfd2c6] bg-[#fbf8f2] px-4 py-2 text-xs font-extrabold text-[#625852] transition disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      Précédent
+                    </button>
+                    <button
+                      onClick={() => setDiscoveryPage((currentPage) => Math.min(discoveryTotalPages, currentPage + 1))}
+                      disabled={safeDiscoveryPage === discoveryTotalPages}
+                      className="rounded-full bg-[#ec3b78] px-4 py-2 text-xs font-extrabold text-white transition disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      Suivant
+                    </button>
                   </div>
-                  <form onSubmit={sendMessage} className="mt-3 flex gap-2">
-                    <input value={newMessage} onChange={(e) => setNewMessage(e.target.value)} placeholder="Votre message..." className="flex-1 rounded-full border border-[#dfd2c6] bg-[#fbf8f2] px-4 py-3 text-sm outline-none focus:border-[#ec3b78]" />
-                    <button type="submit" className="flex h-12 w-12 items-center justify-center rounded-full bg-[#ec3b78] text-white transition hover:bg-[#c92e63]"><Send size={18} /></button>
-                  </form>
-                </>
-              ) : (
-                <div className="flex flex-1 flex-col items-center justify-center text-center">
-                  <MessageCircle size={36} className="text-[#dfd2c6]" />
-                  <p className="mt-3 text-sm font-bold text-[#756960]">Sélectionnez une conversation</p>
-                  <p className="mt-1 text-xs text-[#9a8b82]">Vos messages s&apos;afficheront ici.</p>
                 </div>
               )}
             </div>
-            </div>
-          </div>
-        )}
+          )}
 
-        {/* LIKES TAB */}
-        {tab === 'likes' && (
-          <div className="mt-8">
-            <div className="mb-6 flex items-center gap-4">
-              <button
-                onClick={() => setLikesView('received')}
-                className={`rounded-full px-4 py-2 text-xs font-extrabold transition ${likesView === 'received' ? 'bg-[#ec3b78] text-white' : 'bg-[#f3e9dc] text-[#756960] hover:bg-[#e7cfc0]'}`}
-              >
-                Qui m&apos;a liké ({receivedLikes.length})
-              </button>
-              <button
-                onClick={() => setLikesView('sent')}
-                className={`rounded-full px-4 py-2 text-xs font-extrabold transition ${likesView === 'sent' ? 'bg-[#ec3b78] text-white' : 'bg-[#f3e9dc] text-[#756960] hover:bg-[#e7cfc0]'}`}
-              >
-                Ce que j&apos;ai liké ({likedProfiles.length})
-              </button>
-            </div>
-
-            {likesView === 'received' ? (
-              <>
-                {receivedLikes.length === 0 ? (
-                  <div className="rounded-[26px] bg-white p-8 text-center shadow-[0_8px_30px_rgba(83,46,32,.05)]">
-                    <Heart size={28} className="mx-auto text-[#dfd2c6]" />
-                    <p className="mt-3 font-display text-xl">Personne ne vous a liké pour l&apos;instant</p>
-                    <p className="mt-1 text-sm text-[#756960]">Explorez la découverte pour attirer l&apos;attention.</p>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {receivedLikes.slice(0, 10).map((p) => (
-                      <div key={p.id} className="flex items-center gap-4 rounded-[16px] bg-white p-3 shadow-[0_4px_15px_rgba(83,46,32,.04)] transition hover:shadow-[0_8px_25px_rgba(83,46,32,.08)]">
-                        <div className="relative shrink-0 cursor-pointer" onClick={() => setSelectedReceivedProfile(p)}>
-                          <div className="h-14 w-14 overflow-hidden rounded-full border-3 border-[#f3e9dc]">
-                            <img src={p.photo_url} alt={p.display_name} className="h-full w-full object-cover" />
-                          </div>
-                          <span className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-[#ec3b78]"><Heart size={10} fill="currentColor" className="text-white" /></span>
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="font-display text-base font-semibold truncate">{p.display_name}, <span className="text-[#9a8b82]">{p.age}</span></p>
-                          <p className="text-xs text-[#756960]">{p.city} · {p.profession}</p>
-                        </div>
-                        <button
-                          onClick={() => handleLikeBack(p.id)}
-                          className="shrink-0 rounded-full bg-[#1a6b68] px-4 py-2 text-xs font-extrabold text-white transition hover:bg-[#125552]"
-                        >
-                          Liker
-                        </button>
-                      </div>
-                    ))}
-                    {receivedLikes.length > 10 && (
-                      <p className="text-center text-xs text-[#9a8b82]">... et {receivedLikes.length - 10} autres</p>
-                    )}
-                  </div>
-                )}
-              </>
-            ) : (
-              <>
-                {likedProfiles.length === 0 ? (
-                  <div className="rounded-[26px] bg-white p-8 text-center shadow-[0_8px_30px_rgba(83,46,32,.05)]">
-                    <Heart size={28} className="mx-auto text-[#dfd2c6]" />
-                    <p className="mt-3 font-display text-xl">Vous n&apos;avez liké personne pour l&apos;instant</p>
-                    <p className="mt-1 text-sm text-[#756960]">Explorez la découverte et likez les profils qui vous inspirent.</p>
-                    <Link href="/decouverte" className="mt-4 inline-flex items-center gap-2 rounded-full bg-[#ec3b78] px-6 py-3 text-sm font-extrabold text-white transition hover:bg-[#c92e63]">Aller à la découverte <ArrowRight size={16} /></Link>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {likedProfiles.slice(0, 10).map((p) => (
-                      <div key={p.id} className="flex items-center gap-4 rounded-[16px] bg-white p-3 shadow-[0_4px_15px_rgba(83,46,32,.04)] transition hover:shadow-[0_8px_25px_rgba(83,46,32,.08)]">
-                        <div className="relative shrink-0 cursor-pointer" onClick={() => setSelectedLikedProfile(p)}>
-                          <div className="h-14 w-14 overflow-hidden rounded-full border-3 border-[#f3e9dc]">
-                            <img src={p.photo_url} alt={p.display_name} className="h-full w-full object-cover" />
-                          </div>
-                          <span className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-[#ec3b78]"><Heart size={10} fill="currentColor" className="text-white" /></span>
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="font-display text-base font-semibold truncate">{p.display_name}, <span className="text-[#9a8b82]">{p.age}</span></p>
-                          <p className="text-xs text-[#756960]">{p.city} · {p.profession}</p>
-                        </div>
-                        <div className="shrink-0 text-xs text-[#9a8b82]">En attente...</div>
-                      </div>
-                    ))}
-                    {likedProfiles.length > 10 && (
-                      <p className="text-center text-xs text-[#9a8b82]">... et {likedProfiles.length - 10} autres</p>
-                    )}
-                  </div>
-                )}
-              </>
-            )}
-          </div>
-        )}
-
-        {/* MATCHES TAB */}
-        {tab === 'matches' && (
-          <div className="mt-8">
-            <h2 className="mb-4 font-display text-2xl">Mes matches</h2>
-            {matches.length === 0 ? (
-              <div className="rounded-[26px] bg-white p-8 text-center shadow-[0_8px_30px_rgba(83,46,32,.05)]">
-                <Heart size={28} className="mx-auto text-[#dfd2c6]" />
-                <p className="mt-3 font-display text-xl">Aucun match pour l&apos;instant</p>
-                <p className="mt-1 text-sm text-[#756960]">Likez des profils pour créer des matches mutuels.</p>
-              </div>
-            ) : (
-              <>
-                <p className="mb-4 text-sm font-bold text-[#756960]">{matches.length} match(s)</p>
-                <div className="space-y-3">
-                  {matches.slice(0, 10).map((p) => (
-                    <div key={p.id} className="flex items-center gap-4 rounded-[16px] bg-white p-3 shadow-[0_4px_15px_rgba(83,46,32,.04)] transition hover:shadow-[0_8px_25px_rgba(83,46,32,.08)]">
-                      <div className="relative shrink-0 cursor-pointer" onClick={() => setSelectedMatch(p)}>
-                        <div className="h-14 w-14 overflow-hidden rounded-full border-3 border-[#1a6b68]">
-                          <img src={p.photo_url} alt={p.display_name} className="h-full w-full object-cover" />
-                        </div>
-                        <span className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-[#1a6b68]"><Heart size={10} fill="currentColor" className="text-white" /></span>
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-display text-base font-semibold truncate">{p.display_name}, <span className="text-[#9a8b82]">{p.age}</span></p>
-                        <p className="text-xs text-[#756960]">{p.city} · {p.profession}</p>
-                      </div>
-                      <button
-                        onClick={() => { setTab('messages'); }}
-                        className="shrink-0 rounded-full bg-[#ec3b78] px-4 py-2 text-xs font-extrabold text-white transition hover:bg-[#c92e63]"
-                      >
-                        Discuter
-                      </button>
+          {/* PROFILE TAB */}
+          {tab === 'profile' && (
+            <div className="grid gap-6 lg:grid-cols-[300px_1fr]">
+              <div className="rounded-[26px] bg-white p-6 text-center shadow-[0_8px_30px_rgba(83,46,32,.05)]">
+                <div className="relative mx-auto h-32 w-32 overflow-hidden rounded-full border-4 border-[#f3e9dc]">
+                  <img src={imagePreview || profileForm.photo_url || 'https://images.pexels.com/photos/733872/pexels-photo-733872.jpeg?auto=compress&cs=tinysrgb&w=300'} alt="Photo" className="h-full w-full object-cover" />
+                  <label className="absolute inset-0 flex cursor-pointer items-center justify-center bg-black/40 opacity-0 transition hover:opacity-100">
+                    <Upload size={20} className="text-white" />
+                    <input
+                      type="file"
+                      accept="image/png,image/jpeg,image/jpg"
+                      className="hidden"
+                      onChange={(e) => handleProfileImageSelection(e.target.files?.[0], null)}
+                    />
+                  </label>
+                  {uploadingImage && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/50">
+                      <div className="h-6 w-6 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
                     </div>
-                  ))}
-                  {matches.length > 10 && (
-                    <p className="text-center text-xs text-[#9a8b82]">... et {matches.length - 10} autres</p>
                   )}
                 </div>
-              </>
-            )}
-          </div>
-        )}
-
-        {/* STORIES TAB */}
-
-        {/* EVENTS TAB */}
-        {tab === 'events' && (
-          <div className="mt-8 space-y-4">
-            {events.length === 0 ? (
-              <div className="rounded-[26px] bg-white p-12 text-center shadow-[0_8px_30px_rgba(83,46,32,.05)]">
-                <CalendarDays size={36} className="mx-auto text-[#dfd2c6]" />
-                <p className="mt-4 font-display text-2xl">Aucun événement à venir</p>
-                <p className="mt-2 text-sm text-[#756960]">Les prochains rendez-vous seront bientôt annoncés.</p>
+                <p className="mt-4 font-display text-2xl">{profileForm.display_name || 'Votre nom'}</p>
+                <p className="mt-1 text-sm text-[#756960]">{profileForm.profession || 'Votre profession'}</p>
+                <p className="mt-1 text-sm text-[#756960]">{profileForm.city}</p>
+                {profile?.is_verified && <span className="mt-3 inline-flex items-center gap-1 rounded-full bg-[#e5f0ed] px-3 py-1.5 text-[10px] font-extrabold uppercase text-[#1a6b68]"><ShieldCheck size={12} /> Vérifié</span>}
+                {!profile?.is_verified && <p className="mt-3 text-xs text-[#9a8b82]">Profil non vérifié</p>}
               </div>
-            ) : (
-              events.map((e) => (
-                <div key={e.id} className="flex items-center justify-between rounded-2xl bg-white p-5 shadow-[0_6px_20px_rgba(83,46,32,.04)]">
-                  <div className="flex items-center gap-4">
-                    <div className="flex h-14 w-14 flex-col items-center justify-center rounded-2xl bg-[#fae4e2] text-[#ec3b78]"><CalendarDays size={18} /></div>
-                    <div><p className="font-display text-lg">{e.title}</p><p className="text-sm text-[#756960]">{formatDate(e.event_date)} · {e.location}</p></div>
+              <form onSubmit={saveProfile} className="rounded-[26px] bg-white p-6 shadow-[0_8px_30px_rgba(83,46,32,.05)] lg:p-8">
+                <h2 className="font-display text-2xl">Mes informations</h2>
+                <p className="mt-1 text-sm text-[#756960]">Renseignez votre profil pour augmenter vos chances de match.</p>
+                <div className="mt-6 grid gap-4 sm:grid-cols-2">
+                  <label className="block text-xs font-extrabold text-[#625852]">Nom affiché<input value={profileForm.display_name} onChange={(e) => setProfileForm({ ...profileForm, display_name: e.target.value })} required placeholder="Votre nom" className="mt-2 w-full rounded-xl border border-[#dfd2c6] bg-[#fbf8f2] px-4 py-3 text-sm outline-none focus:border-[#ec3b78]" /></label>
+                  <label className="block text-xs font-extrabold text-[#625852]">Âge<input value={profileForm.age} onChange={(e) => setProfileForm({ ...profileForm, age: e.target.value })} type="number" min="18" max="99" required className="mt-2 w-full rounded-xl border border-[#dfd2c6] bg-[#fbf8f2] px-4 py-3 text-sm outline-none focus:border-[#ec3b78]" /></label>
+                  <label className="block text-xs font-extrabold text-[#625852]">Ville<input value={profileForm.city} onChange={(e) => setProfileForm({ ...profileForm, city: e.target.value })} required className="mt-2 w-full rounded-xl border border-[#dfd2c6] bg-[#fbf8f2] px-4 py-3 text-sm outline-none focus:border-[#ec3b78]" /></label>
+                  <label className="block text-xs font-extrabold text-[#625852]">Profession<input value={profileForm.profession} onChange={(e) => setProfileForm({ ...profileForm, profession: e.target.value })} className="mt-2 w-full rounded-xl border border-[#dfd2c6] bg-[#fbf8f2] px-4 py-3 text-sm outline-none focus:border-[#ec3b78]" /></label>
+                  <div className="sm:col-span-2">
+                    <p className="text-xs font-extrabold text-[#625852]">Photo de profil</p>
+                    <p className="mt-1 text-xs text-[#9a8b82]">Cliquez sur l&apos;image pour changer (PNG, JPG, max 5MB)</p>
                   </div>
-                  <Link href="/evenements" className="rounded-full bg-[#1a6b68] px-5 py-2.5 text-xs font-extrabold text-white transition hover:bg-[#125552]">Détails</Link>
+                  <label className="block text-xs font-extrabold text-[#625852] sm:col-span-2">Centres d&apos;intérêt (séparés par des virgules)<input value={profileForm.interests} onChange={(e) => setProfileForm({ ...profileForm, interests: e.target.value })} placeholder="Voyage, Cuisine, Musique..." className="mt-2 w-full rounded-xl border border-[#dfd2c6] bg-[#fbf8f2] px-4 py-3 text-sm outline-none focus:border-[#ec3b78]" /></label>
+                  <label className="block text-xs font-extrabold text-[#625852] sm:col-span-2">Bio<textarea value={profileForm.bio} onChange={(e) => setProfileForm({ ...profileForm, bio: e.target.value })} rows={4} placeholder="Parlez de vous..." className="mt-2 w-full rounded-xl border border-[#dfd2c6] bg-[#fbf8f2] px-4 py-3 text-sm outline-none focus:border-[#ec3b78]" /></label>
                 </div>
-              ))
-            )}
-          </div>
-        )}
+
+                <div className="mt-8 rounded-[22px] border border-[#dfd2c6] bg-[#fdf9f4] p-4 transition dark:border-[#3a3a3a] dark:bg-[#1d1f24]">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-[10px] font-extrabold uppercase tracking-[0.18em] text-[#625852] dark:text-[#d8d5d2]">Mes Gallery</p>
+                      <h3 className="mt-1 font-display text-xl text-[#241c18] dark:text-white">Photos optionnelles</h3>
+                    </div>
+                    <span className="rounded-full bg-[#fce6ee] px-3 py-1 text-[10px] font-extrabold uppercase tracking-[0.14em] text-[#ec3b78] dark:bg-[#3a1e2a] dark:text-[#f9bfd2]">
+                      {galleryPhotos.filter(Boolean).length}/6
+                    </span>
+                  </div>
+                  <p className="mt-2 text-xs text-[#9a8b82] dark:text-[#c9c3bf]">Ajoutez jusqu’à 6 photos supplémentaires pour enrichir votre profil. C’est 100% optionnel.</p>
+
+                  <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                    {Array.from({ length: 6 }, (_, index) => (
+                      <button
+                        key={`gallery-slot-${index}`}
+                        type="button"
+                        onClick={() => {
+                          setGalleryUploadIndex(index);
+                          galleryFileInputRef.current?.click();
+                        }}
+                        className="group relative flex aspect-[4/5] w-full items-center justify-center overflow-hidden rounded-[20px] border border-dashed border-[#d9c9ba] bg-white transition hover:border-[#ec3b78] dark:border-[#4a4a4a] dark:bg-[#27272a] dark:hover:border-[#ff7ab3]"
+                      >
+                        {galleryPhotos[index] ? (
+                          <>
+                            <img src={galleryPhotos[index]!} alt={`Photo ${index + 1}`} className="h-full w-full object-cover" />
+                            <div className="absolute inset-0 bg-black/20 opacity-0 transition group-hover:opacity-100" />
+                            <div className="absolute bottom-2 left-2 right-2 rounded-full bg-black/45 px-2 py-1 text-[9px] font-extrabold uppercase tracking-[0.16em] text-white opacity-0 transition group-hover:opacity-100">
+                              Remplacer
+                            </div>
+                          </>
+                        ) : (
+                          <div className="flex flex-col items-center justify-center gap-2 text-[#9a8b82] dark:text-[#c9c3bf]">
+                            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#fce6ee] text-[#ec3b78] dark:bg-[#3a1e2a] dark:text-[#f9bfd2]">
+                              <Plus size={20} />
+                            </div>
+                            <span className="text-[10px] font-extrabold uppercase tracking-[0.18em]">Ajouter</span>
+                          </div>
+                        )}
+
+                        {galleryUploadingIndex === index && (
+                          <div className="absolute inset-0 flex items-center justify-center bg-black/35">
+                            <div className="h-6 w-6 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
+                          </div>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="mt-6 flex items-center gap-4">
+                  <button type="submit" className="rounded-full bg-[#ec3b78] px-6 py-3.5 text-sm font-extrabold text-white transition hover:bg-[#c92e63]">Enregistrer</button>
+                  {profileSaved && <span className="flex items-center gap-2 text-sm font-bold text-[#1a6b68]"><Check size={16} /> Profil mis à jour !</span>}
+                </div>
+              </form>
+            </div>
+          )}
+
+          {/* MESSAGES TAB */}
+          {tab === 'messages' && (
+            <div>
+              <div className="grid gap-6 lg:grid-cols-[340px_1fr]">
+              <div className={`${activeConv ? 'hidden lg:block' : 'block'} rounded-[26px] border border-[#dfd2c6] bg-white p-4 shadow-[0_8px_30px_rgba(83,46,32,.05)]`}>
+                <p className="px-2 pb-3 font-display text-xl">Conversations</p>
+                {conversations.length > 0 && (
+                  <div className="relative mb-3 px-2">
+                    <Search size={15} className="absolute left-5 top-1/2 -translate-y-1/2 text-[#9a8b82]" />
+                    <input
+                      value={messageSearch}
+                      onChange={(e) => setMessageSearch(e.target.value)}
+                      placeholder="Rechercher une personne..."
+                      className="w-full rounded-full border border-[#dfd2c6] bg-[#fbf8f2] py-2.5 pl-9 pr-3 text-xs outline-none transition focus:border-[#ec3b78]"
+                    />
+                  </div>
+                )}
+                {conversations.length === 0 ? (
+                  <div className="px-2 py-8 text-center">
+                    <MessageCircle size={28} className="mx-auto text-[#dfd2c6]" />
+                    <p className="mt-3 text-sm text-[#756960]">Aucune conversation pour l&apos;instant.</p>
+                    <p className="mt-1 text-xs text-[#9a8b82]">Quand vous ferez un match, vos conversations apparaîtront ici.</p>
+                    <Link href="/decouverte" className="mt-4 inline-block rounded-full bg-[#ec3b78] px-5 py-2.5 text-xs font-extrabold text-white">Découvrir des profils</Link>
+                  </div>
+                ) : filteredConversations.length === 0 ? (
+                  <p className="px-2 py-8 text-center text-sm text-[#9a8b82]">Aucune conversation ne correspond à « {messageSearch} ».</p>
+                ) : (
+                  <div className="space-y-1">
+                    {filteredConversations.map((c) => {
+                      const otherId = c.user_a === user.id ? c.user_b : c.user_a;
+                      const otherProfile = conversationProfiles[otherId];
+                      const lastMsg = lastMessages[c.id];
+                      const unreadCount = unreadCounts[c.id] || 0;
+                      return (
+                        <button 
+                          key={c.id} 
+                          onClick={() => {
+                            setActiveConv(c.id);
+                            // Marquer comme lu
+                            if (unreadCounts[c.id] > 0) {
+                              setUnreadCounts((prev) => ({ ...prev, [c.id]: 0 }));
+                              setTotalUnread((prev) => Math.max(0, prev - unreadCounts[c.id]));
+                              setUnreadCount(Math.max(0, totalUnread - unreadCounts[c.id]));
+                            }
+                          }} 
+                          className={`w-full flex items-center gap-3 rounded-xl border border-[#dfd2c6] px-3 py-3 text-left transition ${activeConv === c.id ? 'bg-[#fae4e2]' : 'hover:bg-[#f3e9dc]'}`}
+                        >
+                          <div className="relative shrink-0">
+                            <div className="h-12 w-12 overflow-hidden rounded-full border-2 border-[#f3e9dc]">
+                              <img src={otherProfile?.photo_url} alt={otherProfile?.display_name} className="h-full w-full object-cover" />
+                            </div>
+                            {unreadCount > 0 && (
+                              <span className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-[#ec3b78] text-[10px] font-extrabold text-white">
+                                {unreadCount > 9 ? '9+' : unreadCount}
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between">
+                              <p className="text-sm font-bold text-[#241c18] truncate">{otherProfile?.display_name || 'Utilisateur'}</p>
+                              {lastMsg && <p className="text-[10px] text-[#9a8b82]">{lastMsg.time}</p>}
+                            </div>
+                            <p className="mt-0.5 text-xs text-[#9a8b82] truncate">
+                              {lastMsg ? lastMsg.content : 'Aucun message'}
+                            </p>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+              <div className={`${activeConv ? 'flex' : 'hidden lg:flex'} h-[calc(100vh-150px)] min-h-[460px] flex-col rounded-[26px] bg-white p-4 shadow-[0_8px_30px_rgba(83,46,32,.05)]`}>
+                {activeConv ? (
+                  <>
+                    <div className="mb-3 flex items-center gap-3 border-b border-[#eadfd5] pb-3">
+                      <button
+                        type="button"
+                        onClick={() => setActiveConv(null)}
+                        className="flex h-9 w-9 items-center justify-center rounded-full border border-[#dfd2c6] text-[#625852] lg:hidden"
+                        aria-label="Retour aux conversations"
+                      >
+                        <ArrowLeft size={17} />
+                      </button>
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full border border-[#f3e9dc] bg-[#f3e9dc] text-sm font-bold text-[#1a6b68]">
+                        {activeConversationProfile?.photo_url ? (
+                          <img src={activeConversationProfile.photo_url} alt="" className="h-full w-full object-cover" />
+                        ) : (
+                          activeConversationProfile?.display_name?.charAt(0).toUpperCase() || '?'
+                        )}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-extrabold text-[#241c18]">
+                          {activeConversationProfile?.display_name || 'Utilisateur'}
+                        </p>
+                        <p className="flex items-center gap-1.5 text-xs text-[#9a8b82]">
+                          <span className={`h-2 w-2 rounded-full ${activeConversationProfile?.is_online ? 'bg-[#1a6b68]' : 'bg-[#b8aaa1]'}`} />
+                          {activeConversationProfile?.is_online ? 'En ligne' : 'Hors ligne'}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex-1 space-y-3 overflow-y-auto rounded-xl bg-[#fbf8f2] p-4">
+                      {messages.map((m) => (
+                        <div key={m.id} className={`flex ${m.sender_id === user.id ? 'justify-end' : 'justify-start'}`}>
+                          <div className={`max-w-[75%] rounded-2xl px-4 py-2.5 text-sm ${m.sender_id === user.id ? 'bg-[#ec3b78] text-white' : 'bg-white text-[#241c18] shadow-sm'}`}>
+                            <p>{m.content}</p>
+                            {m.sender_id === user.id && (
+                              <div className="mt-1 flex items-center justify-end gap-1">
+                                <span className="text-[10px] opacity-70">
+                                  {new Date(m.created_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+                                </span>
+                                {m.is_read ? (
+                                  <CheckCheck size={14} className="text-[#53bdeb]" />
+                                ) : (
+                                  <Check size={14} className="opacity-50" />
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                      {messages.length === 0 && <p className="py-8 text-center text-sm text-[#9a8b82]">Démarrez la conversation.</p>}
+                    </div>
+                    <form onSubmit={sendMessage} className="mt-3 flex gap-2">
+                      <input value={newMessage} onChange={(e) => setNewMessage(e.target.value)} placeholder="Votre message..." className="flex-1 rounded-full border border-[#dfd2c6] bg-[#fbf8f2] px-4 py-3 text-sm outline-none focus:border-[#ec3b78]" />
+                      <button type="submit" className="flex h-12 w-12 items-center justify-center rounded-full bg-[#ec3b78] text-white transition hover:bg-[#c92e63]"><Send size={18} /></button>
+                    </form>
+                  </>
+                ) : (
+                  <div className="flex flex-1 flex-col items-center justify-center text-center">
+                    <MessageCircle size={36} className="text-[#dfd2c6]" />
+                    <p className="mt-3 text-sm font-bold text-[#756960]">Sélectionnez une conversation</p>
+                    <p className="mt-1 text-xs text-[#9a8b82]">Vos messages s&apos;afficheront ici.</p>
+                  </div>
+                )}
+              </div>
+              </div>
+            </div>
+          )}
+
+          {/* LIKES TAB */}
+          {tab === 'likes' && (
+            <div>
+              <div className="mb-6 flex items-center gap-4">
+                <button
+                  onClick={() => setLikesView('received')}
+                  className={`rounded-full px-4 py-2 text-xs font-extrabold transition ${likesView === 'received' ? 'bg-[#ec3b78] text-white' : 'bg-[#f3e9dc] text-[#756960] hover:bg-[#e7cfc0]'}`}
+                >
+                  Qui m&apos;a liké ({receivedLikes.length})
+                </button>
+                <button
+                  onClick={() => setLikesView('sent')}
+                  className={`rounded-full px-4 py-2 text-xs font-extrabold transition ${likesView === 'sent' ? 'bg-[#ec3b78] text-white' : 'bg-[#f3e9dc] text-[#756960] hover:bg-[#e7cfc0]'}`}
+                >
+                  Ce que j&apos;ai liké ({likedProfiles.length})
+                </button>
+              </div>
+
+              {likesView === 'received' ? (
+                <>
+                  {receivedLikes.length === 0 ? (
+                    <div className="rounded-[26px] bg-white p-8 text-center shadow-[0_8px_30px_rgba(83,46,32,.05)]">
+                      <Heart size={28} className="mx-auto text-[#dfd2c6]" />
+                      <p className="mt-3 font-display text-xl">Personne ne vous a liké pour l&apos;instant</p>
+                      <p className="mt-1 text-sm text-[#756960]">Explorez la découverte pour attirer l&apos;attention.</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {receivedLikes.slice(0, 10).map((p) => (
+                        <div key={p.id} className="flex items-center gap-4 rounded-[16px] bg-white p-3 shadow-[0_4px_15px_rgba(83,46,32,.04)] transition hover:shadow-[0_8px_25px_rgba(83,46,32,.08)]">
+                          <div className="relative shrink-0 cursor-pointer" onClick={() => setSelectedReceivedProfile(p)}>
+                            <div className="h-14 w-14 overflow-hidden rounded-full border-3 border-[#f3e9dc]">
+                              <img src={p.photo_url} alt={p.display_name} className="h-full w-full object-cover" />
+                            </div>
+                            <span className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-[#ec3b78]"><Heart size={10} fill="currentColor" className="text-white" /></span>
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-display text-base font-semibold truncate">{p.display_name}, <span className="text-[#9a8b82]">{p.age}</span></p>
+                            <p className="text-xs text-[#756960]">{p.city} · {p.profession}</p>
+                          </div>
+                          <button
+                            onClick={() => handleLikeBack(p.id)}
+                            className="shrink-0 rounded-full bg-[#1a6b68] px-4 py-2 text-xs font-extrabold text-white transition hover:bg-[#125552]"
+                          >
+                            Liker
+                          </button>
+                        </div>
+                      ))}
+                      {receivedLikes.length > 10 && (
+                        <p className="text-center text-xs text-[#9a8b82]">... et {receivedLikes.length - 10} autres</p>
+                      )}
+                    </div>
+                  )}
+                </>
+              ) : (
+                <>
+                  {likedProfiles.length === 0 ? (
+                    <div className="rounded-[26px] bg-white p-8 text-center shadow-[0_8px_30px_rgba(83,46,32,.05)]">
+                      <Heart size={28} className="mx-auto text-[#dfd2c6]" />
+                      <p className="mt-3 font-display text-xl">Vous n&apos;avez liké personne pour l&apos;instant</p>
+                      <p className="mt-1 text-sm text-[#756960]">Explorez la découverte et likez les profils qui vous inspirent.</p>
+                      <Link href="/decouverte" className="mt-4 inline-flex items-center gap-2 rounded-full bg-[#ec3b78] px-6 py-3 text-sm font-extrabold text-white transition hover:bg-[#c92e63]">Aller à la découverte <ArrowRight size={16} /></Link>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {likedProfiles.slice(0, 10).map((p) => (
+                        <div key={p.id} className="flex items-center gap-4 rounded-[16px] bg-white p-3 shadow-[0_4px_15px_rgba(83,46,32,.04)] transition hover:shadow-[0_8px_25px_rgba(83,46,32,.08)]">
+                          <div className="relative shrink-0 cursor-pointer" onClick={() => setSelectedLikedProfile(p)}>
+                            <div className="h-14 w-14 overflow-hidden rounded-full border-3 border-[#f3e9dc]">
+                              <img src={p.photo_url} alt={p.display_name} className="h-full w-full object-cover" />
+                            </div>
+                            <span className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-[#ec3b78]"><Heart size={10} fill="currentColor" className="text-white" /></span>
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-display text-base font-semibold truncate">{p.display_name}, <span className="text-[#9a8b82]">{p.age}</span></p>
+                            <p className="text-xs text-[#756960]">{p.city} · {p.profession}</p>
+                          </div>
+                          <div className="shrink-0 text-xs text-[#9a8b82]">En attente...</div>
+                        </div>
+                      ))}
+                      {likedProfiles.length > 10 && (
+                        <p className="text-center text-xs text-[#9a8b82]">... et {likedProfiles.length - 10} autres</p>
+                      )}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          )}
+
+          {/* MATCHES TAB */}
+          {tab === 'matches' && (
+            <div>
+              <h2 className="mb-4 font-display text-2xl">Mes matches</h2>
+              {matches.length === 0 ? (
+                <div className="rounded-[26px] bg-white p-8 text-center shadow-[0_8px_30px_rgba(83,46,32,.05)]">
+                  <Heart size={28} className="mx-auto text-[#dfd2c6]" />
+                  <p className="mt-3 font-display text-xl">Aucun match pour l&apos;instant</p>
+                  <p className="mt-1 text-sm text-[#756960]">Likez des profils pour créer des matches mutuels.</p>
+                </div>
+              ) : (
+                <>
+                  <p className="mb-4 text-sm font-bold text-[#756960]">{matches.length} match(s)</p>
+                  <div className="space-y-3">
+                    {matches.slice(0, 10).map((p) => (
+                      <div key={p.id} className="flex items-center gap-4 rounded-[16px] bg-white p-3 shadow-[0_4px_15px_rgba(83,46,32,.04)] transition hover:shadow-[0_8px_25px_rgba(83,46,32,.08)]">
+                        <div className="relative shrink-0 cursor-pointer" onClick={() => setSelectedMatch(p)}>
+                          <div className="h-14 w-14 overflow-hidden rounded-full border-3 border-[#1a6b68]">
+                            <img src={p.photo_url} alt={p.display_name} className="h-full w-full object-cover" />
+                          </div>
+                          <span className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-[#1a6b68]"><Heart size={10} fill="currentColor" className="text-white" /></span>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-display text-base font-semibold truncate">{p.display_name}, <span className="text-[#9a8b82]">{p.age}</span></p>
+                          <p className="text-xs text-[#756960]">{p.city} · {p.profession}</p>
+                        </div>
+                        <button
+                          onClick={() => { setTab('messages'); }}
+                          className="shrink-0 rounded-full bg-[#ec3b78] px-4 py-2 text-xs font-extrabold text-white transition hover:bg-[#c92e63]"
+                        >
+                          Discuter
+                        </button>
+                      </div>
+                    ))}
+                    {matches.length > 10 && (
+                      <p className="text-center text-xs text-[#9a8b82]">... et {matches.length - 10} autres</p>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+
+          {/* EVENTS TAB */}
+          {tab === 'events' && (
+            <div className="space-y-4">
+              {events.length === 0 ? (
+                <div className="rounded-[26px] bg-white p-12 text-center shadow-[0_8px_30px_rgba(83,46,32,.05)]">
+                  <CalendarDays size={36} className="mx-auto text-[#dfd2c6]" />
+                  <p className="mt-4 font-display text-2xl">Aucun événement à venir</p>
+                  <p className="mt-2 text-sm text-[#756960]">Les prochains rendez-vous seront bientôt annoncés.</p>
+                </div>
+              ) : (
+                events.map((e) => (
+                  <div key={e.id} className="flex items-center justify-between rounded-2xl bg-white p-5 shadow-[0_6px_20px_rgba(83,46,32,.04)]">
+                    <div className="flex items-center gap-4">
+                      <div className="flex h-14 w-14 flex-col items-center justify-center rounded-2xl bg-[#fae4e2] text-[#ec3b78]"><CalendarDays size={18} /></div>
+                      <div><p className="font-display text-lg">{e.title}</p><p className="text-sm text-[#756960]">{formatDate(e.event_date)} · {e.location}</p></div>
+                    </div>
+                    <Link href="/evenements" className="rounded-full bg-[#1a6b68] px-5 py-2.5 text-xs font-extrabold text-white transition hover:bg-[#125552]">Détails</Link>
+                  </div>
+                ))
+              )}
+            </div>
+          )}
+
+          {/* SETTINGS TABS */}
+          {tab.startsWith('settings-') && (
+            <SettingsPanels
+              tab={tab}
+              profile={profile}
+              privacySettings={privacySettings}
+              setPrivacySettings={setPrivacySettings}
+              savePrivacy={savePrivacy}
+              privacySaved={privacySaved}
+              securityForm={securityForm}
+              setSecurityForm={setSecurityForm}
+              changePassword={changePassword}
+              securityMessage={securityMessage}
+              securityLoading={securityLoading}
+              showNewPw={showNewPw}
+              setShowNewPw={setShowNewPw}
+              onGoToProfileTab={() => setTab('profile')}
+            />
+          )}
+        </div>
       </div>
 
       {/* PROFILE DETAIL MODALS */}
@@ -1186,5 +1476,3 @@ export default function EspacePage() {
     </main>
   );
 }
-
-

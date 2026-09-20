@@ -92,8 +92,15 @@ export default function DecouvertePage() {
                   className="min-w-[260px] rounded-[28px] border border-[#e9d9ce] bg-white p-5 shadow-[0_10px_30px_rgba(83,46,32,.04)] transition hover:shadow-[0_18px_40px_rgba(83,46,32,.1)]"
                 >
                   <div className="flex items-center justify-between">
-                    <div className="flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-[#ec3b78] to-[#d89b52] text-2xl font-black text-white">
-                      {getFirstNameInitial(profile.display_name)}
+                    {/* Photo réelle, mais floutée : on donne un aperçu sans révéler l'identité tant que la personne n'a pas de compte. */}
+                    <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-full border-2 border-[#f3e9dc] bg-[#f3e9dc]">
+                      <img
+                        src={profile.photo_url}
+                        alt=""
+                        aria-hidden="true"
+                        className="h-full w-full scale-110 object-cover blur-md"
+                      />
+                      <div className="absolute inset-0 bg-black/10" />
                     </div>
                     {profile.is_verified && (
                       <span className="rounded-full bg-[#e5f0ed] px-2.5 py-1 text-[9px] font-extrabold uppercase tracking-[.14em] text-[#1a6b68]">
@@ -106,6 +113,7 @@ export default function DecouvertePage() {
                     <p className="text-[10px] font-extrabold uppercase tracking-[.18em] text-[#9a8b82]">Profil</p>
                     <h3 className="mt-2 font-display text-4xl leading-none text-[#241c18]">
                       {getFirstNameInitial(profile.display_name)}
+                      <span className="text-[#d9c9ba]">...</span>
                     </h3>
                   </div>
 

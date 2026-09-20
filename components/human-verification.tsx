@@ -1,7 +1,6 @@
 'use client';
 
-import Script from 'next/script';
-import { useCallback, useEffect, useId, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useRef } from 'react';
 import { turnstileSiteKey } from '@/lib/turnstile-public';
 
 type TurnstileApi = {
@@ -37,9 +36,13 @@ type HumanVerificationProps = {
 export function HumanVerification({ onToken, onExpire, onError, className }: HumanVerificationProps) {
   const containerId = useId().replace(/:/g, '');
   const widgetIdRef = useRef<string | null>(null);
-  const [scriptReady, setScriptReady] = useState(false);
 
   const renderWidget = useCallback(() => {
+    if (!turnstileSiteKey) {
+      onError?.();
+      return;
+    }
+
     const container = document.getElementById(containerId);
     if (!container || !window.turnstile) return;
 
@@ -69,23 +72,44 @@ export function HumanVerification({ onToken, onExpire, onError, className }: Hum
   }, [containerId, onError, onExpire, onToken]);
 
   useEffect(() => {
-    if (scriptReady) renderWidget();
+    if (!turnstileSiteKey) return;
+
+    const scriptSrc = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
+    const existingScript = document.querySelector(`script[src="${scriptSrc}"]`);
+
+    const initialize = () => {
+      if (window.turnstile) {
+        renderWidget();
+      }
+    };
+
+    if (existingScript) {
+      if (window.turnstile) {
+        renderWidget();
+      } else {
+        existingScript.addEventListener('load', initialize, { once: true });
+      }
+      return;
+    }
+
+    const script = document.createElement('script');
+    script.src = scriptSrc;
+    script.async = true;
+    script.defer = true;
+    script.onload = initialize;
+    script.onerror = () => onError?.();
+    document.body.appendChild(script);
+
     return () => {
       if (widgetIdRef.current && window.turnstile) {
         window.turnstile.remove(widgetIdRef.current);
         widgetIdRef.current = null;
       }
+      if (script.parentNode) {
+        script.parentNode.removeChild(script);
+      }
     };
-  }, [scriptReady, renderWidget]);
+  }, [onError, renderWidget]);
 
-  return (
-    <div className={className}>
-      <Script
-        src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit"
-        strategy="lazyOnload"
-        onLoad={() => setScriptReady(true)}
-      />
-      <div id={containerId} />
-    </div>
-  );
+  return <div id={containerId} className={className} />;
 }

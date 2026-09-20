@@ -3,8 +3,8 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
-import { Menu, X, Heart, LogOut, LayoutDashboard, Bell, Moon, Sun, MessageCircle, CalendarDays, ChevronRight } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { Menu, X, Heart, LogOut, LayoutDashboard, Bell, Moon, Sun, MessageCircle, CalendarDays, ChevronRight, Settings } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
@@ -20,6 +20,16 @@ type NotificationPreview = {
   unread: boolean;
 };
 
+type MiniProfile = {
+  display_name: string;
+  photo_url: string;
+  is_online: boolean;
+  city: string;
+};
+
+const fallbackAvatar =
+  'https://images.pexels.com/photos/733872/pexels-photo-733872.jpeg?auto=compress&cs=tinysrgb&w=300';
+
 export function Navbar() {
   const [open, setOpen] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
@@ -27,6 +37,9 @@ export function Navbar() {
   const [notificationOpen, setNotificationOpen] = useState(false);
   const [notifications, setNotifications] = useState<NotificationPreview[]>([]);
   const [unreadEventCount, setUnreadEventCount] = useState(0);
+  const [miniProfile, setMiniProfile] = useState<MiniProfile | null>(null);
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+  const profileMenuRef = useRef<HTMLDivElement | null>(null);
   const { user, signOut, unreadCount, setUnreadCount } = useAuth();
   const router = useRouter();
   const { resolvedTheme, setTheme } = useTheme();
@@ -61,6 +74,51 @@ export function Navbar() {
 
   useEffect(() => {
     if (!user) {
+      setMiniProfile(null);
+      return;
+    }
+
+    let cancelled = false;
+    const loadMiniProfile = async () => {
+      const { data } = await supabase
+        .from('profiles')
+        .select('full_name, avatar_urls, is_online, city')
+        .eq('id', user.id)
+        .maybeSingle();
+      if (!cancelled && data) {
+        setMiniProfile({
+          display_name: data.full_name || 'Mon profil',
+          photo_url: data.avatar_urls?.[0] || fallbackAvatar,
+          is_online: Boolean(data.is_online),
+          city: data.city || '',
+        });
+      }
+    };
+
+    void loadMiniProfile();
+    const channel = supabase
+      .channel(`navbar-profile-${user.id}`)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'profiles', filter: `id=eq.${user.id}` }, () => void loadMiniProfile())
+      .subscribe();
+
+    return () => {
+      cancelled = true;
+      void supabase.removeChannel(channel);
+    };
+  }, [user]);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (profileMenuRef.current && !profileMenuRef.current.contains(event.target as Node)) {
+        setProfileMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  useEffect(() => {
+    if (!user) {
       setNotifications([]);
       setUnreadEventCount(0);
       return;
@@ -79,9 +137,10 @@ export function Navbar() {
           .limit(6),
         supabase
           .from('events')
-          .select('id, title, description, date, location, city, image_url')
+          .select('id, title, description, date, location, city, image_url, created_at')
           .eq('is_active', true)
           .gte('date', new Date().toISOString())
+          .gte('created_at', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString())
           .order('date', { ascending: true })
           .limit(5),
       ]);
@@ -115,13 +174,13 @@ export function Navbar() {
           unread: true,
         };
       });
-      const eventNotifications: NotificationPreview[] = (eventRows ?? []).map((row: { id: string; title: string; description: string | null; date: string; location: string; city: string | null }) => ({
+      const eventNotifications: NotificationPreview[] = (eventRows ?? []).map((row: { id: string; title: string; description: string | null; date: string; location: string; city: string | null; created_at: string }) => ({
         id: `event-${row.id}`,
         type: 'event',
         title: row.title,
-        message: `${new Date(row.date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })} · ${row.location}${row.city ? `, ${row.city}` : ''}`,
+        message: row.description?.trim() || `${new Date(row.date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })} · ${row.location}${row.city ? `, ${row.city}` : ''}`,
         href: '/espace?tab=events',
-        createdAt: row.date,
+        createdAt: row.created_at,
         unread: !readEventSet.has(row.id),
       }));
 
@@ -172,6 +231,7 @@ export function Navbar() {
   };
 
   const handleSignOut = async () => {
+    setProfileMenuOpen(false);
     await signOut();
     router.push('/');
   };
@@ -269,17 +329,68 @@ export function Navbar() {
                     </div>
                   )}
                 </div>
-              <Link href="/espace" className="flex items-center gap-2 px-4 py-2.5 text-[13px] font-bold text-[#625852] transition hover:text-[#ec3b78]">
-                <LayoutDashboard size={16} /> Mon espace
-              </Link>
-              {isAdmin && (
-                <Link href="/admin" className="flex items-center gap-2 px-4 py-2.5 text-[13px] font-bold text-[#756960] transition hover:text-[#ec3b78]">
-                  Admin
-                </Link>
-              )}
-              <button onClick={handleSignOut} className="flex items-center gap-2 rounded-full border border-[#dfd2c6] px-4 py-2.5 text-[13px] font-bold text-[#625852] transition hover:border-[#ec3b78] hover:text-[#ec3b78]">
-                <LogOut size={15} /> Déconnexion
-              </button>
+
+              {/* PROFIL CONNECTÉ : photo + statut, carte au survol/clic */}
+              <div
+                ref={profileMenuRef}
+                className="relative"
+                onMouseEnter={() => setProfileMenuOpen(true)}
+                onMouseLeave={() => setProfileMenuOpen(false)}
+              >
+                <button
+                  type="button"
+                  onClick={() => setProfileMenuOpen((o) => !o)}
+                  aria-expanded={profileMenuOpen}
+                  className="flex items-center gap-2 rounded-full border border-[#dfd2c6] bg-white py-1 pl-1 pr-3 transition hover:border-[#ec3b78]"
+                >
+                  <span className="relative h-8 w-8 shrink-0 overflow-hidden rounded-full bg-[#f3e9dc]">
+                    <img src={miniProfile?.photo_url || fallbackAvatar} alt="" className="h-full w-full object-cover" />
+                    <span className={`absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-white ${miniProfile?.is_online ? 'bg-[#1a6b68]' : 'bg-[#b8aaa1]'}`} />
+                  </span>
+                  <span className="hidden text-left lg:block">
+                    <span className="block max-w-[110px] truncate text-xs font-extrabold text-[#241c18]">
+                      {miniProfile?.display_name ?? '...'}
+                    </span>
+                    <span className={`block text-[10px] font-bold ${miniProfile?.is_online ? 'text-[#1a6b68]' : 'text-[#9a8b82]'}`}>
+                      {miniProfile?.is_online ? 'En ligne' : 'Hors ligne'}
+                    </span>
+                  </span>
+                </button>
+
+                {profileMenuOpen && (
+                  <div className="absolute right-0 top-full z-50 mt-2 w-[270px] overflow-hidden rounded-2xl border border-[#dfd2c6] bg-white shadow-[0_18px_50px_rgba(83,46,32,.18)]">
+                    <div className="flex items-center gap-3 border-b border-[#f0e5dc] px-4 py-4">
+                      <span className="relative h-12 w-12 shrink-0 overflow-hidden rounded-full bg-[#f3e9dc]">
+                        <img src={miniProfile?.photo_url || fallbackAvatar} alt="" className="h-full w-full object-cover" />
+                        <span className={`absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-white ${miniProfile?.is_online ? 'bg-[#1a6b68]' : 'bg-[#b8aaa1]'}`} />
+                      </span>
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-extrabold text-[#241c18]">{miniProfile?.display_name ?? 'Mon profil'}</p>
+                        <p className={`text-xs font-bold ${miniProfile?.is_online ? 'text-[#1a6b68]' : 'text-[#9a8b82]'}`}>
+                          {miniProfile?.is_online ? 'En ligne' : 'Hors ligne'}
+                          {miniProfile?.city ? ` · ${miniProfile.city}` : ''}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="p-2">
+                      <Link href="/espace" onClick={() => setProfileMenuOpen(false)} className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-bold text-[#625852] transition hover:bg-[#fbf3ee]">
+                        <LayoutDashboard size={16} /> Mon espace
+                      </Link>
+                      <Link href="/espace?tab=settings-profile" onClick={() => setProfileMenuOpen(false)} className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-bold text-[#625852] transition hover:bg-[#fbf3ee]">
+                        <Settings size={16} /> Paramètres
+                      </Link>
+                      {isAdmin && (
+                        <Link href="/admin" onClick={() => setProfileMenuOpen(false)} className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-bold text-[#625852] transition hover:bg-[#fbf3ee]">
+                          <ChevronRight size={16} /> Admin
+                        </Link>
+                      )}
+                      <button onClick={handleSignOut} className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-bold text-[#c92e63] transition hover:bg-[#fae4e2]">
+                        <LogOut size={16} /> Déconnexion
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
             </>
           ) : (
             <>
@@ -314,6 +425,24 @@ export function Navbar() {
             </button>
             {user ? (
               <>
+                {/* Résumé du profil connecté */}
+                <Link
+                  href="/espace"
+                  onClick={() => setOpen(false)}
+                  className="flex items-center gap-3 rounded-2xl border border-[#dfd2c6] bg-white p-3"
+                >
+                  <span className="relative h-11 w-11 shrink-0 overflow-hidden rounded-full bg-[#f3e9dc]">
+                    <img src={miniProfile?.photo_url || fallbackAvatar} alt="" className="h-full w-full object-cover" />
+                    <span className={`absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-white ${miniProfile?.is_online ? 'bg-[#1a6b68]' : 'bg-[#b8aaa1]'}`} />
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block truncate text-sm font-extrabold text-[#241c18]">{miniProfile?.display_name ?? 'Mon profil'}</span>
+                    <span className={`block text-xs font-bold ${miniProfile?.is_online ? 'text-[#1a6b68]' : 'text-[#9a8b82]'}`}>
+                      {miniProfile?.is_online ? 'En ligne' : 'Hors ligne'}
+                    </span>
+                  </span>
+                </Link>
+
                 <div className="rounded-2xl border border-[#dfd2c6] bg-white">
                   <button
                     type="button"
@@ -356,8 +485,8 @@ export function Navbar() {
                     </div>
                   )}
                 </div>
-                <Link href="/espace" onClick={() => setOpen(false)} className="flex items-center gap-2 hover:text-[#ec3b78] transition-colors">
-                  <LayoutDashboard size={16} /> Mon espace
+                <Link href="/espace?tab=settings-profile" onClick={() => setOpen(false)} className="flex items-center gap-2 hover:text-[#ec3b78] transition-colors">
+                  <Settings size={16} /> Paramètres
                 </Link>
                 {isAdmin && (
                   <Link href="/admin" onClick={() => setOpen(false)} className="flex items-center gap-2 hover:text-[#ec3b78] transition-colors">
