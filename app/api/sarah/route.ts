@@ -5,7 +5,7 @@ export const runtime = 'nodejs';
 type ChatMessage = { role: 'system' | 'user' | 'assistant'; content: string };
 
 const systemPrompt = `
-Tu es Sarah, l'assistante IA officielle d'ARAS.
+Tu es SARA, l'assistante IA officielle d'ARAS.
 Tu réponds en français, avec une voix chaleureuse, rassurante et élégante.
 
 Tu aides sur :
@@ -45,7 +45,7 @@ function fallbackAnswer(message: string) {
     return "Pour envoyer un message, il faut généralement un match ou une condition compatible selon la logique du site. Si vous le souhaitez, je peux vous expliquer le parcours exact.";
   }
 
-  return "Je suis Sarah, l'assistante ARAS. Je peux vous aider sur les profils, la découverte, les messages, les tarifs, l'inscription et la connexion. Indiquez-moi simplement votre besoin.";
+  return "Je suis SARA, l'assistante ARAS. Je peux vous aider sur les profils, la découverte, les messages, les tarifs, l'inscription et la connexion. Indiquez-moi simplement votre besoin.";
 }
 
 export async function POST(request: Request) {
@@ -91,7 +91,7 @@ export async function POST(request: Request) {
         return NextResponse.json(
           {
             answer: fallbackAnswer(message),
-            warning: `Sarah utilise une réponse de secours : Ollama a répondu avec le statut ${response.status}.`,
+            warning: `SARA utilise une réponse de secours : Ollama a répondu avec le statut ${response.status}.`,
             details: errorText,
           },
           { status: 200 }
@@ -109,7 +109,7 @@ export async function POST(request: Request) {
       return NextResponse.json({
         answer: fallbackAnswer(message),
         warning:
-          "Sarah utilise une réponse de secours car le service Ollama n'est pas joignable. Vérifiez qu'Ollama est lancé, que OLLAMA_BASE_URL est correct, et que le modèle existe.",
+          "SARA utilise une réponse de secours car le service Ollama n'est pas joignable. Vérifiez qu'Ollama est lancé, que OLLAMA_BASE_URL est correct, et que le modèle existe.",
       });
     }
   } catch (error) {

@@ -6,6 +6,7 @@ import {
   User,
   MessageCircle,
   Heart,
+  Users,
   CalendarDays,
   Settings,
   ChevronLeft,
@@ -34,7 +35,7 @@ const mainItems: { id: EspaceTab; label: string; icon: typeof User }[] = [
   { id: 'decouverte', label: 'Découverte', icon: Search },
   { id: 'messages', label: 'Messages', icon: MessageCircle },
   { id: 'likes', label: 'Likes', icon: Heart },
-  { id: 'matches', label: 'Matches', icon: Heart },
+  { id: 'matches', label: 'Matches', icon: Users },
   { id: 'events', label: 'Événements', icon: CalendarDays },
 ];
 
@@ -56,6 +57,7 @@ export function AppSidebar({ active, onChange, badges }: AppSidebarProps) {
   const [collapsed, setCollapsed] = useState(false);
   const isSettingsActive = active.startsWith('settings-');
   const [settingsOpen, setSettingsOpen] = useState(isSettingsActive);
+  const [mobileSettingsOpen, setMobileSettingsOpen] = useState(false);
 
   return (
     <>
@@ -159,40 +161,78 @@ export function AppSidebar({ active, onChange, badges }: AppSidebarProps) {
       </aside>
 
       {/* MOBILE : icônes en bas de l'écran */}
-      <nav className="fixed inset-x-0 bottom-0 z-40 flex items-center justify-around gap-0.5 overflow-x-auto border-t border-[#eadfd5] bg-white/95 px-1 py-2 backdrop-blur-xl md:hidden">
-        {mainItems.map((item) => {
-          const isActive = active === item.id;
-          const badge = badges?.[item.id];
-          return (
-            <button
-              key={item.id}
-              type="button"
-              onClick={() => onChange(item.id)}
-              aria-label={item.label}
-              className={`relative flex shrink-0 flex-col items-center gap-1 rounded-xl px-2.5 py-1.5 transition ${
-                isActive ? 'text-[#ec3b78]' : 'text-[#9a8b82]'
-              }`}
-            >
-              <item.icon size={20} fill={isActive && item.id === 'likes' ? 'currentColor' : 'none'} />
-              {Boolean(badge) && (
-                <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-[#ec3b78] px-1 text-[9px] font-extrabold text-white">
-                  {badge! > 9 ? '9+' : badge}
-                </span>
-              )}
-            </button>
-          );
-        })}
-        <button
-          type="button"
-          onClick={() => onChange('settings-profile')}
-          aria-label="Paramètres"
-          className={`flex shrink-0 flex-col items-center gap-1 rounded-xl px-2.5 py-1.5 transition ${
-            isSettingsActive ? 'text-[#ec3b78]' : 'text-[#9a8b82]'
-          }`}
-        >
-          <Settings size={20} />
-        </button>
-      </nav>
+      <div className="md:hidden">
+        {mobileSettingsOpen && (
+          <div className="fixed inset-x-3 bottom-[72px] z-50 rounded-[22px] border border-[#eadfd5] bg-white p-2 shadow-[0_18px_40px_rgba(83,46,32,.15)]">
+            {settingsItems.map((item) => {
+              const isActive = active === item.id;
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => {
+                    onChange(item.id);
+                    setMobileSettingsOpen(false);
+                  }}
+                  className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-bold transition ${
+                    isActive ? 'bg-[#ec3b78] text-white' : 'text-[#625852] hover:bg-[#f3e9dc]'
+                  }`}
+                >
+                  <item.icon size={16} className="shrink-0" />
+                  <span>{item.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        <nav className="fixed inset-x-0 bottom-0 z-40 flex items-center justify-around gap-0.5 overflow-x-auto border-t border-[#eadfd5] bg-white/95 px-1 py-2 backdrop-blur-xl">
+          {mainItems.map((item) => {
+            const isActive = active === item.id;
+            const badge = badges?.[item.id];
+            return (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => onChange(item.id)}
+                aria-label={item.label}
+                className={`relative flex shrink-0 flex-col items-center gap-1 rounded-xl px-2.5 py-1.5 transition ${
+                  isActive ? 'text-[#ec3b78]' : 'text-[#9a8b82]'
+                }`}
+              >
+                <item.icon size={20} fill={isActive && item.id === 'likes' ? 'currentColor' : 'none'} />
+                {Boolean(badge) && (
+                  <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-[#ec3b78] px-1 text-[9px] font-extrabold text-white">
+                    {badge! > 9 ? '9+' : badge}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+
+          <button
+            type="button"
+            onClick={() => {
+              if (isSettingsActive && mobileSettingsOpen) {
+                setMobileSettingsOpen(false);
+                return;
+              }
+
+              if (!isSettingsActive) {
+                onChange('settings-profile');
+              }
+
+              setMobileSettingsOpen((open) => !open);
+            }}
+            aria-label="Paramètres"
+            className={`flex shrink-0 flex-col items-center gap-1 rounded-xl px-2.5 py-1.5 transition ${
+              isSettingsActive ? 'text-[#ec3b78]' : 'text-[#9a8b82]'
+            }`}
+          >
+            <Settings size={20} />
+          </button>
+        </nav>
+      </div>
     </>
   );
 }

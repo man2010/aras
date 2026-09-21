@@ -162,7 +162,7 @@ function SettingsPanels({
         <div className="rounded-[26px] bg-white p-6 shadow-[0_8px_30px_rgba(83,46,32,.05)] sm:p-8">
           <h2 className="font-display text-2xl">Sécurité</h2>
           <p className="mt-2 text-sm leading-6 text-[#756960]">
-            Changez votre mot de passe. Vos connexions sont protégées par une double vérification (mot de passe + code envoyé par email ou SMS).
+            Changez votre mot de passe pour sécuriser votre compte et mieux protéger vos informations personnelles.
           </p>
           <form onSubmit={changePassword} className="mt-6 max-w-md space-y-4">
             <label className="block text-xs font-extrabold text-[#625852]">

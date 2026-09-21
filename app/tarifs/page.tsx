@@ -30,7 +30,7 @@ export default function TarifsPage() {
         'Participation aux événements (accès standard)',
         '3 conversations par semaine',
         'Badge profil vérifié',
-        'AI Chatbot(SARAH)',
+        'AI Chatbot(SARA)',
         'Support 24h/7',
       ],
     },

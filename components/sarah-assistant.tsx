@@ -15,7 +15,7 @@ export function SarahAssistant() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [messages, setMessages] = useState<ChatItem[]>([
-    { role: 'assistant', content: 'Bonjour, je suis Sarah. Je peux vous aider sur ARAS, les profils, les messages, les tarifs ou l’inscription.' },
+    { role: 'assistant', content: 'Bonjour, je suis SARA. Je peux vous aider sur ARAS, les profils, les messages, les tarifs ou l’inscription.' },
   ]);
 
   const history = useMemo(
@@ -49,7 +49,7 @@ export function SarahAssistant() {
       const data = (await response.json()) as { answer?: string; error?: string; warning?: string };
 
       if (!response.ok) {
-        setError(data.error || 'Sarah rencontre un souci temporaire.');
+        setError(data.error || 'SARA rencontre un souci temporaire.');
         return;
       }
 
@@ -61,7 +61,7 @@ export function SarahAssistant() {
 
       setMessages((prev) => [...prev, { role: 'assistant', content: data.answer || 'Je vous écoute.' }]);
     } catch {
-      setError('Impossible de joindre Sarah pour le moment.');
+      setError('Impossible de joindre SARA pour le moment.');
     } finally {
       setLoading(false);
     }
@@ -71,12 +71,12 @@ export function SarahAssistant() {
     <>
       <button
         onClick={() => setOpen(true)}
-        className="fixed bottom-5 right-5 z-40 flex items-center gap-3 rounded-full bg-[#ec3b78] px-5 py-3 text-sm font-extrabold text-white shadow-2xl shadow-black/20"
+        className="fixed bottom-[50px] right-4 z-[60] flex items-center gap-3 rounded-full bg-[#ec3b78] px-5 py-3 text-sm font-extrabold text-white shadow-2xl shadow-black/20 md:bottom-5 md:right-5"
       >
         <span className="relative h-5 w-5 overflow-hidden rounded-full bg-white/20">
           <Image src="/aras-logo.jpeg" alt="ARAS" fill className="object-cover" />
         </span>
-        Sarah
+        SARA
       </button>
 
       {open && (
@@ -85,7 +85,7 @@ export function SarahAssistant() {
             <div className="flex items-center justify-between border-b border-[#f1e6da] px-5 py-4">
               <div>
                 <p className="text-xs font-extrabold uppercase tracking-[.18em] text-[#ec3b78]">ARAS Assistant</p>
-                <h3 className="mt-1 font-display text-2xl text-[#24171b]">Sarah</h3>
+                <h3 className="mt-1 font-display text-2xl text-[#24171b]">SARA</h3>
               </div>
               <button onClick={() => setOpen(false)} className="rounded-full bg-[#f6efe6] p-2 text-[#756960]">
                 <X size={18} />
@@ -107,7 +107,7 @@ export function SarahAssistant() {
               ))}
               {loading && (
                 <div className="max-w-[85%] rounded-3xl bg-[#fbf8f2] px-4 py-3 text-sm text-[#756960]">
-                  Sarah réfléchit…
+                  SARA réfléchit…
                 </div>
               )}
               {error && (
