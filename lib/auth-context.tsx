@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import type { Session, User } from '@supabase/supabase-js';
+import { ensureProfile } from './create-profile';
 import { supabase } from './supabase';
 
 type AuthContextType = {
@@ -45,6 +46,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUnreadCount(0);
       return;
     }
+
+    void ensureProfile(
+      user.id,
+      user.email?.split('@')[0] ?? user.user_metadata?.full_name ?? 'Utilisateur'
+    );
 
     let cancelled = false;
     const refreshUnreadCount = async () => {

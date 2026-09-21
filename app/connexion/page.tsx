@@ -1,18 +1,20 @@
 'use client';
 
-import { FormEvent, useMemo, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { useRouter } from 'next/navigation';
-import { ArrowRight, Eye, EyeOff, LockKeyhole, Mail, Phone, X } from 'lucide-react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { ArrowRight, Chrome, Eye, EyeOff, LockKeyhole, Mail, Phone, X } from 'lucide-react';
 import { AuthPhoneInput } from '@/components/auth-phone-input';
 import { normalizePhone, isValidPhone } from '@/lib/phone';
+import { ensureProfile } from '@/lib/create-profile';
 import { supabase } from '@/lib/supabase';
 
 type Method = 'email' | 'phone';
 
 export default function ConnexionPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [method, setMethod] = useState<Method>('email');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
@@ -21,29 +23,29 @@ export default function ConnexionPage() {
 
   const canSubmit = useMemo(() => password.length >= 6, [password]);
 
-  const ensureProfile = async (userId: string, fallbackName: string) => {
-    const { data: profile } = await supabase.from('profiles').select('id').eq('id', userId).maybeSingle();
-    if (profile) return;
+  useEffect(() => {
+    const errorParam = searchParams.get('error');
+    if (errorParam) {
+      setMessage(decodeURIComponent(errorParam));
+    }
+  }, [searchParams]);
 
-    await supabase.from('profiles').upsert(
-      {
-        id: userId,
-        full_name: fallbackName,
-        is_active: true,
-        is_online: true,
-        avatar_urls: ['https://images.pexels.com/photos/733872/pexels-photo-733872.jpeg?auto=compress&cs=tinysrgb&w=600'],
-        interests: [],
-        languages: [],
-        notif_messages: true,
-        notif_likes: true,
-        notif_matches: true,
-        show_age: true,
-        show_online_status: true,
-        show_distance: true,
-        notif_events: true,
+  const handleGoogleAuth = async () => {
+    setLoading(true);
+    setMessage('');
+
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: typeof window !== 'undefined' ? `${window.location.origin}/auth/callback?next=/espace` : undefined,
       },
-      { onConflict: 'id' }
-    );
+    });
+
+    if (error) {
+      setMessage(error.message);
+      setLoading(false);
+      return;
+    }
   };
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
@@ -104,6 +106,22 @@ export default function ConnexionPage() {
               className={`rounded-full px-4 py-3 text-sm font-extrabold transition ${method === 'phone' ? 'bg-[#ec3b78] text-white shadow-[0_8px_20px_rgba(236,59,120,.22)]' : 'text-[#756960] hover:text-[#ec3b78]'}`}
             >
               <span className="inline-flex items-center gap-2"><Phone size={15} /> Téléphone</span>
+            </button>
+          </div>
+
+          <div className="mt-6">
+            <div className="mb-4 flex items-center gap-3 text-[11px] font-extrabold uppercase tracking-[0.2em] text-[#9a8b82]">
+              <span className="h-px flex-1 bg-[#e8d9cd]" />
+              ou
+              <span className="h-px flex-1 bg-[#e8d9cd]" />
+            </div>
+            <button
+              type="button"
+              onClick={handleGoogleAuth}
+              disabled={loading}
+              className="flex w-full items-center justify-center gap-2 rounded-full border border-[#dfd2c6] bg-white px-4 py-3 text-sm font-extrabold text-[#241c18] transition hover:border-[#ec3b78] hover:text-[#ec3b78] disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <Chrome size={16} /> Continuer avec Google
             </button>
           </div>
 

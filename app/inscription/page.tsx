@@ -3,8 +3,8 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { useRouter } from 'next/navigation';
-import { ArrowRight, Check, Eye, EyeOff, LockKeyhole, Mail, Phone, RefreshCw, ShieldCheck, X } from 'lucide-react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { ArrowRight, Check, Chrome, Eye, EyeOff, LockKeyhole, Mail, Phone, RefreshCw, ShieldCheck, X } from 'lucide-react';
 import { AuthPhoneInput } from '@/components/auth-phone-input';
 import { normalizePhone, isValidPhone } from '@/lib/phone';
 import { HumanVerification } from '@/components/human-verification';
@@ -20,6 +20,7 @@ function isStrongPassword(value: string) {
 
 export default function InscriptionPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [method, setMethod] = useState<Method>('email');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
@@ -37,6 +38,31 @@ export default function InscriptionPage() {
   const canSubmit = useMemo(() => {
     return isStrongPassword(password) && Boolean(turnstileToken);
   }, [password, turnstileToken]);
+
+  useEffect(() => {
+    const errorParam = searchParams.get('error');
+    if (errorParam) {
+      setMessage(decodeURIComponent(errorParam));
+    }
+  }, [searchParams]);
+
+  const handleGoogleAuth = async () => {
+    setLoading(true);
+    setMessage('');
+
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: typeof window !== 'undefined' ? `${window.location.origin}/auth/callback?next=/onboarding` : undefined,
+      },
+    });
+
+    if (error) {
+      setMessage(error.message);
+      setLoading(false);
+      return;
+    }
+  };
 
   // Timer pour l'expiration du code (30 secondes)
   useEffect(() => {
@@ -279,6 +305,22 @@ export default function InscriptionPage() {
               className={`rounded-full px-4 py-3 text-sm font-extrabold transition ${method === 'phone' ? 'bg-[#ec3b78] text-white shadow-[0_8px_20px_rgba(236,59,120,.22)]' : 'text-[#756960] hover:text-[#ec3b78]'}`}
             >
               <span className="inline-flex items-center gap-2"><Phone size={15} /> Téléphone</span>
+            </button>
+          </div>
+
+          <div className="mt-6">
+            <div className="mb-4 flex items-center gap-3 text-[11px] font-extrabold uppercase tracking-[0.2em] text-[#9a8b82]">
+              <span className="h-px flex-1 bg-[#e8d9cd]" />
+              ou
+              <span className="h-px flex-1 bg-[#e8d9cd]" />
+            </div>
+            <button
+              type="button"
+              onClick={handleGoogleAuth}
+              disabled={loading}
+              className="flex w-full items-center justify-center gap-2 rounded-full border border-[#dfd2c6] bg-white px-4 py-3 text-sm font-extrabold text-[#241c18] transition hover:border-[#ec3b78] hover:text-[#ec3b78] disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <Chrome size={16} /> Continuer avec Google
             </button>
           </div>
 
