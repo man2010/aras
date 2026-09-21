@@ -373,7 +373,11 @@ export default function InscriptionPage() {
                     <Link href="/cgu" className="font-extrabold text-[#ec3b78] underline-offset-2 hover:underline">
                       conditions générales d&apos;utilisation
                     </Link>{' '}
-                    et la politique de confidentialité.
+                    et la{' '}
+                    <Link href="/politique-confidentialite" className="font-extrabold text-[#ec3b78] underline-offset-2 hover:underline">
+                      politique de confidentialité
+                    </Link>
+                    .
                   </span>
                 </label>
                 <label className="flex items-start gap-3">
