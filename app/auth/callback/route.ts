@@ -1,4 +1,4 @@
-import { createServerClient } from '@supabase/ssr';
+import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 
@@ -18,6 +18,7 @@ export async function GET(request: Request) {
   }
 
   const cookieStore = cookies();
+  const authCookies: Array<{ name: string; value: string; options: CookieOptions }> = [];
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL ?? '',
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? '',
@@ -27,7 +28,10 @@ export async function GET(request: Request) {
           return cookieStore.getAll();
         },
         setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) => cookieStore.set(name, value, options));
+          cookiesToSet.forEach(({ name, value, options }) => {
+            authCookies.push({ name, value, options });
+            cookieStore.set(name, value, options);
+          });
         },
       },
     }
@@ -43,6 +47,31 @@ export async function GET(request: Request) {
   if (userError || !user) {
     await supabase.auth.signOut();
     return NextResponse.redirect(`${siteOrigin}/connexion?error=${encodeURIComponent('Impossible de vérifier votre session Google. Réessayez.')}`);
+  }
+
+  const googleIdentity = user.identities?.find((identity) => identity.provider === 'google');
+  const otherIdentity = user.identities?.find((identity) => identity.provider !== 'google');
+  const identityCreatedAt = new Date(googleIdentity?.created_at ?? 0).getTime();
+  const userCreatedAt = new Date(user.created_at ?? 0).getTime();
+  const googleWasJustLinkedToExistingAccount = Boolean(
+    googleIdentity && otherIdentity && identityCreatedAt - userCreatedAt > 20_000
+  );
+
+  if (googleWasJustLinkedToExistingAccount && googleIdentity) {
+    try {
+      await supabase.auth.unlinkIdentity(googleIdentity);
+    } catch {
+      // Still end this OAuth session and explain which sign-in method to use.
+    }
+    await supabase.auth.signOut();
+    const target = flow === 'signup' ? '/inscription' : '/connexion';
+    const response = NextResponse.redirect(
+      `${siteOrigin}${target}?error=${encodeURIComponent(
+        'Un compte existe déjà avec cette adresse e-mail. Connectez-vous avec votre méthode habituelle (e-mail ou téléphone). Vous pourrez lier Google depuis votre profil après connexion.'
+      )}`
+    );
+    authCookies.forEach(({ name, value, options }) => response.cookies.set(name, value, options));
+    return response;
   }
 
   const adminKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -89,10 +118,6 @@ export async function GET(request: Request) {
   // users should sign in; a first-time Google signup should complete onboarding.
   const destination = flow === 'signup' ? '/onboarding' : next;
   const response = NextResponse.redirect(`${siteOrigin}${destination}`);
-  cookieStore.getAll().forEach(({ name, value }) => {
-    if (request.headers.get('cookie')?.includes(`${name}=`)) {
-      response.cookies.set(name, value);
-    }
-  });
+  authCookies.forEach(({ name, value, options }) => response.cookies.set(name, value, options));
   return response;
 }
