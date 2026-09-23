@@ -285,6 +285,7 @@ export default function EspacePage() {
   const [registeredEventIds, setRegisteredEventIds] = useState<Set<string>>(new Set());
   const [eventRegistrationStatuses, setEventRegistrationStatuses] = useState<Record<string, string>>({});
   const [eventRegistrationBusy, setEventRegistrationBusy] = useState<string | null>(null);
+  const [eventToCancel, setEventToCancel] = useState<{ id: string; title: string } | null>(null);
   const [eventActionMessage, setEventActionMessage] = useState('');
   const [uploadingImage, setUploadingImage] = useState(false);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
@@ -744,13 +745,73 @@ export default function EspacePage() {
           ...(sessionData.session?.access_token ? { Authorization: `Bearer ${sessionData.session.access_token}` } : {}),
         },
         body: JSON.stringify({ eventId }),
-      }).then((response) => response.json()).catch(() => ({ sent: false }));
-      setEventActionMessage(notice.sent
-        ? 'Participation confirmée ! Un e-mail de confirmation est envoyé et tu recevras aussi un rappel dans tes notifications à l’approche de l’événement.'
-        : 'Participation confirmée ! Une notification est disponible dans ton espace. L’envoi d’un e-mail ou SMS n’est pas configuré pour ce compte; tu recevras un rappel dans tes notifications à l’approche de l’événement.');
+      }).then((response) => response.json()).catch(() => ({ sent: false, reason: 'notification_request_failed' }));
+      if (notice.sent) {
+        const channelName = notice.channel === 'sms' ? 'SMS' : 'e-mail';
+        setEventActionMessage(`Participation confirmée ! La confirmation a été envoyée par ${channelName}. Un rappel apparaîtra aussi dans tes notifications à l’approche de l’événement.`);
+      } else if (notice.reason === 'sms_provider_unconfigured') {
+        setEventActionMessage('Participation confirmée dans ton espace, mais le SMS n’a pas pu être envoyé : le service SMS n’est pas configuré. Contacte contact@aras.sn si tu as besoin de cette confirmation.');
+      } else if (notice.reason === 'email_provider_unconfigured') {
+        setEventActionMessage('Participation confirmée dans ton espace, mais l’e-mail n’a pas pu être envoyé : le service d’envoi d’e-mails n’est pas configuré. Contacte contact@aras.sn si tu as besoin de cette confirmation.');
+      } else if (notice.reason === 'sms_delivery_failed' || notice.reason === 'email_delivery_failed') {
+        setEventActionMessage(`Participation confirmée dans ton espace, mais le fournisseur ${notice.channel === 'sms' ? 'SMS' : 'e-mail'} a refusé l’envoi. Vérifie tes coordonnées ou contacte contact@aras.sn.`);
+      } else {
+        setEventActionMessage('Participation confirmée dans ton espace. L’envoi automatique de la confirmation a échoué; vérifie tes notifications ou contacte contact@aras.sn.');
+      }
     } else {
       setEventActionMessage('Ta participation est en attente de paiement. Elle sera confirmée après le règlement.');
     }
+  };
+
+  const cancelFreeEventRegistration = async (eventId: string) => {
+    if (!user || eventRegistrationBusy) return;
+    const event = events.find((item) => item.id === eventId);
+    if (!event || event.price_fcfa !== 0) return;
+    setEventRegistrationBusy(eventId);
+    setEventActionMessage('');
+    const { data, error } = await supabase.rpc('cancel_free_event_registration', { target_event_id: eventId });
+    setEventRegistrationBusy(null);
+    setEventToCancel(null);
+    if (error) {
+      setEventActionMessage(error.message.includes('PAID_EVENT_CANCELLATION_UNAVAILABLE')
+        ? 'Cette participation ne peut pas être annulée depuis l’espace. Pour un événement payant, contacte contact@aras.sn.'
+        : error.message.includes('EVENT_ALREADY_STARTED')
+          ? 'Cet événement a déjà commencé : son inscription ne peut plus être annulée.'
+          : 'Impossible d’annuler cette participation pour le moment. Réessaie dans quelques instants.');
+      return;
+    }
+
+    const result = Array.isArray(data) ? data[0] : data;
+    if (result?.cancellation_status === 'already_cancelled') {
+      setEventActionMessage('Cette participation était déjà annulée.');
+      await loadMemberEvents();
+      return;
+    }
+
+    setRegisteredEventIds((current) => {
+      const next = new Set(current);
+      next.delete(eventId);
+      return next;
+    });
+    setEventRegistrationStatuses((current) => ({ ...current, [eventId]: 'cancelled' }));
+    await loadMemberEvents();
+    window.dispatchEvent(new Event('aras:notifications-refresh'));
+
+    const { data: sessionData } = await supabase.auth.getSession();
+    const notice = await fetch('/api/events/cancellation-notification', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(sessionData.session?.access_token ? { Authorization: `Bearer ${sessionData.session.access_token}` } : {}),
+      },
+      body: JSON.stringify({ eventId }),
+    }).then((response) => response.json()).catch(() => ({ sent: false, reason: 'notification_request_failed' }));
+
+    setEventActionMessage(notice.sent
+      ? `Ta participation à « ${event.title} » est annulée. Un e-mail de confirmation a été envoyé.`
+      : notice.reason === 'email_provider_unconfigured'
+        ? `Ta participation à « ${event.title} » est annulée dans ton espace, mais l’e-mail n’a pas été envoyé : Resend n’est pas configuré sur cet environnement.`
+        : `Ta participation à « ${event.title} » est annulée dans ton espace, mais l’e-mail de confirmation n’a pas pu être envoyé. Contacte contact@aras.sn si nécessaire.`);
   };
 
   const submitProfileReport = async (event: FormEvent<HTMLFormElement>) => {
@@ -1522,9 +1583,15 @@ export default function EspacePage() {
                           </div>
                           <div className="mt-auto flex flex-wrap items-center justify-between gap-3 border-t border-[#eadfd5] pt-5 dark:border-white/10">
                             <span className="text-sm font-extrabold text-[#241c18] dark:text-white">{e.price_fcfa === 0 ? 'Gratuit' : `${new Intl.NumberFormat('fr-FR').format(e.price_fcfa)} FCFA`}</span>
-                            <button type="button" disabled={registered || eventRegistrationBusy === e.id || e.capacity <= 0} onClick={() => void registerForEvent(e.id)} className="min-h-11 rounded-full bg-[#ec3b78] px-5 py-2.5 text-xs font-extrabold text-white transition hover:bg-[#c92e63] disabled:cursor-default disabled:bg-[#1a6b68]">
-                              {eventRegistrationBusy === e.id ? 'Inscription…' : registered ? (status === 'payment_pending' ? 'Paiement en attente' : 'Inscrit') : e.capacity <= 0 ? 'Complet' : e.price_fcfa === 0 ? 'Participer' : 'Réserver ma place'}
-                            </button>
+                            {registered && e.price_fcfa === 0 && status === 'confirmed' ? (
+                              <button type="button" disabled={eventRegistrationBusy === e.id} onClick={() => setEventToCancel({ id: e.id, title: e.title })} className="min-h-11 rounded-full border border-[#e6bfd0] bg-white px-5 py-2.5 text-xs font-extrabold text-[#bd2d62] transition hover:bg-[#fff1f5] disabled:cursor-wait disabled:opacity-60 dark:border-[#633246] dark:bg-transparent dark:hover:bg-white/5">
+                                {eventRegistrationBusy === e.id ? 'Annulation…' : 'Annuler ma participation'}
+                              </button>
+                            ) : (
+                              <button type="button" disabled={registered || eventRegistrationBusy === e.id || e.capacity <= 0} onClick={() => void registerForEvent(e.id)} className="min-h-11 rounded-full bg-[#ec3b78] px-5 py-2.5 text-xs font-extrabold text-white transition hover:bg-[#c92e63] disabled:cursor-default disabled:bg-[#1a6b68]">
+                                {eventRegistrationBusy === e.id ? 'Inscription…' : registered ? (status === 'payment_pending' ? 'En attente de paiement' : 'Annulation après paiement indisponible') : e.capacity <= 0 ? 'Complet' : e.price_fcfa === 0 ? 'Participer' : 'Réserver ma place'}
+                              </button>
+                            )}
                           </div>
                         </div>
                       </article>
@@ -1629,6 +1696,22 @@ export default function EspacePage() {
             </div>
             <div className="mt-6 text-center text-sm text-[#9a8b82]">En attente de like en retour...</div>
           </div>
+        </div>
+      )}
+
+      {eventToCancel && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/55 p-4" role="dialog" aria-modal="true" aria-labelledby="cancel-event-title">
+          <section className="w-full max-w-md rounded-[28px] bg-white p-6 shadow-[0_20px_60px_rgba(0,0,0,.3)] dark:border dark:border-white/10 dark:bg-[#1c1b21]">
+            <div className="flex items-center justify-between gap-4">
+              <h3 id="cancel-event-title" className="font-display text-2xl text-[#24171b] dark:text-white">Annuler ta participation ?</h3>
+              <button type="button" onClick={() => setEventToCancel(null)} aria-label="Fermer" className="shrink-0 rounded-full bg-[#f3e9dc] p-2 text-[#756960] transition hover:bg-[#e7cfc0]"><X size={20} /></button>
+            </div>
+            <p className="mt-4 text-sm leading-6 text-[#756960] dark:text-white/65">Ta place pour « {eventToCancel.title} » sera libérée. Comme l’événement est gratuit, aucun remboursement n’est nécessaire. Une confirmation sera envoyée par e-mail si le service est configuré.</p>
+            <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+              <button type="button" disabled={eventRegistrationBusy === eventToCancel.id} onClick={() => setEventToCancel(null)} className="rounded-full bg-[#f3e9dc] px-5 py-3 text-sm font-extrabold text-[#625852] disabled:opacity-50">Garder ma place</button>
+              <button type="button" disabled={eventRegistrationBusy === eventToCancel.id} onClick={() => void cancelFreeEventRegistration(eventToCancel.id)} className="rounded-full bg-[#c92e63] px-5 py-3 text-sm font-extrabold text-white transition hover:bg-[#a92350] disabled:opacity-50">{eventRegistrationBusy === eventToCancel.id ? 'Annulation…' : 'Confirmer l’annulation'}</button>
+            </div>
+          </section>
         </div>
       )}
 
