@@ -531,6 +531,10 @@ export function Navbar() {
 }
 
 export function Footer() {
+  const { user } = useAuth();
+
+  if (user) return null;
+
   return (
     <footer className="bg-[#241c18] px-5 pb-8 pt-14 text-white lg:px-8">
       <div className="mx-auto max-w-[1120px]">

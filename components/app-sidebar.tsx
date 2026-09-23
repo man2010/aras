@@ -60,9 +60,9 @@ export function AppSidebar({ active, onChange, badges }: AppSidebarProps) {
 
   return (
     <>
-      {/* DESKTOP / TABLETTE : sidebar verticale rétractable, plaquée au bord */}
+      {/* Grand écran : sidebar verticale rétractable, plaquée au bord */}
       <aside
-        className={`sticky top-[60px] hidden h-[calc(100vh-60px)] shrink-0 flex-col border-r border-[#eadfd5] bg-white transition-[width] duration-300 dark:border-white/10 dark:bg-[#15151a] md:flex ${
+        className={`sticky top-[60px] hidden h-[calc(100vh-60px)] shrink-0 flex-col border-r border-[#eadfd5] bg-white transition-[width] duration-300 dark:border-white/10 dark:bg-[#15151a] lg:flex ${
           collapsed ? 'w-[76px]' : 'w-[252px]'
         }`}
       >
@@ -160,7 +160,7 @@ export function AppSidebar({ active, onChange, badges }: AppSidebarProps) {
       </aside>
 
       {/* MOBILE : icônes en bas de l'écran */}
-      <div className="md:hidden">
+      <div className="lg:hidden">
         <nav className="fixed inset-x-0 bottom-0 z-40 flex items-center justify-around gap-0.5 overflow-x-auto border-t border-[#eadfd5] bg-white/95 px-1 py-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] backdrop-blur-xl dark:border-white/10 dark:bg-[#15151a]/95">
           {mainItems.map((item) => {
             const isActive = active === item.id;

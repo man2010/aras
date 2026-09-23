@@ -254,6 +254,8 @@ export default function EspacePage() {
   const [discoveryCityFilter, setDiscoveryCityFilter] = useState('all');
   const [showDiscoveryFilters, setShowDiscoveryFilters] = useState(true);
   const [discoveryPage, setDiscoveryPage] = useState(1);
+  const [mobileDiscoveryIndex, setMobileDiscoveryIndex] = useState(0);
+  const discoveryTouchStartX = useRef<number | null>(null);
   const [toggleBusyId, setToggleBusyId] = useState<string | null>(null);
   const [profileForm, setProfileForm] = useState({ display_name: '', age: '', city: 'Dakar', bio: '', profession: '', photo_url: '', interests: '' });
   const [profileSaved, setProfileSaved] = useState(false);
@@ -934,6 +936,10 @@ export default function EspacePage() {
 
     return matchesSearch && matchesCity;
   });
+  const mobileDiscoveryProfile = filteredDiscoveryProfiles[mobileDiscoveryIndex] ?? filteredDiscoveryProfiles[0];
+  const advanceMobileDiscovery = () => {
+    setMobileDiscoveryIndex((index) => (index + 1) % Math.max(filteredDiscoveryProfiles.length, 1));
+  };
   const discoveryPageSize = 12;
   const discoveryTotalPages = Math.max(1, Math.ceil(filteredDiscoveryProfiles.length / discoveryPageSize));
   const safeDiscoveryPage = Math.min(discoveryPage, discoveryTotalPages);
@@ -961,29 +967,29 @@ export default function EspacePage() {
           badges={{ messages: totalUnread, likes: receivedLikes.length }}
         />
 
-        <div className="min-w-0 flex-1 bg-[radial-gradient(ellipse_at_top_right,_rgba(236,59,120,0.08),_transparent_40%)] px-3 pb-28 pt-5 sm:px-6 sm:pt-8 lg:px-10 lg:pt-10 md:pb-12">
+        <div className="min-w-0 flex-1 bg-[radial-gradient(ellipse_at_top_right,_rgba(236,59,120,0.08),_transparent_40%)] px-3 pb-28 pt-5 sm:px-6 sm:pt-8 lg:px-10 lg:pt-10 lg:pb-12">
           {/* DISCOVERY TAB */}
           {tab === 'decouverte' && (
             <div className="space-y-6">
-              <div className="relative overflow-hidden rounded-[26px] border border-white/80 bg-[linear-gradient(125deg,#fffdfa_0%,#fff7f2_58%,#f9e9ee_100%)] p-5 shadow-[0_18px_55px_rgba(83,46,32,.08)] sm:rounded-[32px] sm:p-8 dark:border-white/10 dark:bg-[linear-gradient(125deg,#201a20_0%,#19171c_58%,#261821_100%)]">
+              <div className="relative overflow-hidden rounded-[22px] border border-white/80 bg-[linear-gradient(125deg,#fffdfa_0%,#fff7f2_58%,#f9e9ee_100%)] p-3 shadow-[0_12px_35px_rgba(83,46,32,.08)] sm:rounded-[32px] sm:p-8 sm:shadow-[0_18px_55px_rgba(83,46,32,.08)] dark:border-white/10 dark:bg-[linear-gradient(125deg,#201a20_0%,#19171c_58%,#261821_100%)]">
                 <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
                   <div className="flex items-center gap-3">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#fbe8ec] text-[#ec3b78]">
+                    <div className="hidden h-12 w-12 items-center justify-center rounded-2xl bg-[#fbe8ec] text-[#ec3b78] sm:flex">
                       <Search size={20} />
                     </div>
                     <div>
-                      <p className="text-[11px] font-extrabold uppercase tracking-[.18em] text-[#ec3b78]">Découverte</p>
-                      <h2 className="max-w-2xl font-display text-2xl leading-tight text-[#24171b] sm:text-3xl lg:text-4xl dark:text-white">Des profils qui correspondent à toi</h2>
+                      <p className="hidden text-[11px] font-extrabold uppercase tracking-[.18em] text-[#ec3b78] sm:block">Découverte</p>
+                      <h2 className="max-w-2xl font-display text-xl leading-tight text-[#24171b] sm:text-3xl lg:text-4xl dark:text-white">Découvrir</h2>
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-3 self-start xl:self-auto">
+                  <div className="flex items-center gap-2 self-start xl:self-auto">
                     <span className="rounded-full border border-[#efdae0] bg-white/80 px-3 py-1.5 text-xs font-extrabold text-[#756960] shadow-sm dark:border-white/10 dark:bg-white/5 dark:text-white/75">
                       {filteredDiscoveryProfiles.length} profils
                     </span>
                     <button
                       onClick={() => setShowDiscoveryFilters((value) => !value)}
-                      className="rounded-full border border-[#dfd2c6] bg-white/75 px-4 py-2 text-xs font-extrabold text-[#625852] transition hover:border-[#ec3b78] hover:text-[#c92e63] dark:border-white/15 dark:bg-white/5 dark:text-white/75"
+                      className="rounded-full border border-[#dfd2c6] bg-white/75 px-3 py-2 text-[11px] font-extrabold text-[#625852] transition hover:border-[#ec3b78] hover:text-[#c92e63] sm:px-4 sm:text-xs dark:border-white/15 dark:bg-white/5 dark:text-white/75"
                     >
                       {showDiscoveryFilters ? 'Masquer les filtres' : 'Afficher les filtres'}
                     </button>
@@ -996,7 +1002,7 @@ export default function EspacePage() {
                       <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-[#9a8b82]" />
                       <input
                         value={discoverySearch}
-                        onChange={(event) => setDiscoverySearch(event.target.value)}
+                        onChange={(event) => { setDiscoverySearch(event.target.value); setMobileDiscoveryIndex(0); }}
                         placeholder="Rechercher par nom, ville, profession, intérêt…"
                         className="w-full rounded-2xl border border-[#e7d9ce] bg-white/80 py-3.5 pl-11 pr-4 text-sm outline-none transition placeholder:text-[#aa9c93] focus:border-[#ec3b78] focus:bg-white dark:border-white/10 dark:bg-black/20 dark:text-white dark:placeholder:text-white/40 dark:focus:bg-black/30"
                       />
@@ -1008,7 +1014,7 @@ export default function EspacePage() {
                         {discoveryCities.map((city) => (
                           <button
                             key={city}
-                            onClick={() => setDiscoveryCityFilter(city)}
+                            onClick={() => { setDiscoveryCityFilter(city); setMobileDiscoveryIndex(0); }}
                             className={`rounded-full px-4 py-2 text-xs font-extrabold transition ${
                               discoveryCityFilter === city
                                 ? 'bg-[#ec3b78] text-white'
@@ -1033,7 +1039,58 @@ export default function EspacePage() {
                   Aucun profil ne correspond à ces filtres pour le moment.
                 </div>
               ) : (
-                <div className="grid gap-5 sm:gap-6 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+                <>
+                {mobileDiscoveryProfile && (
+                  <section className="mx-auto w-full max-w-[560px] lg:hidden" aria-label="Profils à découvrir">
+                    <article
+                      key={mobileDiscoveryProfile.id}
+                      onTouchStart={(event) => { discoveryTouchStartX.current = event.touches[0]?.clientX ?? null; }}
+                      onTouchEnd={(event) => {
+                        const startX = discoveryTouchStartX.current;
+                        const endX = event.changedTouches[0]?.clientX;
+                        discoveryTouchStartX.current = null;
+                        if (startX === null || endX === undefined || Math.abs(endX - startX) < 65) return;
+                        if (endX > startX) void toggleDiscoveryLike(mobileDiscoveryProfile.id);
+                        advanceMobileDiscovery();
+                      }}
+                      className="relative isolate h-[min(68dvh,680px)] min-h-[430px] overflow-hidden rounded-[30px] border border-white/15 bg-[#202027] shadow-[0_22px_60px_rgba(0,0,0,.22)] touch-pan-y sm:h-[min(72dvh,760px)] sm:rounded-[36px]"
+                    >
+                      {mobileDiscoveryProfile.photo_url ? (
+                        <img src={mobileDiscoveryProfile.photo_url} alt={mobileDiscoveryProfile.display_name} className="absolute inset-0 h-full w-full object-cover" />
+                      ) : (
+                        <div className="absolute inset-0 flex items-center justify-center bg-[#292832] text-7xl font-black text-white/70">{mobileDiscoveryProfile.display_name.charAt(0).toUpperCase()}</div>
+                      )}
+                      <div className="absolute inset-0 bg-gradient-to-b from-black/25 via-transparent to-black/85" />
+                      <div className="absolute left-4 top-4 rounded-full border border-white/45 bg-black/35 px-4 py-2 text-sm font-extrabold text-white backdrop-blur-md">
+                        <MapPin size={15} className="mr-1 inline" />{mobileDiscoveryProfile.city || 'Ville non renseignée'}
+                      </div>
+                      <div className="absolute inset-x-0 bottom-0 p-5 text-white sm:p-7">
+                        <p className="text-xs font-extrabold uppercase tracking-[.18em] text-[#ff4b9b]">À découvrir</p>
+                        <h3 className="mt-1 font-display text-4xl leading-tight sm:text-5xl">
+                          {mobileDiscoveryProfile.display_name}{mobileDiscoveryProfile.age ? `, ${mobileDiscoveryProfile.age}` : ''}
+                        </h3>
+                        {mobileDiscoveryProfile.profession && <p className="mt-2 text-base font-semibold text-white/80">{mobileDiscoveryProfile.profession}</p>}
+                        {mobileDiscoveryProfile.bio && <p className="mt-2 line-clamp-2 max-w-prose text-sm leading-6 text-white/75">{mobileDiscoveryProfile.bio}</p>}
+                        {mobileDiscoveryProfile.interests?.length ? (
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            {mobileDiscoveryProfile.interests.slice(0, 3).map((interest) => <span key={interest} className="rounded-full border border-white/35 bg-white/10 px-3 py-1.5 text-xs font-bold text-white backdrop-blur">★ {interest}</span>)}
+                          </div>
+                        ) : null}
+                        <div className="mt-5 flex items-center justify-center gap-5">
+                          <button type="button" onClick={advanceMobileDiscovery} aria-label="Passer ce profil" className="flex h-14 w-14 items-center justify-center rounded-full bg-black/45 text-white ring-1 ring-white/15 backdrop-blur transition active:scale-95"><X size={25} /></button>
+                          <button type="button" onClick={() => handleDiscoveryMessage(mobileDiscoveryProfile)} aria-label="Envoyer un message" className="flex h-16 w-16 items-center justify-center rounded-full bg-[#292746] text-white shadow-lg transition active:scale-95"><MessageCircle size={27} /></button>
+                          <button type="button" onClick={() => { void toggleDiscoveryLike(mobileDiscoveryProfile.id); advanceMobileDiscovery(); }} aria-label="Aimer ce profil" className="flex h-14 w-14 items-center justify-center rounded-full bg-[#ec1689] text-white shadow-[0_10px_28px_rgba(236,22,137,.32)] transition active:scale-95"><Heart size={25} fill="currentColor" /></button>
+                        </div>
+                        <p className="mt-3 text-center text-xs font-semibold text-white/60">Balaye pour découvrir le profil suivant</p>
+                      </div>
+                    </article>
+                    <div className="mt-3 flex items-center justify-between px-2 text-xs font-bold text-[#756960] dark:text-white/55">
+                      <span>{mobileDiscoveryIndex + 1} / {filteredDiscoveryProfiles.length}</span>
+                      <button type="button" onClick={() => setShowDiscoveryFilters(true)} className="rounded-full border border-[#dfd2c6] bg-white/80 px-3 py-1.5 dark:border-white/15 dark:bg-white/5">Modifier les filtres</button>
+                    </div>
+                  </section>
+                )}
+                <div className="hidden gap-5 sm:gap-6 lg:grid lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
                   {visibleDiscoveryProfiles.map((profileItem, index) => (
                     <article
                       key={profileItem.id}
@@ -1107,10 +1164,11 @@ export default function EspacePage() {
                     </article>
                   ))}
                 </div>
+                </>
               )}
 
               {filteredDiscoveryProfiles.length > discoveryPageSize && (
-                <div className="flex flex-col items-center justify-between gap-3 rounded-[24px] bg-white p-4 shadow-[0_8px_30px_rgba(83,46,32,.05)] sm:flex-row">
+                <div className="hidden flex-col items-center justify-between gap-3 rounded-[24px] bg-white p-4 shadow-[0_8px_30px_rgba(83,46,32,.05)] sm:flex-row lg:flex">
                   <p className="text-xs font-bold uppercase tracking-[.14em] text-[#756960]">
                     Page {safeDiscoveryPage} / {discoveryTotalPages}
                   </p>
