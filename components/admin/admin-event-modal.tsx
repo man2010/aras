@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { X, Calendar, MapPin, Users, DollarSign, Image as ImageIcon, Plus, Trash2, Upload } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 
@@ -12,6 +12,13 @@ interface AdminEventModalProps {
 }
 
 export function AdminEventModal({ isOpen, onClose, onSubmit, editEvent }: AdminEventModalProps) {
+  const toLocalDateTime = (value?: string) => {
+    if (!value) return '';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '';
+    const pad = (part: number) => String(part).padStart(2, '0');
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+  };
   const [formData, setFormData] = useState({
     title: editEvent?.title || '',
     description: editEvent?.description || '',
@@ -24,6 +31,21 @@ export function AdminEventModal({ isOpen, onClose, onSubmit, editEvent }: AdminE
   });
   const [uploading, setUploading] = useState(false);
   const [imagePreview, setImagePreview] = useState(editEvent?.image_url || '');
+
+  useEffect(() => {
+    if (!isOpen) return;
+    setFormData({
+      title: editEvent?.title ?? '',
+      description: editEvent?.description ?? '',
+      date: toLocalDateTime(editEvent?.date),
+      location: editEvent?.location ?? '',
+      city: editEvent?.city ?? 'Dakar',
+      price: editEvent?.price == null ? '' : String(editEvent.price),
+      total_places: String(editEvent?.total_places ?? 100),
+      image_url: editEvent?.image_url ?? '',
+    });
+    setImagePreview(editEvent?.image_url ?? '');
+  }, [isOpen, editEvent]);
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -73,7 +95,7 @@ export function AdminEventModal({ isOpen, onClose, onSubmit, editEvent }: AdminE
       ...formData,
       price: formData.price ? parseInt(formData.price) : null,
       total_places: parseInt(formData.total_places),
-      remaining_places: parseInt(formData.total_places),
+      remaining_places: editEvent?.remaining_places ?? parseInt(formData.total_places),
     });
     onClose();
     // Reset form
@@ -132,7 +154,7 @@ export function AdminEventModal({ isOpen, onClose, onSubmit, editEvent }: AdminE
               <div className="relative">
                 <Calendar size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#9a8b82]" />
                 <input
-                  type="date"
+                  type="datetime-local"
                   value={formData.date}
                   onChange={(e) => setFormData({ ...formData, date: e.target.value })}
                   required

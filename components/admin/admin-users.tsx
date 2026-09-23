@@ -1,26 +1,23 @@
 'use client';
 
 import { useState } from 'react';
-import { Search, ShieldCheck, Ban, Edit, Mail, Calendar, MapPin, Briefcase, CheckCircle, XCircle, Filter, Download } from 'lucide-react';
+import { Search, Ban, Mail, MapPin, Briefcase, CheckCircle, XCircle, Download, X } from 'lucide-react';
 import type { Profile } from '@/lib/types';
-import { AdminUserModal } from './admin-user-modal';
 
 interface AdminUsersProps {
   profiles: Profile[];
   currentPage: number;
   totalPages: number;
   onPageChange: (page: number) => void;
-  onToggleVerification: (profileId: string, currentStatus: boolean) => void;
-  onDeleteProfile: (profileId: string) => void;
-  onEditProfile: (profileId: string, userData: any) => void;
+  onToggleBlocked: (profileId: string, currentlyActive: boolean) => void;
 }
 
-export function AdminUsers({ profiles, currentPage, totalPages, onPageChange, onToggleVerification, onDeleteProfile, onEditProfile }: AdminUsersProps) {
+export function AdminUsers({ profiles, currentPage, totalPages, onPageChange, onToggleBlocked }: AdminUsersProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterCity, setFilterCity] = useState('');
   const [filterVerified, setFilterVerified] = useState<'all' | 'verified' | 'unverified'>('all');
-  const [showModal, setShowModal] = useState(false);
-  const [editingProfile, setEditingProfile] = useState<Profile | null>(null);
+  const [selectedProfile, setSelectedProfile] = useState<Profile | null>(null);
+  const [pendingBlockAction, setPendingBlockAction] = useState<{ profile: Profile; currentlyActive: boolean } | null>(null);
 
   const filteredProfiles = profiles.filter((p) => {
     const matchesSearch = p.display_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -33,18 +30,6 @@ export function AdminUsers({ profiles, currentPage, totalPages, onPageChange, on
   });
 
   const cities = Array.from(new Set(profiles.map((p) => p.city)));
-
-  const handleEditProfile = (profile: Profile) => {
-    setEditingProfile(profile);
-    setShowModal(true);
-  };
-
-  const handleEditSubmit = (userData: any) => {
-    if (editingProfile) {
-      onEditProfile(editingProfile.id, userData);
-      setEditingProfile(null);
-    }
-  };
 
   const handleExport = () => {
     const csv = [
@@ -147,7 +132,7 @@ export function AdminUsers({ profiles, currentPage, totalPages, onPageChange, on
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2 text-sm text-[#756960]">
                         <Mail size={14} />
-                        {p.user_id ? '✓ Actif' : '⚠ Inactif'}
+                        {p.user_id ? '✓ Compte lié' : '⚠ Sans compte lié'}
                       </div>
                     </td>
                     <td className="px-4 py-3">
@@ -178,27 +163,17 @@ export function AdminUsers({ profiles, currentPage, totalPages, onPageChange, on
                             Premium
                           </span>
                         )}
+                        {p.is_active === false && <span className="flex items-center gap-1 text-xs font-extrabold text-[#c92e63]"><Ban size={13} /> Bloqué</span>}
                       </div>
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex gap-2">
+                        <button onClick={() => setSelectedProfile(p)} className="rounded-full bg-[#e5f0ed] px-3 py-1.5 text-xs font-extrabold text-[#1a6b68] transition hover:bg-[#d0e8e5]">Voir profil</button>
                         <button
-                          onClick={() => handleEditProfile(p)}
-                          className="rounded-full bg-[#e5f0ed] px-3 py-1.5 text-xs font-extrabold text-[#1a6b68] transition hover:bg-[#d0e8e5]"
+                          onClick={() => setPendingBlockAction({ profile: p, currentlyActive: p.is_active !== false })}
+                          className={`rounded-full px-3 py-1.5 text-xs font-extrabold transition ${p.is_active === false ? 'bg-[#e5f0ed] text-[#1a6b68] hover:bg-[#d0e8e5]' : 'bg-[#fae4e2] text-[#c92e63] hover:bg-[#f5d5d5]'}`}
                         >
-                          <Edit size={12} />
-                        </button>
-                        <button
-                          onClick={() => onToggleVerification(p.id, p.is_verified)}
-                          className="rounded-full bg-[#e5f0ed] px-3 py-1.5 text-xs font-extrabold text-[#1a6b68] transition hover:bg-[#d0e8e5]"
-                        >
-                          {p.is_verified ? 'Révoquer' : 'Vérifier'}
-                        </button>
-                        <button
-                          onClick={() => onDeleteProfile(p.id)}
-                          className="rounded-full bg-[#fae4e2] px-3 py-1.5 text-xs font-extrabold text-[#c92e63] transition hover:bg-[#f5d5d5]"
-                        >
-                          <Ban size={12} />
+                          {p.is_active === false ? 'Débloquer' : 'Bloquer'}
                         </button>
                       </div>
                     </td>
@@ -231,12 +206,47 @@ export function AdminUsers({ profiles, currentPage, totalPages, onPageChange, on
         </div>
       </div>
 
-      <AdminUserModal
-        isOpen={showModal}
-        onClose={() => { setShowModal(false); setEditingProfile(null); }}
-        onSubmit={handleEditSubmit}
-        editProfile={editingProfile || undefined}
-      />
+      {selectedProfile && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4" role="dialog" aria-modal="true" aria-label={`Profil de ${selectedProfile.display_name}`}>
+          <section className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-[28px] bg-white p-6 shadow-[0_24px_80px_rgba(0,0,0,.3)]">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex items-center gap-4">
+                <img src={selectedProfile.photo_url} alt="" className="h-16 w-16 rounded-2xl object-cover" />
+                <div><h2 className="font-display text-2xl">{selectedProfile.display_name}</h2><p className="text-sm text-[#756960]">{selectedProfile.age} ans · {selectedProfile.city}</p></div>
+              </div>
+              <button onClick={() => setSelectedProfile(null)} aria-label="Fermer" className="rounded-full bg-[#f3e9dc] p-2"><X size={18} /></button>
+            </div>
+            <div className="mt-6 grid gap-3 sm:grid-cols-2">
+              <div className="rounded-2xl bg-[#fbf8f2] p-4"><p className="text-[11px] font-extrabold uppercase text-[#9a8b82]">Profession</p><p className="mt-1 text-sm font-semibold">{selectedProfile.profession || 'Non renseignée'}</p></div>
+              <div className="rounded-2xl bg-[#fbf8f2] p-4"><p className="text-[11px] font-extrabold uppercase text-[#9a8b82]">Zone</p><p className="mt-1 text-sm font-semibold">{selectedProfile.zone || selectedProfile.city || 'Non renseignée'}</p></div>
+              <div className="rounded-2xl bg-[#fbf8f2] p-4"><p className="text-[11px] font-extrabold uppercase text-[#9a8b82]">Genre</p><p className="mt-1 text-sm font-semibold">{selectedProfile.gender || 'Non renseigné'}</p></div>
+              <div className="rounded-2xl bg-[#fbf8f2] p-4"><p className="text-[11px] font-extrabold uppercase text-[#9a8b82]">Statut</p><p className="mt-1 text-sm font-semibold">{selectedProfile.is_active === false ? 'Compte bloqué' : 'Compte actif'} · {selectedProfile.is_verified ? 'Vérifié' : 'Non vérifié'}{selectedProfile.is_premium ? ' · Premium' : ''}</p></div>
+            </div>
+            <div className="mt-3 rounded-2xl bg-[#fbf8f2] p-4"><p className="text-[11px] font-extrabold uppercase text-[#9a8b82]">À propos</p><p className="mt-1 whitespace-pre-wrap text-sm leading-6">{selectedProfile.bio || 'Aucune biographie renseignée.'}</p></div>
+            {selectedProfile.interests?.length > 0 && <div className="mt-3 rounded-2xl bg-[#fbf8f2] p-4"><p className="text-[11px] font-extrabold uppercase text-[#9a8b82]">Centres d’intérêt</p><p className="mt-1 text-sm">{selectedProfile.interests.join(' · ')}</p></div>}
+            {selectedProfile.avatar_urls?.length ? <div className="mt-4 grid grid-cols-3 gap-2">{selectedProfile.avatar_urls.filter(Boolean).map((url, i) => <img key={`${url}-${i}`} src={url!} alt={`Photo ${i + 1} de ${selectedProfile.display_name}`} className="aspect-square w-full rounded-xl object-cover" />)}</div> : null}
+          </section>
+        </div>
+      )}
+      {pendingBlockAction && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4" role="dialog" aria-modal="true" aria-labelledby="block-user-title">
+          <section className="w-full max-w-md rounded-[28px] bg-white p-6 shadow-[0_24px_80px_rgba(0,0,0,.3)] sm:p-8">
+            <div className={`mb-5 flex h-12 w-12 items-center justify-center rounded-2xl ${pendingBlockAction.currentlyActive ? 'bg-[#fae4e2] text-[#c92e63]' : 'bg-[#e5f0ed] text-[#1a6b68]'}`}><Ban size={21} /></div>
+            <h2 id="block-user-title" className="font-display text-2xl">{pendingBlockAction.currentlyActive ? 'Bloquer ce compte ?' : 'Débloquer ce compte ?'}</h2>
+            <p className="mt-3 text-sm leading-6 text-[#756960]">
+              {pendingBlockAction.currentlyActive
+                ? `Le compte de ${pendingBlockAction.profile.display_name} ne pourra plus accéder à ARAS. À la prochaine connexion, la personne sera invitée à contacter contact@aras.sn.`
+                : `Le compte de ${pendingBlockAction.profile.display_name} pourra de nouveau se connecter à ARAS.`}
+            </p>
+            <div className="mt-7 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+              <button type="button" onClick={() => setPendingBlockAction(null)} className="rounded-full bg-[#f3e9dc] px-5 py-3 text-sm font-extrabold text-[#625852]">Annuler</button>
+              <button type="button" onClick={() => { onToggleBlocked(pendingBlockAction.profile.id, pendingBlockAction.currentlyActive); setPendingBlockAction(null); }} className={`rounded-full px-5 py-3 text-sm font-extrabold text-white ${pendingBlockAction.currentlyActive ? 'bg-[#c92e63] hover:bg-[#a92350]' : 'bg-[#1a6b68] hover:bg-[#125552]'}`}>
+                {pendingBlockAction.currentlyActive ? 'Bloquer le compte' : 'Débloquer le compte'}
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
     </>
   );
 }

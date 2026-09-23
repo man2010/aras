@@ -112,6 +112,31 @@ export async function GET(request: Request) {
       cookieStore.getAll().forEach(({ name }) => response.cookies.delete(name));
       return response;
     }
+    const { data: accessProfile, error: accessError } = await admin.from('profiles').select('is_active').eq('id', user.id).maybeSingle();
+    if (accessError || accessProfile?.is_active === false) {
+      await supabase.auth.signOut();
+      const reason = accessProfile?.is_active === false
+        ? 'Votre compte est bloqué. Veuillez contacter contact@aras.sn pour obtenir de l’aide.'
+        : 'Nous ne pouvons pas vérifier le statut de votre compte pour le moment. Réessayez dans quelques instants.';
+      const response = NextResponse.redirect(`${siteOrigin}/connexion?error=${encodeURIComponent(reason)}`);
+      authCookies.forEach(({ name, value, options }) => response.cookies.set(name, value, options));
+      return response;
+    }
+    const userAgent = request.headers.get('user-agent') || '';
+    const browser = /Edg\//.test(userAgent) ? 'Microsoft Edge' : /OPR\//.test(userAgent) ? 'Opera' : /Firefox\//.test(userAgent) ? 'Firefox' : /Chrome\//.test(userAgent) ? 'Chrome' : /Safari\//.test(userAgent) ? 'Safari' : 'Navigateur inconnu';
+    const operatingSystem = /Windows NT/.test(userAgent) ? 'Windows' : /Android/.test(userAgent) ? 'Android' : /iPhone|iPad|iPod/.test(userAgent) ? 'iOS' : /Mac OS X/.test(userAgent) ? 'macOS' : /Linux/.test(userAgent) ? 'Linux' : 'Système inconnu';
+    await admin.from('admin_activity_logs').insert({
+      user_id: user.id,
+      kind: 'login',
+      country: request.headers.get('x-vercel-ip-country') || request.headers.get('cf-ipcountry') || request.headers.get('x-nf-geo-country-code'),
+      region: request.headers.get('x-vercel-ip-country-region') || request.headers.get('x-nf-geo-region'),
+      city: request.headers.get('x-vercel-ip-city') || request.headers.get('x-nf-geo-city'),
+      browser,
+      operating_system: operatingSystem,
+      device: /iPad|Tablet/.test(userAgent) ? 'Tablette' : /Mobile|iPhone|Android/.test(userAgent) ? 'Mobile' : 'Ordinateur',
+      user_agent: userAgent,
+      page: `Google OAuth · ${flow}`,
+    });
   }
 
   // Supabase automatically links verified email identities. Existing linked

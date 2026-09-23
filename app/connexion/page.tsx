@@ -76,6 +76,31 @@ export default function ConnexionPage() {
     }
 
     if (data.user) {
+      const { data: sessionData } = await supabase.auth.getSession();
+      if (!sessionData.session?.access_token) {
+        await supabase.auth.signOut();
+        setMessage('Nous ne pouvons pas vérifier le statut de votre compte pour le moment. Réessayez dans quelques instants.');
+        setLoading(false);
+        return;
+      }
+      {
+        const accessCheck = await fetch('/api/auth/access', { headers: { Authorization: `Bearer ${sessionData.session.access_token}` } });
+        if (accessCheck.status === 403) {
+          await supabase.auth.signOut();
+          setMessage('Votre compte est bloqué. Veuillez contacter contact@aras.sn pour obtenir de l’aide.');
+          setLoading(false);
+          return;
+        }
+        if (!accessCheck.ok) {
+          await supabase.auth.signOut();
+          setMessage('Nous ne pouvons pas vérifier le statut de votre compte pour le moment. Réessayez dans quelques instants.');
+          setLoading(false);
+          return;
+        }
+      }
+      if (sessionData.session?.access_token) {
+        void fetch('/api/admin/activity-log', { method: 'POST', headers: { Authorization: `Bearer ${sessionData.session.access_token}` } }).catch(() => undefined);
+      }
       await ensureProfile(data.user.id, method === 'email' ? contact.split('@')[0] : contact);
       router.push('/espace');
     }

@@ -14,7 +14,7 @@ export function AdminMessages({ messages, profiles, onDeleteMessage }: AdminMess
   const [filterConversation, setFilterConversation] = useState('');
 
   const filteredMessages = messages.filter((m) => {
-    const matchesSearch = m.content.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesSearch = String(m.content ?? '').toLowerCase().includes(searchTerm.toLowerCase());
     const matchesConv = !filterConversation || m.match_id === filterConversation;
     return matchesSearch && matchesConv;
   });
@@ -23,10 +23,10 @@ export function AdminMessages({ messages, profiles, onDeleteMessage }: AdminMess
     const csv = [
       ['ID', 'Expéditeur', 'Conversation', 'Contenu', 'Lu', 'Date'].join(','),
       ...filteredMessages.map(m => [
-        m.id.slice(0, 8),
+        String(m.id ?? '').slice(0, 8),
         profiles[m.sender_id]?.full_name || 'Inconnu',
-        m.match_id.slice(0, 8),
-        `"${m.content.replace(/"/g, '""')}"`,
+        String(m.match_id ?? 'sans-conversation').slice(0, 8),
+        `"${String(m.content ?? '').replace(/"/g, '""')}"`,
         m.is_read ? 'Oui' : 'Non',
         new Date(m.created_at).toLocaleString('fr-FR'),
       ].join(','))
@@ -41,7 +41,7 @@ export function AdminMessages({ messages, profiles, onDeleteMessage }: AdminMess
     URL.revokeObjectURL(url);
   };
 
-  const conversations = Array.from(new Set(messages.map((m) => m.match_id)));
+  const conversations = Array.from(new Set(messages.map((m) => m.match_id).filter((id): id is string => typeof id === 'string' && id.length > 0)));
 
   return (
     <div className="space-y-6">
@@ -127,11 +127,11 @@ export function AdminMessages({ messages, profiles, onDeleteMessage }: AdminMess
                             {sender?.full_name || 'Utilisateur inconnu'}
                           </p>
                           <p className="text-xs text-[#9a8b82]">
-                            Conversation {message.match_id.slice(0, 8)}
+                            Conversation {typeof message.match_id === 'string' ? message.match_id.slice(0, 8) : 'sans identifiant'}
                           </p>
                         </div>
                       </div>
-                      <p className="text-sm text-[#756960]">{message.content}</p>
+                      <p className="text-sm text-[#756960]">{message.content || 'Message vide'}</p>
                       <div className="mt-2 flex items-center gap-4 text-xs text-[#9a8b82]">
                         <span>{new Date(message.created_at).toLocaleString('fr-FR')}</span>
                         {message.is_read && (

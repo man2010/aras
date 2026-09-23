@@ -111,6 +111,7 @@ export function toProfile(row: ProfileRow): Profile {
     interests: row.interests || [],
     profession: row.profession || '',
     is_verified: Boolean(row.is_verified),
+    is_active: row.is_active !== false,
     is_featured: Boolean(row.is_premium),
     created_at: row.created_at,
     gender: row.gender,

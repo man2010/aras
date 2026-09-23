@@ -1,9 +1,9 @@
 'use client';
 
-import { Dispatch, FormEvent, SetStateAction, useEffect, useRef, useState } from 'react';
+import { Dispatch, FormEvent, SetStateAction, useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { User, MessageCircle, Heart, CalendarDays, ArrowRight, ArrowLeft, ShieldCheck, Send, Plus, Check, Upload, X, CheckCheck, Search, MapPin, Eye, EyeOff, ChevronRight } from 'lucide-react';
+import { User, MessageCircle, Heart, CalendarDays, ArrowRight, ArrowLeft, ShieldCheck, Send, Plus, Check, Upload, X, CheckCheck, Search, MapPin, Users, Eye, EyeOff, ChevronRight, Flag } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
 import type { Profile, Conversation, Message, Story } from '@/lib/types';
@@ -277,7 +277,11 @@ export default function EspacePage() {
   const [selectedReceivedProfile, setSelectedReceivedProfile] = useState<Profile | null>(null);
   const [selectedMatch, setSelectedMatch] = useState<Profile | null>(null);
   const [likesView, setLikesView] = useState<'received' | 'sent'>('received');
-  const [events, setEvents] = useState<{ id: string; title: string; event_date: string; location: string }[]>([]);
+  const [events, setEvents] = useState<{ id: string; title: string; description: string; event_date: string; location: string; city: string; image_url: string; price_fcfa: number; capacity: number }[]>([]);
+  const [eventSearch, setEventSearch] = useState('');
+  const [eventCityFilter, setEventCityFilter] = useState('all');
+  const [eventKindFilter, setEventKindFilter] = useState<'all' | 'free' | 'paid' | 'registered'>('all');
+  const [eventPage, setEventPage] = useState(1);
   const [registeredEventIds, setRegisteredEventIds] = useState<Set<string>>(new Set());
   const [eventRegistrationStatuses, setEventRegistrationStatuses] = useState<Record<string, string>>({});
   const [eventRegistrationBusy, setEventRegistrationBusy] = useState<string | null>(null);
@@ -285,6 +289,26 @@ export default function EspacePage() {
   const [uploadingImage, setUploadingImage] = useState(false);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [infoModal, setInfoModal] = useState<{ title: string; message: string; confirmLabel?: string } | null>(null);
+  const [reportingProfile, setReportingProfile] = useState<Profile | null>(null);
+  const [reportReason, setReportReason] = useState('comportement');
+  const [reportDescription, setReportDescription] = useState('');
+  const [reportSubmitting, setReportSubmitting] = useState(false);
+
+  const loadMemberEvents = useCallback(async () => {
+    if (!user) return;
+    const [{ data: eventRows }, { data: registrations }] = await Promise.all([
+      supabase.from('events').select('*').eq('is_active', true).gte('date', new Date().toISOString()).order('date', { ascending: true }),
+      supabase.from('event_registrations').select('event_id,status').eq('user_id', user.id).neq('status', 'cancelled'),
+    ]);
+    if (eventRows) setEvents((eventRows as EventRow[]).map((row) => {
+      const event = toEvent(row);
+      return { id: event.id, title: event.title, description: event.description, event_date: event.event_date, location: row.location, city: row.city, image_url: event.image_url, price_fcfa: event.price_fcfa, capacity: event.capacity };
+    }));
+    if (registrations) {
+      setRegisteredEventIds(new Set(registrations.map((registration: { event_id: string }) => registration.event_id)));
+      setEventRegistrationStatuses(Object.fromEntries(registrations.map((registration: { event_id: string; status: string }) => [registration.event_id, registration.status])));
+    }
+  }, [user]);
 
   // --- Paramètres ---
   const [privacySettings, setPrivacySettings] = useState<PrivacyState>({
@@ -462,15 +486,18 @@ export default function EspacePage() {
         setTotalUnread(total);
         setUnreadCount(total);
       }
-      const { data: evts } = await supabase.from('events').select('*').eq('is_active', true).gte('date', new Date().toISOString()).order('date', { ascending: true }).limit(5);
-      if (evts) setEvents((evts as EventRow[]).map(toEvent).map((event) => ({ id: event.id, title: event.title, event_date: event.event_date, location: event.location })));
-      const { data: registrations } = await supabase.from('event_registrations').select('event_id, status').eq('user_id', user.id).neq('status', 'cancelled');
-      if (registrations) {
-        setRegisteredEventIds(new Set(registrations.map((registration: { event_id: string }) => registration.event_id)));
-        setEventRegistrationStatuses(Object.fromEntries(registrations.map((registration: { event_id: string; status: string }) => [registration.event_id, registration.status])));
-      }
+      await loadMemberEvents();
     })();
-  }, [user]);
+  }, [user, loadMemberEvents]);
+
+  useEffect(() => {
+    if (!user || tab !== 'events') return;
+    const channel = supabase.channel(`member-events-${user.id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'events' }, () => void loadMemberEvents())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'event_registrations', filter: `user_id=eq.${user.id}` }, () => void loadMemberEvents())
+      .subscribe();
+    return () => { void supabase.removeChannel(channel); };
+  }, [user, tab, loadMemberEvents]);
 
   useEffect(() => {
     if (!activeConv || !user) return;
@@ -675,6 +702,21 @@ export default function EspacePage() {
   }
 
   const formatDate = (d: string) => { const date = new Date(d); return isNaN(date.getTime()) ? '—' : new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'short' }).format(date); };
+  const formatEventDate = (d: string) => { const date = new Date(d); return isNaN(date.getTime()) ? 'Date à confirmer' : new Intl.DateTimeFormat('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' }).format(date); };
+  const eventCities = Array.from(new Set(events.map((event) => event.city).filter(Boolean)));
+  const filteredEvents = events.filter((event) => {
+    const query = eventSearch.trim().toLocaleLowerCase('fr');
+    const matchesSearch = !query || `${event.title} ${event.description} ${event.location} ${event.city}`.toLocaleLowerCase('fr').includes(query);
+    const matchesCity = eventCityFilter === 'all' || event.city === eventCityFilter;
+    const matchesKind = eventKindFilter === 'all'
+      || (eventKindFilter === 'free' && event.price_fcfa === 0)
+      || (eventKindFilter === 'paid' && event.price_fcfa > 0)
+      || (eventKindFilter === 'registered' && registeredEventIds.has(event.id));
+    return matchesSearch && matchesCity && matchesKind;
+  });
+  const eventPageSize = 3;
+  const eventPageCount = Math.max(1, Math.ceil(filteredEvents.length / eventPageSize));
+  const visibleEvents = filteredEvents.slice((eventPage - 1) * eventPageSize, eventPage * eventPageSize);
 
   const registerForEvent = async (eventId: string) => {
     if (!user || registeredEventIds.has(eventId)) return;
@@ -691,6 +733,7 @@ export default function EspacePage() {
     const status = result?.registration_status ?? 'confirmed';
     setRegisteredEventIds((current) => new Set(current).add(eventId));
     setEventRegistrationStatuses((current) => ({ ...current, [eventId]: status }));
+    await loadMemberEvents();
     window.dispatchEvent(new Event('aras:notifications-refresh'));
     if (status === 'confirmed') {
       const { data: sessionData } = await supabase.auth.getSession();
@@ -708,6 +751,27 @@ export default function EspacePage() {
     } else {
       setEventActionMessage('Ta participation est en attente de paiement. Elle sera confirmée après le règlement.');
     }
+  };
+
+  const submitProfileReport = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!user || !reportingProfile || reportSubmitting) return;
+    setReportSubmitting(true);
+    const { error } = await supabase.from('reports').insert({
+      reporter_id: user.id,
+      reported_id: reportingProfile.id,
+      type: reportReason,
+      reason: reportReason,
+      description: reportDescription.trim() || null,
+    });
+    setReportSubmitting(false);
+    if (error) {
+      setInfoModal({ title: 'Signalement non envoyé', message: 'Le signalement n’a pas pu être enregistré. Réessaie dans quelques instants.', confirmLabel: 'OK' });
+      return;
+    }
+    setReportingProfile(null);
+    setReportDescription('');
+    setInfoModal({ title: 'Signalement transmis', message: 'Merci. Notre équipe de modération va examiner ce signalement.', confirmLabel: 'OK' });
   };
 
   const showInfoModal = (title: string, message: string, confirmLabel = 'OK') => {
@@ -975,6 +1039,9 @@ export default function EspacePage() {
                             Message
                           </button>
                         </div>
+                        <button type="button" onClick={() => { setReportingProfile(profileItem); setReportReason('comportement'); setReportDescription(''); }} className="inline-flex items-center gap-1.5 py-1 text-[10px] font-semibold text-[#9a8b82] transition hover:text-[#c92e63]">
+                          <Flag size={12} /> Signaler ce profil
+                        </button>
                       </div>
                     </article>
                   ))}
@@ -1062,22 +1129,35 @@ export default function EspacePage() {
                   </div>
                   <p className="mt-2 text-xs text-[#9a8b82] dark:text-[#c9c3bf]">Ajoutez jusqu’à 6 photos supplémentaires pour enrichir votre profil. C’est 100% optionnel.</p>
 
+                  <input
+                    ref={galleryFileInputRef}
+                    type="file"
+                    accept="image/png,image/jpeg,image/jpg"
+                    className="sr-only"
+                    tabIndex={-1}
+                    onChange={(event) => {
+                      const file = event.target.files?.[0];
+                      if (file && galleryUploadIndex !== null) void handleProfileImageSelection(file, galleryUploadIndex);
+                    }}
+                  />
                   <div className="mt-4 grid gap-3 sm:grid-cols-3">
                     {Array.from({ length: 6 }, (_, index) => (
                       <button
                         key={`gallery-slot-${index}`}
                         type="button"
+                        disabled={galleryUploadingIndex !== null}
+                        aria-label={galleryPhotos[index] ? `Remplacer la photo ${index + 1}` : `Ajouter une photo ${index + 1}`}
                         onClick={() => {
                           setGalleryUploadIndex(index);
                           galleryFileInputRef.current?.click();
                         }}
-                        className="group relative flex aspect-[4/5] w-full items-center justify-center overflow-hidden rounded-[20px] border border-dashed border-[#d9c9ba] bg-white transition hover:border-[#ec3b78] dark:border-[#4a4a4a] dark:bg-[#27272a] dark:hover:border-[#ff7ab3]"
+                        className="group relative flex aspect-[4/5] w-full items-center justify-center overflow-hidden rounded-[20px] border border-dashed border-[#d9c9ba] bg-white transition hover:border-[#ec3b78] disabled:cursor-wait disabled:opacity-70 dark:border-[#4a4a4a] dark:bg-[#27272a] dark:hover:border-[#ff7ab3]"
                       >
                         {galleryPhotos[index] ? (
                           <>
                             <img src={galleryPhotos[index]!} alt={`Photo ${index + 1}`} className="h-full w-full object-cover" />
                             <div className="absolute inset-0 bg-black/20 opacity-0 transition group-hover:opacity-100" />
-                            <div className="absolute bottom-2 left-2 right-2 rounded-full bg-black/45 px-2 py-1 text-[9px] font-extrabold uppercase tracking-[0.16em] text-white opacity-0 transition group-hover:opacity-100">
+                            <div className="absolute bottom-2 left-2 right-2 rounded-full bg-black/55 px-2 py-1 text-[9px] font-extrabold uppercase tracking-[0.16em] text-white opacity-100 transition sm:opacity-0 sm:group-hover:opacity-100">
                               Remplacer
                             </div>
                           </>
@@ -1384,10 +1464,26 @@ export default function EspacePage() {
           {/* EVENTS TAB */}
           {tab === 'events' && (
             <div className="space-y-5">
-              <header className="rounded-[28px] border border-[#eadfd5] bg-[linear-gradient(120deg,#fffdfa,#f9e9ee)] p-6 dark:border-white/10 dark:bg-[linear-gradient(120deg,#201a20,#261821)] sm:p-8">
+              <header className="relative overflow-hidden rounded-[28px] border border-[#eadfd5] bg-[linear-gradient(120deg,#fffdfa,#f9e9ee)] p-6 dark:border-white/10 dark:bg-[linear-gradient(120deg,#201a20,#261821)] sm:p-8">
+                <div className="pointer-events-none absolute -right-10 -top-20 h-64 w-64 rounded-full bg-[#ec3b78]/10 blur-3xl" />
                 <p className="text-xs font-extrabold uppercase tracking-[.18em] text-[#ec3b78]">À vivre ensemble</p>
                 <h2 className="mt-2 font-display text-3xl text-[#241c18] dark:text-white sm:text-4xl">Tes prochains événements</h2>
                 <p className="mt-2 max-w-xl text-sm leading-6 text-[#756960] dark:text-white/60">Découvre les rendez-vous ARAS et confirme ta participation. Tes inscriptions restent accessibles depuis cet espace.</p>
+                <div className="mt-6 grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto]">
+                  <label className="flex min-h-12 items-center gap-3 rounded-2xl border border-[#eadfd5] bg-white/85 px-4 dark:border-white/10 dark:bg-white/5">
+                    <Search size={17} className="shrink-0 text-[#9a8b82]" />
+                    <input aria-label="Rechercher un événement" value={eventSearch} onChange={(event) => { setEventSearch(event.target.value); setEventPage(1); }} placeholder="Rechercher un événement, un lieu…" className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-[#9a8b82]" />
+                  </label>
+                  <select aria-label="Filtrer par ville" value={eventCityFilter} onChange={(event) => { setEventCityFilter(event.target.value); setEventPage(1); }} className="min-h-12 rounded-2xl border border-[#eadfd5] bg-white/85 px-4 text-sm font-semibold text-[#625852] outline-none dark:border-white/10 dark:bg-[#1c1b21] dark:text-white">
+                    <option value="all">Toutes les villes</option>
+                    {eventCities.map((city) => <option key={city} value={city}>{city}</option>)}
+                  </select>
+                </div>
+                <div className="mt-4 flex gap-2 overflow-x-auto pb-1">
+                  {([{ id: 'all', label: 'Tous' }, { id: 'free', label: 'Gratuits' }, { id: 'paid', label: 'Payants' }, { id: 'registered', label: 'Mes participations' }] as const).map((filter) => (
+                    <button key={filter.id} type="button" onClick={() => { setEventKindFilter(filter.id); setEventPage(1); }} className={`shrink-0 rounded-full px-4 py-2.5 text-xs font-extrabold transition ${eventKindFilter === filter.id ? 'bg-[#ec3b78] text-white shadow-[0_8px_20px_rgba(236,59,120,.2)]' : 'bg-white text-[#756960] hover:bg-[#f3e9dc] dark:bg-white/5 dark:text-white/75 dark:hover:bg-white/10'}`}>{filter.label}</button>
+                  ))}
+                </div>
               </header>
               {eventActionMessage && <p role="status" className="rounded-2xl border border-[#eadfd5] bg-white px-4 py-3 text-sm font-semibold text-[#625852] dark:border-white/10 dark:bg-[#1c1b21] dark:text-white/80">{eventActionMessage}</p>}
               {events.length === 0 ? (
@@ -1396,19 +1492,46 @@ export default function EspacePage() {
                   <p className="mt-4 font-display text-2xl">Aucun événement à venir</p>
                   <p className="mt-2 text-sm text-[#756960]">Les prochains rendez-vous seront bientôt annoncés.</p>
                 </div>
+              ) : filteredEvents.length === 0 ? (
+                <div className="rounded-[26px] border border-[#eadfd5] bg-white p-10 text-center dark:border-white/10 dark:bg-[#1c1b21]">
+                  <Search size={28} className="mx-auto text-[#ec3b78]" />
+                  <p className="mt-3 font-display text-xl text-[#241c18] dark:text-white">Aucun événement ne correspond à ces filtres</p>
+                  <button type="button" onClick={() => { setEventSearch(''); setEventCityFilter('all'); setEventKindFilter('all'); setEventPage(1); }} className="mt-4 text-sm font-bold text-[#ec3b78]">Effacer les filtres</button>
+                </div>
               ) : (
-                events.map((e) => (
-                  <article key={e.id} className="flex flex-col gap-4 rounded-[24px] border border-[#eadfd5] bg-white p-5 shadow-[0_10px_30px_rgba(83,46,32,.05)] dark:border-white/10 dark:bg-[#1c1b21] sm:flex-row sm:items-center sm:justify-between sm:p-6">
-                    <div className="flex min-w-0 items-center gap-4">
-                      <div className="flex h-14 w-14 shrink-0 flex-col items-center justify-center rounded-2xl bg-[#fae4e2] text-[#ec3b78] dark:bg-[#38232d]"><CalendarDays size={18} /></div>
-                      <div className="min-w-0"><p className="font-display text-xl text-[#241c18] dark:text-white">{e.title}</p><p className="mt-1 break-words text-sm text-[#756960] dark:text-white/60">{formatDate(e.event_date)} · {e.location}</p></div>
-                    </div>
-                    <div className="flex items-center gap-3 sm:shrink-0">
-                      {registeredEventIds.has(e.id) && <span className={`rounded-full px-3 py-2 text-xs font-bold ${eventRegistrationStatuses[e.id] === 'confirmed' ? 'bg-[#e5f0ed] text-[#1a6b68] dark:bg-[#173432] dark:text-[#8ce0cb]' : 'bg-[#fff3d9] text-[#8c5d12] dark:bg-[#332819] dark:text-[#f4c27a]'}`}>{eventRegistrationStatuses[e.id] === 'payment_pending' ? 'Paiement en attente' : 'Participation confirmée'}</span>}
-                      <button type="button" disabled={registeredEventIds.has(e.id) || eventRegistrationBusy === e.id} onClick={() => void registerForEvent(e.id)} className="min-h-11 rounded-full bg-[#ec3b78] px-5 py-2.5 text-xs font-extrabold text-white transition hover:bg-[#c92e63] disabled:cursor-default disabled:bg-[#1a6b68]">{eventRegistrationBusy === e.id ? 'Inscription…' : registeredEventIds.has(e.id) ? 'Inscrit' : 'Participer'}</button>
-                    </div>
-                  </article>
-                ))
+                <div className="grid gap-6 sm:grid-cols-2 2xl:grid-cols-3">
+                  {visibleEvents.map((e) => {
+                    const registered = registeredEventIds.has(e.id);
+                    const status = eventRegistrationStatuses[e.id];
+                    return (
+                      <article key={e.id} className="group flex h-full flex-col overflow-hidden rounded-[26px] border border-[#eadfd5] bg-white shadow-[0_10px_35px_rgba(83,46,32,.06)] transition duration-300 hover:-translate-y-1 hover:shadow-[0_18px_45px_rgba(83,46,32,.12)] dark:border-white/10 dark:bg-[#1c1b21]">
+                        <div className="relative h-52 overflow-hidden bg-[#f3e9dc] sm:h-56">
+                          <img src={e.image_url} alt={e.title} className="h-full w-full object-cover transition duration-700 group-hover:scale-105" />
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/45 via-transparent to-black/10" />
+                          <span className="absolute left-4 top-4 rounded-full bg-[#fbf8f2]/95 px-3 py-1.5 text-[10px] font-extrabold uppercase tracking-wider text-[#1a6b68]">ARAS · Rencontre</span>
+                          <span className={`absolute right-4 top-4 rounded-full px-3 py-1.5 text-[10px] font-extrabold uppercase ${e.price_fcfa === 0 ? 'bg-[#1a6b68] text-white' : 'bg-[#fbf8f2]/95 text-[#241c18]'}`}>{e.price_fcfa === 0 ? 'Gratuit' : `${new Intl.NumberFormat('fr-FR').format(e.price_fcfa)} FCFA`}</span>
+                          {registered && <span className={`absolute bottom-4 left-4 rounded-full px-3 py-1.5 text-[10px] font-extrabold ${status === 'confirmed' ? 'bg-[#e5f0ed] text-[#1a6b68]' : 'bg-[#fff3d9] text-[#8c5d12]'}`}>{status === 'payment_pending' ? 'En attente de paiement' : 'Participation confirmée'}</span>}
+                        </div>
+                        <div className="flex flex-1 flex-col p-5 sm:p-6">
+                          <div className="flex items-center gap-2 text-[11px] font-extrabold uppercase tracking-wider text-[#ec3b78]"><CalendarDays size={14} /> {formatEventDate(e.event_date)}</div>
+                          <h3 className="mt-3 font-display text-2xl leading-tight text-[#241c18] dark:text-white">{e.title}</h3>
+                          <p className="mt-3 line-clamp-3 min-h-[4.5rem] text-sm leading-6 text-[#756960] dark:text-white/65">{e.description || 'Retrouve la communauté ARAS pour un moment de rencontre et de partage.'}</p>
+                          <div className="mt-4 space-y-2 text-xs font-bold text-[#756960] dark:text-white/65">
+                            <div className="flex items-center gap-2"><MapPin size={14} className="shrink-0 text-[#d89b52]" /> {e.location}{e.city ? ` · ${e.city}` : ''}</div>
+                            <div className="flex items-center gap-2"><Users size={14} className="shrink-0 text-[#d89b52]" /> {e.capacity} places restantes</div>
+                          </div>
+                          <div className="mt-auto flex flex-wrap items-center justify-between gap-3 border-t border-[#eadfd5] pt-5 dark:border-white/10">
+                            <span className="text-sm font-extrabold text-[#241c18] dark:text-white">{e.price_fcfa === 0 ? 'Gratuit' : `${new Intl.NumberFormat('fr-FR').format(e.price_fcfa)} FCFA`}</span>
+                            <button type="button" disabled={registered || eventRegistrationBusy === e.id || e.capacity <= 0} onClick={() => void registerForEvent(e.id)} className="min-h-11 rounded-full bg-[#ec3b78] px-5 py-2.5 text-xs font-extrabold text-white transition hover:bg-[#c92e63] disabled:cursor-default disabled:bg-[#1a6b68]">
+                              {eventRegistrationBusy === e.id ? 'Inscription…' : registered ? (status === 'payment_pending' ? 'Paiement en attente' : 'Inscrit') : e.capacity <= 0 ? 'Complet' : e.price_fcfa === 0 ? 'Participer' : 'Réserver ma place'}
+                            </button>
+                          </div>
+                        </div>
+                      </article>
+                    );
+                  })}
+                  {eventPageCount > 1 && <div className="col-span-full flex items-center justify-between rounded-2xl border border-[#eadfd5] bg-white px-4 py-3 dark:border-white/10 dark:bg-[#1c1b21]"><p className="text-xs font-semibold text-[#756960] dark:text-white/60">Page {eventPage} sur {eventPageCount} · {filteredEvents.length} événement(s)</p><div className="flex gap-2"><button type="button" disabled={eventPage === 1} onClick={() => setEventPage((page) => Math.max(1, page - 1))} className="rounded-full bg-[#f3e9dc] px-4 py-2 text-xs font-bold disabled:opacity-50 dark:bg-white/10">Précédent</button><button type="button" disabled={eventPage === eventPageCount} onClick={() => setEventPage((page) => Math.min(eventPageCount, page + 1))} className="rounded-full bg-[#ec3b78] px-4 py-2 text-xs font-bold text-white disabled:opacity-50">Suivant</button></div></div>}
+                </div>
               )}
             </div>
           )}
@@ -1438,6 +1561,22 @@ export default function EspacePage() {
       </div>
 
       {/* PROFILE DETAIL MODALS */}
+      {reportingProfile && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4" role="dialog" aria-modal="true" aria-label={`Signaler ${reportingProfile.display_name}`}>
+          <form onSubmit={submitProfileReport} className="w-full max-w-lg rounded-[28px] bg-white p-6 shadow-[0_24px_80px_rgba(0,0,0,.3)]">
+            <div className="flex items-start justify-between gap-4"><div><p className="text-xs font-extrabold uppercase tracking-wider text-[#ec3b78]">Modération</p><h2 className="mt-1 font-display text-2xl">Signaler {reportingProfile.display_name}</h2></div><button type="button" onClick={() => setReportingProfile(null)} aria-label="Fermer" className="rounded-full bg-[#f3e9dc] p-2"><X size={18} /></button></div>
+            <label className="mt-5 block text-sm font-bold text-[#625852]">Motif
+              <select value={reportReason} onChange={(event) => setReportReason(event.target.value)} className="mt-2 w-full rounded-xl border border-[#dfd2c6] bg-[#fbf8f2] px-4 py-3 text-sm outline-none focus:border-[#ec3b78]">
+                <option value="comportement">Comportement inapproprié</option><option value="faux_profil">Faux profil ou usurpation</option><option value="harcelement">Harcèlement</option><option value="contenu">Contenu inapproprié</option><option value="autre">Autre</option>
+              </select>
+            </label>
+            <label className="mt-4 block text-sm font-bold text-[#625852]">Détails (facultatif)
+              <textarea value={reportDescription} onChange={(event) => setReportDescription(event.target.value)} maxLength={1000} rows={4} placeholder="Décris brièvement ce qui s’est passé…" className="mt-2 w-full resize-y rounded-xl border border-[#dfd2c6] bg-[#fbf8f2] px-4 py-3 text-sm outline-none focus:border-[#ec3b78]" />
+            </label>
+            <button type="submit" disabled={reportSubmitting} className="mt-5 min-h-12 w-full rounded-full bg-[#ec3b78] px-5 py-3 text-sm font-extrabold text-white disabled:opacity-60">{reportSubmitting ? 'Envoi…' : 'Envoyer le signalement'}</button>
+          </form>
+        </div>
+      )}
       {selectedReceivedProfile && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <div className="w-full max-w-lg rounded-[28px] bg-white p-6 shadow-[0_20px_60px_rgba(0,0,0,.3)]">

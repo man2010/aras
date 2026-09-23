@@ -8,7 +8,7 @@ export async function ensureProfile(userId: string, fallbackName: string) {
   const { data: profile } = await supabase.from('profiles').select('id').eq('id', userId).maybeSingle();
   if (profile) return;
 
-  await supabase.from('profiles').upsert(
+  await supabase.from('profiles').insert(
     {
       id: userId,
       full_name: fallbackName,
@@ -24,8 +24,7 @@ export async function ensureProfile(userId: string, fallbackName: string) {
       show_online_status: true,
       show_distance: true,
       notif_events: true,
-    },
-    { onConflict: 'id' }
+    }
   );
 }
 
@@ -51,6 +50,7 @@ export async function createProfileAfterSignup(
 
   const payload = (await response.json()) as { error?: string; is_verified?: boolean };
   if (!response.ok) {
+    if (response.status === 403) await supabase.auth.signOut();
     return { ok: false, error: payload.error ?? 'Impossible de créer le profil.' };
   }
 

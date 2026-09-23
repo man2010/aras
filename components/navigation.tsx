@@ -143,8 +143,8 @@ export function Navbar() {
           .gte('created_at', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString())
           .order('date', { ascending: true })
           .limit(5),
-        supabase.from('event_registrations').select('event_id').eq('user_id', user.id),
-        supabase.from('user_notifications').select('id, title, body, created_at, read_at').eq('user_id', user.id).order('created_at', { ascending: false }).limit(6),
+        supabase.from('event_registrations').select('event_id').eq('user_id', user.id).eq('status', 'confirmed'),
+        supabase.from('user_notifications').select('id, title, body, created_at, read_at').eq('user_id', user.id).is('read_at', null).order('created_at', { ascending: false }).limit(20),
       ]);
 
       const reminderFrom = new Date().toISOString();
@@ -185,25 +185,25 @@ export function Navbar() {
       });
       const eventNotifications: NotificationPreview[] = (eventRows ?? []).map((row: { id: string; title: string; description: string | null; date: string; location: string; city: string | null; created_at: string }) => ({
         id: `event-${row.id}`,
-        type: 'event',
+        type: 'event' as const,
         title: row.title,
         message: row.description?.trim() || `${new Date(row.date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })} · ${row.location}${row.city ? `, ${row.city}` : ''}`,
         href: '/espace?tab=events',
         createdAt: row.created_at,
-        unread: !readEventSet.has(row.id),
-      }));
+        unread: true,
+      })).filter((notification) => !readEventSet.has(notification.id.replace('event-', '')));
       const reminderNotifications: NotificationPreview[] = (reminderRows ?? []).map((row: { id: string; title: string; date: string; location: string; city: string | null; created_at: string | null }) => ({
-        id: `event-${row.id}`,
-        type: 'event',
+        id: `reminder-${row.id}`,
+        type: 'event' as const,
         title: `Rappel · ${row.title}`,
         message: `Tu as confirmé ta participation. Rendez-vous le ${new Date(row.date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })} à ${row.location}${row.city ? `, ${row.city}` : ''}.`,
         href: '/espace?tab=events',
         createdAt: row.created_at || row.date,
-        unread: !readEventSet.has(`reminder-${row.id}`),
-      }));
+        unread: true,
+      })).filter((notification) => !readEventSet.has(notification.id.replace('reminder-', 'reminder-')));
       const storedEventNotifications: NotificationPreview[] = (storedNotifications ?? []).map((row: { id: string; title: string; body: string; created_at: string; read_at: string | null }) => ({
         id: `db-event-${row.id}`,
-        type: 'event',
+        type: 'event' as const,
         title: row.title,
         message: row.body,
         href: '/espace?tab=events',
@@ -242,15 +242,16 @@ export function Navbar() {
     } else if (user) {
       if (notification.id.startsWith('db-event-')) {
         const notificationId = notification.id.replace('db-event-', '');
-        await supabase.from('user_notifications').update({ read_at: new Date().toISOString() }).eq('id', notificationId).eq('user_id', user.id);
-        if (notification.unread) setUnreadEventCount((count) => Math.max(0, count - 1));
-        setNotifications((current) => current.map((item) => item.id === notification.id ? { ...item, unread: false } : item));
+        await supabase.from('user_notifications').update({ read_at: new Date().toISOString() }).eq('id', notificationId).eq('user_id', user.id).is('read_at', null);
+        setUnreadEventCount((count) => Math.max(0, count - (notification.unread ? 1 : 0)));
+        setNotifications((current) => current.filter((item) => item.id !== notification.id));
         router.push(notification.href);
         setNotificationOpen(false);
         return;
       }
-      const eventId = notification.id.replace('event-', '');
-      const readKey = notification.title.startsWith('Rappel ·') ? `reminder-${eventId}` : eventId;
+      const isReminder = notification.id.startsWith('reminder-');
+      const eventId = notification.id.replace(isReminder ? 'reminder-' : 'event-', '');
+      const readKey = isReminder ? `reminder-${eventId}` : eventId;
       const key = `aras-read-events-${user.id}`;
       let readEventIds: string[] = [];
       try {
@@ -260,12 +261,10 @@ export function Navbar() {
       }
       if (!readEventIds.includes(readKey)) {
         window.localStorage.setItem(key, JSON.stringify([...readEventIds, readKey]));
-        setUnreadEventCount((count) => Math.max(0, count - 1));
+        setUnreadEventCount((count) => Math.max(0, count - (notification.unread ? 1 : 0)));
       }
     }
-    setNotifications((current) => current
-      .filter((item) => item.id !== notification.id || item.type === 'event')
-      .map((item) => item.id === notification.id ? { ...item, unread: false } : item));
+    setNotifications((current) => current.filter((item) => item.id !== notification.id));
     setNotificationOpen(false);
     setOpen(false);
     router.push(notification.href);
@@ -443,7 +442,33 @@ export function Navbar() {
           )}
         </div>
 
-        <button aria-label="Menu" onClick={() => setOpen(!open)} className="rounded-full p-2 text-[#1e1916] md:hidden">
+        <div className="flex items-center gap-1 md:hidden">
+          <button type="button" onClick={() => setTheme(isDark ? 'light' : 'dark')} aria-label={isDark ? 'Activer le mode clair' : 'Activer le mode sombre'} className="rounded-full border border-[#dfd2c6] p-2.5 text-[#625852] transition hover:border-[#ec3b78] hover:text-[#ec3b78]">
+            {isDark ? <Sun size={18} /> : <Moon size={18} />}
+          </button>
+          {user && (
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setNotificationOpen((openState) => !openState)}
+                aria-label={`Ouvrir les notifications${(unreadCount + unreadEventCount) > 0 ? `, ${unreadCount + unreadEventCount} non lues` : ''}`}
+                aria-expanded={notificationOpen}
+                className="relative rounded-full border border-[#dfd2c6] p-2.5 text-[#625852] transition hover:border-[#ec3b78] hover:text-[#ec3b78]"
+              >
+                <Bell size={18} />
+                {(unreadCount + unreadEventCount) > 0 && <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-[#ec3b78] px-1 text-[10px] font-extrabold text-white">{(unreadCount + unreadEventCount) > 9 ? '9+' : unreadCount + unreadEventCount}</span>}
+              </button>
+              {notificationOpen && (
+                <div className="absolute right-0 top-full z-50 mt-3 w-[min(360px,calc(100vw-1rem))] overflow-hidden rounded-2xl border border-[#dfd2c6] bg-white shadow-[0_18px_50px_rgba(83,46,32,.18)]">
+                  <div className="flex items-center justify-between border-b border-[#f0e5dc] px-4 py-3"><p className="text-sm font-extrabold text-[#241c18]">Notifications</p>{(unreadCount + unreadEventCount) > 0 && <span className="text-[10px] font-extrabold uppercase tracking-[.12em] text-[#ec3b78]">{unreadCount + unreadEventCount} nouvelle{unreadCount + unreadEventCount > 1 ? 's' : ''}</span>}</div>
+                  {notifications.length === 0 ? <div className="px-4 py-8 text-center"><Bell size={22} className="mx-auto text-[#d9c9ba]" /><p className="mt-3 text-sm font-bold text-[#756960]">Aucune notification</p><p className="mt-1 text-xs text-[#9a8b82]">Tout est à jour.</p></div> : <div className="max-h-[min(440px,70vh)] overflow-y-auto p-2">{notifications.map((notification) => <button key={notification.id} type="button" onClick={() => void handleNotificationClick(notification)} className={`flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left transition hover:bg-[#fbf3ee] ${notification.unread ? 'bg-[#fff7f4]' : ''}`}><div className="relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[#f3e9dc] text-[#1a6b68]">{notification.avatarUrl ? <img src={notification.avatarUrl} alt="" className="h-full w-full object-cover" /> : notification.type === 'message' ? <MessageCircle size={17} /> : <CalendarDays size={17} />}{notification.unread && <span className="absolute right-0 top-0 h-2.5 w-2.5 rounded-full border-2 border-white bg-[#ec3b78]" />}</div><div className="min-w-0 flex-1"><p className="truncate text-xs font-extrabold text-[#241c18]">{notification.title}</p><p className="mt-0.5 line-clamp-2 text-xs leading-4 text-[#756960]">{notification.message}</p></div><ChevronRight size={15} className="shrink-0 text-[#b8aaa1]" /></button>)}</div>}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        <button aria-label="Menu" aria-expanded={open} onClick={() => setOpen(!open)} className="rounded-full p-2 text-[#1e1916] md:hidden">
           {open ? <X size={22} /> : <Menu size={22} />}
         </button>
       </div>
@@ -461,9 +486,6 @@ export function Navbar() {
                 <Link href="/contact" onClick={() => setOpen(false)} className="hover:text-[#ec3b78] transition-colors">Contact</Link>
               </>
             )}
-            <button onClick={() => setTheme(isDark ? 'light' : 'dark')} className="flex items-center gap-2 text-left hover:text-[#ec3b78] transition-colors">
-              {isDark ? <Sun size={16} /> : <Moon size={16} />} {isDark ? 'Mode clair' : 'Mode sombre'}
-            </button>
             {user ? (
               <>
                 {/* Résumé du profil connecté */}
@@ -484,48 +506,6 @@ export function Navbar() {
                   </span>
                 </Link>
 
-                <div className="rounded-2xl border border-[#dfd2c6] bg-white">
-                  <button
-                    type="button"
-                    onClick={() => setNotificationOpen((openState) => !openState)}
-                    className="flex w-full items-center justify-between px-4 py-3 text-left"
-                    aria-expanded={notificationOpen}
-                  >
-                    <span className="flex items-center gap-2">
-                      <Bell size={16} /> Notifications
-                    </span>
-                    {(unreadCount + unreadEventCount) > 0 && (
-                      <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-[#ec3b78] px-1 text-[10px] text-white">
-                        {(unreadCount + unreadEventCount) > 9 ? '9+' : unreadCount + unreadEventCount}
-                      </span>
-                    )}
-                  </button>
-                  {notificationOpen && (
-                    <div className="border-t border-[#f0e5dc] p-2">
-                      {notifications.length === 0 ? (
-                        <p className="px-2 py-4 text-center text-xs font-bold text-[#9a8b82]">Aucune notification</p>
-                      ) : (
-                        notifications.map((notification) => (
-                          <button
-                            key={notification.id}
-                            type="button"
-                            onClick={() => void handleNotificationClick(notification)}
-                            className={`flex w-full items-center gap-3 rounded-xl px-2 py-2.5 text-left ${notification.unread ? 'bg-[#fff7f4]' : ''}`}
-                          >
-                            <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[#f3e9dc] text-[#1a6b68]">
-                              {notification.avatarUrl ? <img src={notification.avatarUrl} alt="" className="h-full w-full object-cover" /> : notification.type === 'message' ? <MessageCircle size={16} /> : <CalendarDays size={16} />}
-                            </div>
-                            <span className="min-w-0 flex-1">
-                              <span className="block truncate text-xs font-extrabold text-[#241c18]">{notification.title}</span>
-                              <span className="mt-0.5 block line-clamp-2 text-[11px] font-normal leading-4 text-[#756960]">{notification.message}</span>
-                            </span>
-                            <ChevronRight size={14} className="shrink-0 text-[#b8aaa1]" />
-                          </button>
-                        ))
-                      )}
-                    </div>
-                  )}
-                </div>
                 <Link href="/espace?tab=settings-profile" onClick={() => setOpen(false)} className="flex items-center gap-2 hover:text-[#ec3b78] transition-colors">
                   <Settings size={16} /> Paramètres
                 </Link>

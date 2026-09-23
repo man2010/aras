@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { BarChart3, TrendingUp, Users, Heart, MessageSquare, Calendar, Download, Filter } from 'lucide-react';
+import { Users, Heart, MessageSquare, Calendar, Download } from 'lucide-react';
 
 interface AdminAnalyticsProps {
   analytics: {
@@ -9,12 +9,18 @@ interface AdminAnalyticsProps {
     dailyMessages: { date: string; count: number }[];
     dailyMatches: { date: string; count: number }[];
     userDemographics: { city: string; count: number }[];
-    topProfiles: { profileId: string; views: number; likes: number }[];
+    topProfiles: { profileId: string; profileName: string; likes: number }[];
   };
 }
 
 export function AdminAnalytics({ analytics }: AdminAnalyticsProps) {
   const [timeRange, setTimeRange] = useState<'7d' | '30d' | '90d'>('30d');
+  const days = Number.parseInt(timeRange, 10);
+  const dailySignups = analytics.dailySignups.slice(-days);
+  const dailyMessages = analytics.dailyMessages.slice(-days);
+  const dailyMatches = analytics.dailyMatches.slice(-days);
+  const total = (items: { count: number }[]) => items.reduce((sum, item) => sum + item.count, 0);
+  const barHeight = (count: number, items: { count: number }[]) => count === 0 ? '0%' : `${Math.max(8, (count / Math.max(1, ...items.map((item) => item.count))) * 100)}%`;
 
   const handleExport = () => {
     const csv = [
@@ -59,6 +65,12 @@ export function AdminAnalytics({ analytics }: AdminAnalyticsProps) {
         </div>
       </div>
 
+      <div className="grid gap-4 sm:grid-cols-3">
+        {[{ label: 'Nouveaux profils', value: total(dailySignups), color: '#ec3b78' }, { label: 'Messages', value: total(dailyMessages), color: '#1a6b68' }, { label: 'Matches', value: total(dailyMatches), color: '#d89b52' }].map((metric) => (
+          <div key={metric.label} className="rounded-[22px] bg-white p-5 shadow-[0_8px_30px_rgba(83,46,32,.05)]"><p className="font-display text-3xl" style={{ color: metric.color }}>{metric.value}</p><p className="mt-1 text-xs font-bold uppercase tracking-wider text-[#9a8b82]">{metric.label} · {days} jours</p></div>
+        ))}
+      </div>
+
       {/* Charts Grid */}
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Daily Signups */}
@@ -68,11 +80,11 @@ export function AdminAnalytics({ analytics }: AdminAnalyticsProps) {
             <Users size={20} className="text-[#ec3b78]" />
           </div>
           <div className="h-64 flex items-end gap-2">
-            {analytics.dailySignups.slice(-7).map((item, index) => (
+            {dailySignups.slice(-Math.min(days, 14)).map((item, index) => (
               <div key={index} className="flex-1 flex flex-col items-center gap-2">
                 <div
                   className="w-full rounded-t-lg bg-[#ec3b78] transition hover:bg-[#c92e63]"
-                  style={{ height: `${Math.max(10, (item.count / Math.max(...analytics.dailySignups.map(d => d.count))) * 100)}%` }}
+                  style={{ height: barHeight(item.count, dailySignups) }}
                 />
                 <p className="text-[10px] text-[#9a8b82]">{new Date(item.date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}</p>
               </div>
@@ -87,11 +99,11 @@ export function AdminAnalytics({ analytics }: AdminAnalyticsProps) {
             <MessageSquare size={20} className="text-[#1a6b68]" />
           </div>
           <div className="h-64 flex items-end gap-2">
-            {analytics.dailyMessages.slice(-7).map((item, index) => (
+            {dailyMessages.slice(-Math.min(days, 14)).map((item, index) => (
               <div key={index} className="flex-1 flex flex-col items-center gap-2">
                 <div
                   className="w-full rounded-t-lg bg-[#1a6b68] transition hover:bg-[#125552]"
-                  style={{ height: `${Math.max(10, (item.count / Math.max(...analytics.dailyMessages.map(d => d.count))) * 100)}%` }}
+                  style={{ height: barHeight(item.count, dailyMessages) }}
                 />
                 <p className="text-[10px] text-[#9a8b82]">{new Date(item.date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}</p>
               </div>
@@ -106,11 +118,11 @@ export function AdminAnalytics({ analytics }: AdminAnalyticsProps) {
             <Heart size={20} className="text-[#d89b52]" />
           </div>
           <div className="h-64 flex items-end gap-2">
-            {analytics.dailyMatches.slice(-7).map((item, index) => (
+            {dailyMatches.slice(-Math.min(days, 14)).map((item, index) => (
               <div key={index} className="flex-1 flex flex-col items-center gap-2">
                 <div
                   className="w-full rounded-t-lg bg-[#d89b52] transition hover:bg-[#c08040]"
-                  style={{ height: `${Math.max(10, (item.count / Math.max(...analytics.dailyMatches.map(d => d.count))) * 100)}%` }}
+                  style={{ height: barHeight(item.count, dailyMatches) }}
                 />
                 <p className="text-[10px] text-[#9a8b82]">{new Date(item.date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}</p>
               </div>
@@ -138,6 +150,7 @@ export function AdminAnalytics({ analytics }: AdminAnalyticsProps) {
               </div>
             ))}
           </div>
+          {analytics.userDemographics.length === 0 && <p className="py-8 text-center text-sm text-[#9a8b82]">Aucune donnée de ville disponible.</p>}
         </div>
       </div>
 
@@ -149,9 +162,7 @@ export function AdminAnalytics({ analytics }: AdminAnalyticsProps) {
             <thead>
               <tr className="border-b border-[#dfd2c6]">
                 <th className="px-4 py-3 text-left text-xs font-extrabold uppercase text-[#625852]">Profil</th>
-                <th className="px-4 py-3 text-left text-xs font-extrabold uppercase text-[#625852]">Vues</th>
                 <th className="px-4 py-3 text-left text-xs font-extrabold uppercase text-[#625852]">Likes</th>
-                <th className="px-4 py-3 text-left text-xs font-extrabold uppercase text-[#625852]">Taux de match</th>
               </tr>
             </thead>
             <tbody>
@@ -162,16 +173,15 @@ export function AdminAnalytics({ analytics }: AdminAnalyticsProps) {
                       <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#ec3b78] text-xs font-extrabold text-white">
                         {index + 1}
                       </span>
-                      <p className="text-sm font-bold text-[#241c18]">{profile.profileId.slice(0, 8)}</p>
+                      <p className="text-sm font-bold text-[#241c18]">{profile.profileName}</p>
                     </div>
                   </td>
-                  <td className="px-4 py-3 text-sm text-[#756960]">{profile.views}</td>
                   <td className="px-4 py-3 text-sm text-[#756960]">{profile.likes}</td>
-                  <td className="px-4 py-3 text-sm text-[#756960]">{profile.likes > 0 ? `${((profile.likes / profile.views) * 100).toFixed(1)}%` : '0%'}</td>
                 </tr>
               ))}
             </tbody>
           </table>
+          {analytics.topProfiles.length === 0 && <p className="py-8 text-center text-sm text-[#9a8b82]">Aucun like sur la période sélectionnée.</p>}
         </div>
       </div>
     </div>

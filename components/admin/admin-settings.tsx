@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Settings, Save, Shield, Database, Bell, Palette } from 'lucide-react';
 
 interface AdminSettingsProps {
@@ -15,6 +15,7 @@ interface AdminSettingsProps {
 
 export function AdminSettings({ settings, onSaveSettings }: AdminSettingsProps) {
   const [localSettings, setLocalSettings] = useState(settings);
+  useEffect(() => setLocalSettings(settings), [settings]);
 
   return (
     <div className="space-y-6">

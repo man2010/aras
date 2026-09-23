@@ -9,6 +9,7 @@ export type Profile = {
   interests: string[];
   profession: string;
   is_verified: boolean;
+  is_active?: boolean;
   is_featured: boolean;
   created_at: string;
   gender?: string | null;

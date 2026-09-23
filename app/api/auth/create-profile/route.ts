@@ -55,7 +55,18 @@ export async function POST(request: Request) {
     );
   }
 
-  const { error: profileError } = await admin.from('profiles').upsert(
+  const { data: existingProfile, error: existingProfileError } = await admin
+    .from('profiles')
+    .select('is_active,is_verified')
+    .eq('id', userData.user.id)
+    .maybeSingle();
+  if (existingProfileError) return NextResponse.json({ error: 'Impossible de vérifier le statut du compte.' }, { status: 503 });
+  if (existingProfile?.is_active === false) {
+    return NextResponse.json({ error: 'Votre compte est bloqué. Veuillez contacter contact@aras.sn pour obtenir de l’aide.' }, { status: 403 });
+  }
+  if (existingProfile) return NextResponse.json({ ok: true, is_verified: Boolean(existingProfile.is_verified) });
+
+  const { error: profileError } = await admin.from('profiles').insert(
     {
       id: userData.user.id,
       full_name: displayName,
@@ -74,8 +85,7 @@ export async function POST(request: Request) {
       profile_status: 'pending',
       onboarding_completed: false,
       is_verified: humanVerified,
-    },
-    { onConflict: 'id' }
+    }
   );
 
   if (profileError) {
