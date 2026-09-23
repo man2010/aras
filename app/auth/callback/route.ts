@@ -7,7 +7,11 @@ const LINK_WINDOW_MS = 20_000; // marge de tolérance réseau
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get('code');
-  const next = searchParams.get('next') ?? '/espace';
+  // Accept only local paths so an OAuth parameter cannot become an open redirect.
+  const requestedNext = searchParams.get('next') ?? '/espace';
+  const next = requestedNext.startsWith('/') && !requestedNext.startsWith('//')
+    ? requestedNext
+    : '/espace';
 
   if (!code) {
     return NextResponse.redirect(`${origin}/connexion?error=oauth_missing_code`);
