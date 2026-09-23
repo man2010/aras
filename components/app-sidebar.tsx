@@ -57,7 +57,6 @@ export function AppSidebar({ active, onChange, badges }: AppSidebarProps) {
   const [collapsed, setCollapsed] = useState(false);
   const isSettingsActive = active.startsWith('settings-');
   const [settingsOpen, setSettingsOpen] = useState(isSettingsActive);
-  const [mobileSettingsOpen, setMobileSettingsOpen] = useState(false);
 
   return (
     <>
@@ -162,30 +161,6 @@ export function AppSidebar({ active, onChange, badges }: AppSidebarProps) {
 
       {/* MOBILE : icônes en bas de l'écran */}
       <div className="md:hidden">
-        {mobileSettingsOpen && (
-          <div className="fixed inset-x-3 bottom-[72px] z-50 rounded-[22px] border border-[#eadfd5] bg-white p-2 shadow-[0_18px_40px_rgba(83,46,32,.15)] dark:border-white/10 dark:bg-[#202027]">
-            {settingsItems.map((item) => {
-              const isActive = active === item.id;
-              return (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={() => {
-                    onChange(item.id);
-                    setMobileSettingsOpen(false);
-                  }}
-                  className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-bold transition ${
-                    isActive ? 'bg-[#ec3b78] text-white' : 'text-[#625852] hover:bg-[#f3e9dc] dark:text-white/70 dark:hover:bg-white/5'
-                  }`}
-                >
-                  <item.icon size={16} className="shrink-0" />
-                  <span>{item.label}</span>
-                </button>
-              );
-            })}
-          </div>
-        )}
-
         <nav className="fixed inset-x-0 bottom-0 z-40 flex items-center justify-around gap-0.5 overflow-x-auto border-t border-[#eadfd5] bg-white/95 px-1 py-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] backdrop-blur-xl dark:border-white/10 dark:bg-[#15151a]/95">
           {mainItems.map((item) => {
             const isActive = active === item.id;
@@ -212,18 +187,7 @@ export function AppSidebar({ active, onChange, badges }: AppSidebarProps) {
 
           <button
             type="button"
-            onClick={() => {
-              if (isSettingsActive && mobileSettingsOpen) {
-                setMobileSettingsOpen(false);
-                return;
-              }
-
-              if (!isSettingsActive) {
-                onChange('settings-profile');
-              }
-
-              setMobileSettingsOpen((open) => !open);
-            }}
+            onClick={() => onChange('settings-profile')}
             aria-label="Paramètres"
             className={`flex shrink-0 flex-col items-center gap-1 rounded-xl px-2.5 py-1.5 transition ${
               isSettingsActive ? 'text-[#ec3b78]' : 'text-[#9a8b82] dark:text-white/45'

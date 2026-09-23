@@ -323,7 +323,7 @@ export function Navbar() {
                   </button>
 
                   {notificationOpen && (
-                    <div className="absolute right-0 top-full z-50 mt-2 w-[min(360px,calc(100vw-2rem))] overflow-hidden rounded-2xl border border-[#dfd2c6] bg-white shadow-[0_18px_50px_rgba(83,46,32,.18)]">
+                    <div className="fixed left-3 right-3 top-[72px] z-50 max-h-[calc(100dvh-88px)] overflow-hidden rounded-2xl border border-[#dfd2c6] bg-white shadow-[0_18px_50px_rgba(83,46,32,.18)] md:absolute md:left-auto md:right-0 md:top-full md:mt-2 md:max-h-none md:w-[min(360px,calc(100vw-2rem))]">
                       <div className="flex items-center justify-between border-b border-[#f0e5dc] px-4 py-3">
                         <p className="text-sm font-extrabold text-[#241c18]">Notifications</p>
                         {(unreadCount + unreadEventCount) > 0 && (
@@ -339,7 +339,7 @@ export function Navbar() {
                           <p className="mt-1 text-xs text-[#9a8b82]">Tout est à jour.</p>
                         </div>
                       ) : (
-                        <div className="max-h-[min(440px,70vh)] overflow-y-auto p-2">
+                      <div className="max-h-[calc(100dvh-160px)] overflow-y-auto p-2 md:max-h-[min(440px,70vh)]">
                           {notifications.map((notification) => (
                             <button
                               key={notification.id}
@@ -443,9 +443,6 @@ export function Navbar() {
         </div>
 
         <div className="flex items-center gap-1 md:hidden">
-          <button type="button" onClick={() => setTheme(isDark ? 'light' : 'dark')} aria-label={isDark ? 'Activer le mode clair' : 'Activer le mode sombre'} className="rounded-full border border-[#dfd2c6] p-2.5 text-[#625852] transition hover:border-[#ec3b78] hover:text-[#ec3b78]">
-            {isDark ? <Sun size={18} /> : <Moon size={18} />}
-          </button>
           {user && (
             <div className="relative">
               <button
@@ -459,18 +456,17 @@ export function Navbar() {
                 {(unreadCount + unreadEventCount) > 0 && <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-[#ec3b78] px-1 text-[10px] font-extrabold text-white">{(unreadCount + unreadEventCount) > 9 ? '9+' : unreadCount + unreadEventCount}</span>}
               </button>
               {notificationOpen && (
-                <div className="absolute right-0 top-full z-50 mt-3 w-[min(360px,calc(100vw-1rem))] overflow-hidden rounded-2xl border border-[#dfd2c6] bg-white shadow-[0_18px_50px_rgba(83,46,32,.18)]">
+                <div className="fixed left-3 right-3 top-[72px] z-50 max-h-[calc(100dvh-88px)] overflow-hidden rounded-2xl border border-[#dfd2c6] bg-white shadow-[0_18px_50px_rgba(83,46,32,.18)] md:absolute md:left-auto md:right-0 md:top-full md:mt-3 md:max-h-none md:w-[min(360px,calc(100vw-2rem))]">
                   <div className="flex items-center justify-between border-b border-[#f0e5dc] px-4 py-3"><p className="text-sm font-extrabold text-[#241c18]">Notifications</p>{(unreadCount + unreadEventCount) > 0 && <span className="text-[10px] font-extrabold uppercase tracking-[.12em] text-[#ec3b78]">{unreadCount + unreadEventCount} nouvelle{unreadCount + unreadEventCount > 1 ? 's' : ''}</span>}</div>
-                  {notifications.length === 0 ? <div className="px-4 py-8 text-center"><Bell size={22} className="mx-auto text-[#d9c9ba]" /><p className="mt-3 text-sm font-bold text-[#756960]">Aucune notification</p><p className="mt-1 text-xs text-[#9a8b82]">Tout est à jour.</p></div> : <div className="max-h-[min(440px,70vh)] overflow-y-auto p-2">{notifications.map((notification) => <button key={notification.id} type="button" onClick={() => void handleNotificationClick(notification)} className={`flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left transition hover:bg-[#fbf3ee] ${notification.unread ? 'bg-[#fff7f4]' : ''}`}><div className="relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[#f3e9dc] text-[#1a6b68]">{notification.avatarUrl ? <img src={notification.avatarUrl} alt="" className="h-full w-full object-cover" /> : notification.type === 'message' ? <MessageCircle size={17} /> : <CalendarDays size={17} />}{notification.unread && <span className="absolute right-0 top-0 h-2.5 w-2.5 rounded-full border-2 border-white bg-[#ec3b78]" />}</div><div className="min-w-0 flex-1"><p className="truncate text-xs font-extrabold text-[#241c18]">{notification.title}</p><p className="mt-0.5 line-clamp-2 text-xs leading-4 text-[#756960]">{notification.message}</p></div><ChevronRight size={15} className="shrink-0 text-[#b8aaa1]" /></button>)}</div>}
+                  {notifications.length === 0 ? <div className="px-4 py-8 text-center"><Bell size={22} className="mx-auto text-[#d9c9ba]" /><p className="mt-3 text-sm font-bold text-[#756960]">Aucune notification</p><p className="mt-1 text-xs text-[#9a8b82]">Tout est à jour.</p></div> : <div className="max-h-[calc(100dvh-160px)] overflow-y-auto p-2 md:max-h-[min(440px,70vh)]">{notifications.map((notification) => <button key={notification.id} type="button" onClick={() => void handleNotificationClick(notification)} className={`flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left transition hover:bg-[#fbf3ee] ${notification.unread ? 'bg-[#fff7f4]' : ''}`}><div className="relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[#f3e9dc] text-[#1a6b68]">{notification.avatarUrl ? <img src={notification.avatarUrl} alt="" className="h-full w-full object-cover" /> : notification.type === 'message' ? <MessageCircle size={17} /> : <CalendarDays size={17} />}{notification.unread && <span className="absolute right-0 top-0 h-2.5 w-2.5 rounded-full border-2 border-white bg-[#ec3b78]" />}</div><div className="min-w-0 flex-1"><p className="truncate text-xs font-extrabold text-[#241c18]">{notification.title}</p><p className="mt-0.5 line-clamp-2 break-words text-xs leading-4 text-[#756960]">{notification.message}</p></div><ChevronRight size={15} className="shrink-0 text-[#b8aaa1]" /></button>)}</div>}
                 </div>
               )}
             </div>
           )}
+          <button aria-label="Menu" aria-expanded={open} onClick={() => setOpen(!open)} className="rounded-full p-2 text-[#1e1916] md:hidden">
+            {open ? <X size={22} /> : <Menu size={22} />}
+          </button>
         </div>
-
-        <button aria-label="Menu" aria-expanded={open} onClick={() => setOpen(!open)} className="rounded-full p-2 text-[#1e1916] md:hidden">
-          {open ? <X size={22} /> : <Menu size={22} />}
-        </button>
       </div>
 
       {open && (
@@ -486,6 +482,9 @@ export function Navbar() {
                 <Link href="/contact" onClick={() => setOpen(false)} className="hover:text-[#ec3b78] transition-colors">Contact</Link>
               </>
             )}
+            <button onClick={() => setTheme(isDark ? 'light' : 'dark')} className="flex items-center gap-2 text-left hover:text-[#ec3b78] transition-colors">
+              {isDark ? <Sun size={16} /> : <Moon size={16} />} {isDark ? 'Mode clair' : 'Mode sombre'}
+            </button>
             {user ? (
               <>
                 {/* Résumé du profil connecté */}
