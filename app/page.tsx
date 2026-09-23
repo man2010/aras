@@ -12,12 +12,6 @@ import { supabase } from '@/lib/supabase';
 import type { Profile, EventItem, Testimonial } from '@/lib/types';
 import { toEvent, toProfile, type EventRow, type ProfileRow } from '@/lib/adapters';
 
-const fallbackEvents: EventItem[] = [
-  { id: '1', title: 'Dîner sous les étoiles', description: 'Une soirée intime pour prendre le temps de se découvrir autour d’une table généreuse.', location: 'Dakar · Almadies', event_date: '2026-09-18T19:30:00+00', price_fcfa: 15000, capacity: 24, image_url: 'https://images.pexels.com/photos/18823960/pexels-photo-18823960.jpeg?auto=compress&cs=tinysrgb&w=1200', category: 'Dîner', is_featured: true },
-  { id: '2', title: 'Sunset & conversations', description: 'Un moment simple, doux et authentique face à l’océan.', location: 'Dakar · Ngor', event_date: '2026-09-26T17:00:00+00', price_fcfa: 0, capacity: 40, image_url: 'https://images.pexels.com/photos/3184436/pexels-photo-3184436.jpeg?auto=compress&cs=tinysrgb&w=1200', category: 'Apéro', is_featured: true },
-  { id: '3', title: 'Brunch Téranga', description: 'Des conversations légères, des sourires et une parenthèse chaleureuse.', location: 'Dakar · Fann', event_date: '2026-10-04T11:00:00+00', price_fcfa: 8000, capacity: 30, image_url: 'https://images.pexels.com/photos/4878006/pexels-photo-4878006.jpeg?auto=compress&cs=tinysrgb&w=1200', category: 'Brunch', is_featured: false },
-];
-
 const formatDate = (d: string) => { const date = new Date(d); return isNaN(date.getTime()) ? '—' : new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'long' }).format(date); };
 const formatPrice = (p: number) => p === 0 ? 'Gratuit' : `${new Intl.NumberFormat('fr-FR').format(p)} FCFA`;
 
@@ -26,7 +20,7 @@ export default function Home() {
   const [mounted, setMounted] = useState(false);
   const isDark = mounted && resolvedTheme === 'dark';
   const [profiles, setProfiles] = useState<Profile[]>([]);
-  const [events, setEvents] = useState<EventItem[]>(fallbackEvents);
+  const [events, setEvents] = useState<EventItem[]>([]);
   const [testimonials, setTestimonials] = useState<Testimonial[]>([]);
 
   useEffect(() => {
@@ -37,10 +31,10 @@ export default function Home() {
     (async () => {
       const [{ data: p }, { data: e }] = await Promise.all([
         supabase.from('profiles').select('*').eq('is_active', true).eq('is_premium', true).limit(8),
-        supabase.from('events').select('*').order('date', { ascending: true }).limit(3),
+        supabase.from('events').select('*').eq('is_active', true).gte('date', new Date().toISOString()).order('date', { ascending: true }).limit(3),
       ]);
       if (p && p.length > 0) setProfiles((p as ProfileRow[]).map(toProfile));
-      if (e && e.length > 0) setEvents((e as EventRow[]).map(toEvent));
+      if (e) setEvents((e as EventRow[]).map(toEvent));
     })();
   }, []);
 
@@ -174,6 +168,29 @@ export default function Home() {
           </div>
         </div>
       </section>
+
+      {events.length > 0 && (
+        <section className="bg-[#fbf8f2] px-5 py-20 lg:px-8 lg:py-24">
+          <div className="mx-auto max-w-[1120px]">
+            <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
+              <div>
+                <p className="text-xs font-extrabold uppercase tracking-[.2em] text-[#ec3b78]">Les prochaines rencontres</p>
+                <h2 className="mt-3 font-display text-4xl tracking-[-.04em] text-[#241c18] sm:text-5xl">Bientôt, <span className="italic text-[#1a6b68]">en vrai</span></h2>
+                <p className="mt-3 max-w-xl text-sm leading-6 text-[#756960]">Des moments chaleureux pour prolonger la rencontre autour d’une expérience partagée.</p>
+              </div>
+              <Link href="/evenements" className="inline-flex items-center gap-2 text-sm font-extrabold text-[#ec3b78]">Tous les événements <ArrowRight size={16} /></Link>
+            </div>
+            <div className="mt-8 grid gap-5 md:grid-cols-3">
+              {events.map((item) => (
+                <Link key={item.id} href="/evenements" className="group overflow-hidden rounded-[24px] border border-[#eadfd5] bg-white shadow-[0_12px_34px_rgba(83,46,32,.07)] transition hover:-translate-y-1 hover:shadow-[0_18px_44px_rgba(83,46,32,.13)]">
+                  <div className="relative h-48 overflow-hidden"><img src={item.image_url} alt={item.title} className="h-full w-full object-cover transition duration-500 group-hover:scale-105" /><span className="absolute bottom-3 left-3 rounded-full bg-white/90 px-3 py-1.5 text-xs font-extrabold text-[#1a6b68]">{formatDate(item.event_date)}</span></div>
+                  <div className="p-5"><h3 className="font-display text-2xl text-[#241c18]">{item.title}</h3><p className="mt-2 text-sm text-[#756960]">{item.location}</p><p className="mt-4 text-sm font-extrabold text-[#ec3b78]">{formatPrice(item.price_fcfa)}</p></div>
+                </Link>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* FEATURED PROFILES */}
       {profiles.length > 0 && (

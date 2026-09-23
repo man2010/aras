@@ -127,7 +127,7 @@ export function Navbar() {
     let cancelled = false;
     const readEventsKey = `aras-read-events-${user.id}`;
     const loadNotifications = async () => {
-      const [{ data: messageRows }, { data: eventRows }] = await Promise.all([
+      const [{ data: messageRows }, { data: eventRows }, { data: registrations }, { data: storedNotifications }] = await Promise.all([
         supabase
           .from('messages')
           .select('id, sender_id, content, created_at, match_id')
@@ -143,7 +143,16 @@ export function Navbar() {
           .gte('created_at', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString())
           .order('date', { ascending: true })
           .limit(5),
+        supabase.from('event_registrations').select('event_id').eq('user_id', user.id),
+        supabase.from('user_notifications').select('id, title, body, created_at, read_at').eq('user_id', user.id).order('created_at', { ascending: false }).limit(6),
       ]);
+
+      const reminderFrom = new Date().toISOString();
+      const reminderUntil = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+      const registeredEventIds = (registrations ?? []).map((row: { event_id: string }) => row.event_id);
+      const { data: reminderRows } = registeredEventIds.length
+        ? await supabase.from('events').select('id, title, date, location, city, created_at').in('id', registeredEventIds).gte('date', reminderFrom).lte('date', reminderUntil).eq('is_active', true)
+        : { data: [] };
 
       const senderIds = Array.from(new Set((messageRows ?? []).map((row: { sender_id: string }) => row.sender_id)));
       const { data: senderRows } = senderIds.length > 0
@@ -183,22 +192,44 @@ export function Navbar() {
         createdAt: row.created_at,
         unread: !readEventSet.has(row.id),
       }));
+      const reminderNotifications: NotificationPreview[] = (reminderRows ?? []).map((row: { id: string; title: string; date: string; location: string; city: string | null; created_at: string | null }) => ({
+        id: `event-${row.id}`,
+        type: 'event',
+        title: `Rappel · ${row.title}`,
+        message: `Tu as confirmé ta participation. Rendez-vous le ${new Date(row.date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })} à ${row.location}${row.city ? `, ${row.city}` : ''}.`,
+        href: '/espace?tab=events',
+        createdAt: row.created_at || row.date,
+        unread: !readEventSet.has(`reminder-${row.id}`),
+      }));
+      const storedEventNotifications: NotificationPreview[] = (storedNotifications ?? []).map((row: { id: string; title: string; body: string; created_at: string; read_at: string | null }) => ({
+        id: `db-event-${row.id}`,
+        type: 'event',
+        title: row.title,
+        message: row.body,
+        href: '/espace?tab=events',
+        createdAt: row.created_at,
+        unread: !row.read_at,
+      }));
 
       if (!cancelled) {
-        setNotifications([...messageNotifications, ...eventNotifications].sort((first, second) => new Date(second.createdAt).getTime() - new Date(first.createdAt).getTime()).slice(0, 8));
-        setUnreadEventCount(eventNotifications.filter((notification) => notification.unread).length);
+        setNotifications([...messageNotifications, ...storedEventNotifications, ...eventNotifications, ...reminderNotifications].sort((first, second) => new Date(second.createdAt).getTime() - new Date(first.createdAt).getTime()).slice(0, 8));
+        setUnreadEventCount([...storedEventNotifications, ...eventNotifications, ...reminderNotifications].filter((notification) => notification.unread).length);
       }
     };
 
     void loadNotifications();
+    window.addEventListener('aras:notifications-refresh', loadNotifications);
     const channel = supabase
       .channel(`navbar-notifications-${user.id}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'messages', filter: `receiver_id=eq.${user.id}` }, () => void loadNotifications())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'events' }, () => void loadNotifications())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'event_registrations', filter: `user_id=eq.${user.id}` }, () => void loadNotifications())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'user_notifications', filter: `user_id=eq.${user.id}` }, () => void loadNotifications())
       .subscribe();
 
     return () => {
       cancelled = true;
+      window.removeEventListener('aras:notifications-refresh', loadNotifications);
       void supabase.removeChannel(channel);
     };
   }, [user]);
@@ -209,7 +240,17 @@ export function Navbar() {
       await supabase.from('messages').update({ is_read: true }).eq('id', messageId).eq('receiver_id', user?.id);
       setUnreadCount(Math.max(0, unreadCount - 1));
     } else if (user) {
+      if (notification.id.startsWith('db-event-')) {
+        const notificationId = notification.id.replace('db-event-', '');
+        await supabase.from('user_notifications').update({ read_at: new Date().toISOString() }).eq('id', notificationId).eq('user_id', user.id);
+        if (notification.unread) setUnreadEventCount((count) => Math.max(0, count - 1));
+        setNotifications((current) => current.map((item) => item.id === notification.id ? { ...item, unread: false } : item));
+        router.push(notification.href);
+        setNotificationOpen(false);
+        return;
+      }
       const eventId = notification.id.replace('event-', '');
+      const readKey = notification.title.startsWith('Rappel ·') ? `reminder-${eventId}` : eventId;
       const key = `aras-read-events-${user.id}`;
       let readEventIds: string[] = [];
       try {
@@ -217,8 +258,8 @@ export function Navbar() {
       } catch {
         readEventIds = [];
       }
-      if (!readEventIds.includes(eventId)) {
-        window.localStorage.setItem(key, JSON.stringify([...readEventIds, eventId]));
+      if (!readEventIds.includes(readKey)) {
+        window.localStorage.setItem(key, JSON.stringify([...readEventIds, readKey]));
         setUnreadEventCount((count) => Math.max(0, count - 1));
       }
     }

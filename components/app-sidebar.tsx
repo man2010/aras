@@ -63,7 +63,7 @@ export function AppSidebar({ active, onChange, badges }: AppSidebarProps) {
     <>
       {/* DESKTOP / TABLETTE : sidebar verticale rétractable, plaquée au bord */}
       <aside
-        className={`sticky top-[60px] hidden h-[calc(100vh-60px)] shrink-0 flex-col border-r border-[#eadfd5] bg-white transition-[width] duration-300 md:flex ${
+        className={`sticky top-[60px] hidden h-[calc(100vh-60px)] shrink-0 flex-col border-r border-[#eadfd5] bg-white transition-[width] duration-300 dark:border-white/10 dark:bg-[#15151a] md:flex ${
           collapsed ? 'w-[76px]' : 'w-[252px]'
         }`}
       >
@@ -71,7 +71,7 @@ export function AppSidebar({ active, onChange, badges }: AppSidebarProps) {
           type="button"
           onClick={() => setCollapsed((c) => !c)}
           aria-label={collapsed ? 'Déployer le menu' : 'Réduire le menu'}
-          className="absolute -right-3 top-6 z-10 flex h-7 w-7 items-center justify-center rounded-full border border-[#eadfd5] bg-white text-[#756960] shadow-[0_4px_12px_rgba(83,46,32,.14)] transition hover:border-[#ec3b78] hover:text-[#ec3b78]"
+          className="absolute -right-3 top-6 z-10 flex h-7 w-7 items-center justify-center rounded-full border border-[#eadfd5] bg-white text-[#756960] shadow-[0_4px_12px_rgba(83,46,32,.14)] transition hover:border-[#ec3b78] hover:text-[#ec3b78] dark:border-white/10 dark:bg-[#202027] dark:text-white/65"
         >
           {collapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
         </button>
@@ -89,7 +89,7 @@ export function AppSidebar({ active, onChange, badges }: AppSidebarProps) {
                 className={`group relative flex w-full items-center gap-3 rounded-2xl px-3.5 py-3 text-sm font-bold transition-all duration-200 ${
                   isActive
                     ? 'bg-[#ec3b78] text-white shadow-[0_8px_20px_rgba(236,59,120,.22)]'
-                    : 'text-[#625852] hover:bg-[#f3e9dc] hover:translate-x-0.5'
+                    : 'text-[#625852] hover:bg-[#f3e9dc] hover:translate-x-0.5 dark:text-white/65 dark:hover:bg-white/5'
                 } ${collapsed ? 'justify-center' : ''}`}
               >
                 <item.icon size={19} className="shrink-0" fill={isActive && item.id === 'likes' ? 'currentColor' : 'none'} />
@@ -120,7 +120,7 @@ export function AppSidebar({ active, onChange, badges }: AppSidebarProps) {
               }}
               title={collapsed ? 'Paramètres' : undefined}
               className={`flex w-full items-center gap-3 rounded-2xl px-3.5 py-3 text-sm font-bold transition ${
-                isSettingsActive ? 'bg-[#fae4e2] text-[#c92e63]' : 'text-[#625852] hover:bg-[#f3e9dc]'
+                isSettingsActive ? 'bg-[#fae4e2] text-[#c92e63] dark:bg-[#38232d] dark:text-[#ff9fc1]' : 'text-[#625852] hover:bg-[#f3e9dc] dark:text-white/65 dark:hover:bg-white/5'
               } ${collapsed ? 'justify-center' : ''}`}
             >
               <Settings size={19} className="shrink-0" />
@@ -134,7 +134,7 @@ export function AppSidebar({ active, onChange, badges }: AppSidebarProps) {
 
             {!collapsed && (
               <div
-                className={`ml-3 space-y-1 overflow-hidden border-l-2 border-[#f3e9dc] pl-3 transition-all duration-300 ${
+                className={`ml-3 space-y-1 overflow-hidden border-l-2 border-[#f3e9dc] pl-3 transition-all duration-300 dark:border-white/10 ${
                   settingsOpen ? 'mt-1 max-h-[260px] opacity-100' : 'max-h-0 opacity-0'
                 }`}
               >
@@ -146,7 +146,7 @@ export function AppSidebar({ active, onChange, badges }: AppSidebarProps) {
                       type="button"
                       onClick={() => onChange(item.id)}
                       className={`flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-xs font-bold transition ${
-                        isActive ? 'bg-[#ec3b78] text-white' : 'text-[#756960] hover:bg-[#f3e9dc]'
+                        isActive ? 'bg-[#ec3b78] text-white' : 'text-[#756960] hover:bg-[#f3e9dc] dark:text-white/55 dark:hover:bg-white/5'
                       }`}
                     >
                       <item.icon size={15} className="shrink-0" />
@@ -163,7 +163,7 @@ export function AppSidebar({ active, onChange, badges }: AppSidebarProps) {
       {/* MOBILE : icônes en bas de l'écran */}
       <div className="md:hidden">
         {mobileSettingsOpen && (
-          <div className="fixed inset-x-3 bottom-[72px] z-50 rounded-[22px] border border-[#eadfd5] bg-white p-2 shadow-[0_18px_40px_rgba(83,46,32,.15)]">
+          <div className="fixed inset-x-3 bottom-[72px] z-50 rounded-[22px] border border-[#eadfd5] bg-white p-2 shadow-[0_18px_40px_rgba(83,46,32,.15)] dark:border-white/10 dark:bg-[#202027]">
             {settingsItems.map((item) => {
               const isActive = active === item.id;
               return (
@@ -175,7 +175,7 @@ export function AppSidebar({ active, onChange, badges }: AppSidebarProps) {
                     setMobileSettingsOpen(false);
                   }}
                   className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-bold transition ${
-                    isActive ? 'bg-[#ec3b78] text-white' : 'text-[#625852] hover:bg-[#f3e9dc]'
+                    isActive ? 'bg-[#ec3b78] text-white' : 'text-[#625852] hover:bg-[#f3e9dc] dark:text-white/70 dark:hover:bg-white/5'
                   }`}
                 >
                   <item.icon size={16} className="shrink-0" />
@@ -186,7 +186,7 @@ export function AppSidebar({ active, onChange, badges }: AppSidebarProps) {
           </div>
         )}
 
-        <nav className="fixed inset-x-0 bottom-0 z-40 flex items-center justify-around gap-0.5 overflow-x-auto border-t border-[#eadfd5] bg-white/95 px-1 py-2 backdrop-blur-xl">
+        <nav className="fixed inset-x-0 bottom-0 z-40 flex items-center justify-around gap-0.5 overflow-x-auto border-t border-[#eadfd5] bg-white/95 px-1 py-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] backdrop-blur-xl dark:border-white/10 dark:bg-[#15151a]/95">
           {mainItems.map((item) => {
             const isActive = active === item.id;
             const badge = badges?.[item.id];
@@ -197,7 +197,7 @@ export function AppSidebar({ active, onChange, badges }: AppSidebarProps) {
                 onClick={() => onChange(item.id)}
                 aria-label={item.label}
                 className={`relative flex shrink-0 flex-col items-center gap-1 rounded-xl px-2.5 py-1.5 transition ${
-                  isActive ? 'text-[#ec3b78]' : 'text-[#9a8b82]'
+                  isActive ? 'text-[#ec3b78]' : 'text-[#9a8b82] dark:text-white/45'
                 }`}
               >
                 <item.icon size={20} fill={isActive && item.id === 'likes' ? 'currentColor' : 'none'} />
@@ -226,7 +226,7 @@ export function AppSidebar({ active, onChange, badges }: AppSidebarProps) {
             }}
             aria-label="Paramètres"
             className={`flex shrink-0 flex-col items-center gap-1 rounded-xl px-2.5 py-1.5 transition ${
-              isSettingsActive ? 'text-[#ec3b78]' : 'text-[#9a8b82]'
+              isSettingsActive ? 'text-[#ec3b78]' : 'text-[#9a8b82] dark:text-white/45'
             }`}
           >
             <Settings size={20} />

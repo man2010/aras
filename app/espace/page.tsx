@@ -69,6 +69,8 @@ function SettingsPanels({
   showNewPw,
   setShowNewPw,
   onGoToProfileTab,
+  onChangeTab,
+  subscriptionPlan,
 }: {
   tab: Tab;
   profile: Profile | null;
@@ -84,6 +86,8 @@ function SettingsPanels({
   showNewPw: boolean;
   setShowNewPw: Dispatch<SetStateAction<boolean>>;
   onGoToProfileTab: () => void;
+  onChangeTab: (tab: Tab) => void;
+  subscriptionPlan: 'discovery' | 'premium' | 'elite';
 }) {
   const subTabs: { id: Tab; label: string }[] = [
     { id: 'settings-profile', label: 'Mon profil' },
@@ -95,14 +99,16 @@ function SettingsPanels({
 
   return (
     <div className="space-y-6">
-      <div className="flex gap-2 overflow-x-auto rounded-2xl bg-white p-2 shadow-[0_6px_20px_rgba(83,46,32,.04)]">
+      <div className="flex snap-x gap-2 overflow-x-auto rounded-2xl bg-white p-2 shadow-[0_6px_20px_rgba(83,46,32,.04)] dark:bg-[#1c1b21]">
         {subTabs.map((item) => (
-          <span
+          <button
             key={item.id}
-            className={`whitespace-nowrap rounded-xl px-4 py-2 text-xs font-extrabold ${tab === item.id ? 'bg-[#ec3b78] text-white' : 'text-[#9a8b82]'}`}
+            type="button"
+            onClick={() => onChangeTab(item.id)}
+            className={`shrink-0 snap-start whitespace-nowrap rounded-xl px-4 py-2.5 text-xs font-extrabold transition ${tab === item.id ? 'bg-[#ec3b78] text-white shadow-sm' : 'text-[#9a8b82] hover:bg-[#f3e9dc] dark:text-white/60 dark:hover:bg-white/5'}`}
           >
             {item.label}
-          </span>
+          </button>
         ))}
       </div>
 
@@ -203,12 +209,17 @@ function SettingsPanels({
       )}
 
       {tab === 'settings-subscription' && (
-        <div className="rounded-[26px] bg-white p-6 shadow-[0_8px_30px_rgba(83,46,32,.05)] sm:p-8">
-          <h2 className="font-display text-2xl">Abonnement</h2>
-          <p className="mt-2 text-sm leading-6 text-[#756960]">Vous êtes actuellement sur la formule Gratuite.</p>
-          <Link href="/tarifs" className="mt-5 inline-flex items-center gap-2 rounded-full bg-[#ec3b78] px-5 py-3 text-xs font-extrabold text-white transition hover:bg-[#c92e63]">
-            Voir les formules Premium et Elite <ChevronRight size={14} />
-          </Link>
+        <div className="rounded-[26px] bg-white p-6 shadow-[0_8px_30px_rgba(83,46,32,.05)] sm:p-8 dark:bg-[#1c1b21]">
+          <p className="text-xs font-extrabold uppercase tracking-[.18em] text-[#ec3b78]">Votre formule actuelle</p>
+          <div className="mt-3 flex flex-col justify-between gap-5 sm:flex-row sm:items-center">
+            <div>
+              <h2 className="font-display text-3xl text-[#241c18] dark:text-white">{subscriptionPlan === 'elite' ? 'Élite' : subscriptionPlan === 'premium' ? 'Premium' : 'Découverte'}</h2>
+              <p className="mt-2 text-sm leading-6 text-[#756960] dark:text-white/60">{subscriptionPlan === 'discovery' ? 'Les essentiels pour faire de belles rencontres.' : 'Votre abonnement est actif. Gérez ou faites évoluer votre formule à tout moment.'}</p>
+            </div>
+            <Link href="/tarifs" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full bg-[#ec3b78] px-6 py-3 text-sm font-extrabold text-white transition hover:bg-[#c92e63]">
+              {subscriptionPlan === 'discovery' ? 'Passer à Premium' : subscriptionPlan === 'premium' ? 'Passer à Élite' : 'Voir mon abonnement'} <ChevronRight size={16} />
+            </Link>
+          </div>
         </div>
       )}
 
@@ -267,6 +278,10 @@ export default function EspacePage() {
   const [selectedMatch, setSelectedMatch] = useState<Profile | null>(null);
   const [likesView, setLikesView] = useState<'received' | 'sent'>('received');
   const [events, setEvents] = useState<{ id: string; title: string; event_date: string; location: string }[]>([]);
+  const [registeredEventIds, setRegisteredEventIds] = useState<Set<string>>(new Set());
+  const [eventRegistrationStatuses, setEventRegistrationStatuses] = useState<Record<string, string>>({});
+  const [eventRegistrationBusy, setEventRegistrationBusy] = useState<string | null>(null);
+  const [eventActionMessage, setEventActionMessage] = useState('');
   const [uploadingImage, setUploadingImage] = useState(false);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [infoModal, setInfoModal] = useState<{ title: string; message: string; confirmLabel?: string } | null>(null);
@@ -286,6 +301,7 @@ export default function EspacePage() {
   const [securityMessage, setSecurityMessage] = useState('');
   const [securityLoading, setSecurityLoading] = useState(false);
   const [showNewPw, setShowNewPw] = useState(false);
+  const [subscriptionPlan, setSubscriptionPlan] = useState<'discovery' | 'premium' | 'elite'>('discovery');
 
   useEffect(() => {
     if (!authLoading && !user) router.push('/connexion');
@@ -320,8 +336,11 @@ export default function EspacePage() {
           return;
         }
         setProfile(p);
+        setSubscriptionPlan(p.is_premium ? 'premium' : 'discovery');
         setProfileForm({ display_name: p.display_name, age: String(p.age), city: p.city, bio: p.bio, profession: p.profession, photo_url: p.photo_url, interests: p.interests.join(', ') });
         setGalleryPhotos(Array.from({ length: 6 }, (_, index) => p.avatar_urls?.[index] ?? (index === 0 ? p.photo_url : null)));
+        const { data: subscription } = await supabase.from('user_subscriptions').select('plan_code').eq('user_id', user.id).eq('status', 'active').or(`ends_at.is.null,ends_at.gt.${new Date().toISOString()}`).order('created_at', { ascending: false }).limit(1).maybeSingle();
+        if (subscription?.plan_code === 'premium' || subscription?.plan_code === 'elite') setSubscriptionPlan(subscription.plan_code);
         const raw = existing as Record<string, unknown>;
         setPrivacySettings({
           show_age: (raw.show_age as boolean) ?? true,
@@ -443,8 +462,13 @@ export default function EspacePage() {
         setTotalUnread(total);
         setUnreadCount(total);
       }
-      const { data: evts } = await supabase.from('events').select('*').order('date', { ascending: true }).limit(5);
+      const { data: evts } = await supabase.from('events').select('*').eq('is_active', true).gte('date', new Date().toISOString()).order('date', { ascending: true }).limit(5);
       if (evts) setEvents((evts as EventRow[]).map(toEvent).map((event) => ({ id: event.id, title: event.title, event_date: event.event_date, location: event.location })));
+      const { data: registrations } = await supabase.from('event_registrations').select('event_id, status').eq('user_id', user.id).neq('status', 'cancelled');
+      if (registrations) {
+        setRegisteredEventIds(new Set(registrations.map((registration: { event_id: string }) => registration.event_id)));
+        setEventRegistrationStatuses(Object.fromEntries(registrations.map((registration: { event_id: string; status: string }) => [registration.event_id, registration.status])));
+      }
     })();
   }, [user]);
 
@@ -652,6 +676,40 @@ export default function EspacePage() {
 
   const formatDate = (d: string) => { const date = new Date(d); return isNaN(date.getTime()) ? '—' : new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'short' }).format(date); };
 
+  const registerForEvent = async (eventId: string) => {
+    if (!user || registeredEventIds.has(eventId)) return;
+    setEventActionMessage('');
+    setEventRegistrationBusy(eventId);
+    const { data, error } = await supabase.rpc('register_for_event', { target_event_id: eventId });
+    setEventRegistrationBusy(null);
+    if (error) {
+      const full = error.message.includes('EVENT_FULL');
+      setEventActionMessage(full ? 'Désolé, toutes les places sont déjà attribuées. Cet événement est complet.' : error.message.includes('EVENT_UNAVAILABLE') ? 'Cet événement n’accepte plus de participations.' : 'Inscription impossible pour le moment. Réessaie dans quelques instants.');
+      return;
+    }
+    const result = Array.isArray(data) ? data[0] : data;
+    const status = result?.registration_status ?? 'confirmed';
+    setRegisteredEventIds((current) => new Set(current).add(eventId));
+    setEventRegistrationStatuses((current) => ({ ...current, [eventId]: status }));
+    window.dispatchEvent(new Event('aras:notifications-refresh'));
+    if (status === 'confirmed') {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const notice = await fetch('/api/events/registration-notification', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(sessionData.session?.access_token ? { Authorization: `Bearer ${sessionData.session.access_token}` } : {}),
+        },
+        body: JSON.stringify({ eventId }),
+      }).then((response) => response.json()).catch(() => ({ sent: false }));
+      setEventActionMessage(notice.sent
+        ? 'Participation confirmée ! Un e-mail de confirmation est envoyé et tu recevras aussi un rappel dans tes notifications à l’approche de l’événement.'
+        : 'Participation confirmée ! Une notification est disponible dans ton espace. L’envoi d’un e-mail ou SMS n’est pas configuré pour ce compte; tu recevras un rappel dans tes notifications à l’approche de l’événement.');
+    } else {
+      setEventActionMessage('Ta participation est en attente de paiement. Elle sera confirmée après le règlement.');
+    }
+  };
+
   const showInfoModal = (title: string, message: string, confirmLabel = 'OK') => {
     setInfoModal({ title, message, confirmLabel });
   };
@@ -770,7 +828,7 @@ export default function EspacePage() {
   });
 
   return (
-    <main className="min-h-screen bg-[#fbf8f2] pt-[60px]">
+    <main className="aras-espace min-h-screen bg-[#f6f0e8] pt-[60px] transition-colors dark:bg-[#101014]">
       <div className="flex min-h-[calc(100vh-60px)] w-full items-stretch">
         <AppSidebar
           active={tab}
@@ -778,11 +836,11 @@ export default function EspacePage() {
           badges={{ messages: totalUnread, likes: receivedLikes.length }}
         />
 
-        <div className="min-w-0 flex-1 px-5 pb-28 pt-6 sm:px-7 sm:pt-8 lg:px-10 lg:pt-10 md:pb-12">
+        <div className="min-w-0 flex-1 bg-[radial-gradient(ellipse_at_top_right,_rgba(236,59,120,0.08),_transparent_40%)] px-3 pb-28 pt-5 sm:px-6 sm:pt-8 lg:px-10 lg:pt-10 md:pb-12">
           {/* DISCOVERY TAB */}
           {tab === 'decouverte' && (
             <div className="space-y-6">
-              <div className="rounded-[30px] bg-white p-5 shadow-[0_8px_30px_rgba(83,46,32,.05)] sm:p-6">
+              <div className="relative overflow-hidden rounded-[26px] border border-white/80 bg-[linear-gradient(125deg,#fffdfa_0%,#fff7f2_58%,#f9e9ee_100%)] p-5 shadow-[0_18px_55px_rgba(83,46,32,.08)] sm:rounded-[32px] sm:p-8 dark:border-white/10 dark:bg-[linear-gradient(125deg,#201a20_0%,#19171c_58%,#261821_100%)]">
                 <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
                   <div className="flex items-center gap-3">
                     <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#fbe8ec] text-[#ec3b78]">
@@ -790,17 +848,17 @@ export default function EspacePage() {
                     </div>
                     <div>
                       <p className="text-[11px] font-extrabold uppercase tracking-[.18em] text-[#ec3b78]">Découverte</p>
-                      <h2 className="font-display text-2xl text-[#24171b]">Des profils qui correspondent à toi</h2>
+                      <h2 className="max-w-2xl font-display text-2xl leading-tight text-[#24171b] sm:text-3xl lg:text-4xl dark:text-white">Des profils qui correspondent à toi</h2>
                     </div>
                   </div>
 
                   <div className="flex items-center gap-3 self-start xl:self-auto">
-                    <span className="rounded-full bg-[#f3e9dc] px-3 py-1.5 text-xs font-extrabold text-[#756960]">
+                    <span className="rounded-full border border-[#efdae0] bg-white/80 px-3 py-1.5 text-xs font-extrabold text-[#756960] shadow-sm dark:border-white/10 dark:bg-white/5 dark:text-white/75">
                       {filteredDiscoveryProfiles.length} profils
                     </span>
                     <button
                       onClick={() => setShowDiscoveryFilters((value) => !value)}
-                      className="rounded-full border border-[#dfd2c6] bg-[#fbf8f2] px-4 py-2 text-xs font-extrabold text-[#625852]"
+                      className="rounded-full border border-[#dfd2c6] bg-white/75 px-4 py-2 text-xs font-extrabold text-[#625852] transition hover:border-[#ec3b78] hover:text-[#c92e63] dark:border-white/15 dark:bg-white/5 dark:text-white/75"
                     >
                       {showDiscoveryFilters ? 'Masquer les filtres' : 'Afficher les filtres'}
                     </button>
@@ -815,7 +873,7 @@ export default function EspacePage() {
                         value={discoverySearch}
                         onChange={(event) => setDiscoverySearch(event.target.value)}
                         placeholder="Rechercher par nom, ville, profession, intérêt…"
-                        className="w-full rounded-full border border-[#dfd2c6] bg-[#fbf8f2] py-3.5 pl-11 pr-4 text-sm outline-none transition focus:border-[#ec3b78]"
+                        className="w-full rounded-2xl border border-[#e7d9ce] bg-white/80 py-3.5 pl-11 pr-4 text-sm outline-none transition placeholder:text-[#aa9c93] focus:border-[#ec3b78] focus:bg-white dark:border-white/10 dark:bg-black/20 dark:text-white dark:placeholder:text-white/40 dark:focus:bg-black/30"
                       />
                     </div>
 
@@ -829,7 +887,7 @@ export default function EspacePage() {
                             className={`rounded-full px-4 py-2 text-xs font-extrabold transition ${
                               discoveryCityFilter === city
                                 ? 'bg-[#ec3b78] text-white'
-                                : 'bg-[#f3e9dc] text-[#756960] hover:bg-[#e7cfc0]'
+                                : 'bg-white/75 text-[#756960] hover:bg-[#f3e9dc] dark:bg-white/5 dark:text-white/65 dark:hover:bg-white/10'
                             }`}
                           >
                             {city === 'all' ? 'Toutes les villes' : city}
@@ -850,14 +908,14 @@ export default function EspacePage() {
                   Aucun profil ne correspond à ces filtres pour le moment.
                 </div>
               ) : (
-                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+                <div className="grid gap-5 sm:gap-6 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
                   {visibleDiscoveryProfiles.map((profileItem, index) => (
                     <article
                       key={profileItem.id}
-                      className="group overflow-hidden rounded-[22px] border border-[#dfd2c6] bg-white shadow-[0_8px_30px_rgba(83,46,32,.05)] transition duration-300 hover:-translate-y-1 hover:shadow-[0_16px_40px_rgba(83,46,32,.12)]"
+                      className="group overflow-hidden rounded-[26px] border border-[#eadfd5] bg-white shadow-[0_12px_38px_rgba(83,46,32,.08)] transition duration-300 hover:-translate-y-1 hover:border-[#e7b5c6] hover:shadow-[0_22px_55px_rgba(83,46,32,.16)] dark:border-white/10 dark:bg-[#19191f] dark:hover:border-[#ec3b78]/50"
                       style={{ animationDelay: `${index * 50}ms` }}
                     >
-                      <div className="relative h-[160px] overflow-hidden">
+                      <div className="relative h-[240px] overflow-hidden sm:h-[300px]">
                         {profileItem.photo_url ? (
                           <img src={profileItem.photo_url} alt={profileItem.display_name} className="h-full w-full object-cover transition duration-500 group-hover:scale-105" />
                         ) : (
@@ -1325,7 +1383,13 @@ export default function EspacePage() {
 
           {/* EVENTS TAB */}
           {tab === 'events' && (
-            <div className="space-y-4">
+            <div className="space-y-5">
+              <header className="rounded-[28px] border border-[#eadfd5] bg-[linear-gradient(120deg,#fffdfa,#f9e9ee)] p-6 dark:border-white/10 dark:bg-[linear-gradient(120deg,#201a20,#261821)] sm:p-8">
+                <p className="text-xs font-extrabold uppercase tracking-[.18em] text-[#ec3b78]">À vivre ensemble</p>
+                <h2 className="mt-2 font-display text-3xl text-[#241c18] dark:text-white sm:text-4xl">Tes prochains événements</h2>
+                <p className="mt-2 max-w-xl text-sm leading-6 text-[#756960] dark:text-white/60">Découvre les rendez-vous ARAS et confirme ta participation. Tes inscriptions restent accessibles depuis cet espace.</p>
+              </header>
+              {eventActionMessage && <p role="status" className="rounded-2xl border border-[#eadfd5] bg-white px-4 py-3 text-sm font-semibold text-[#625852] dark:border-white/10 dark:bg-[#1c1b21] dark:text-white/80">{eventActionMessage}</p>}
               {events.length === 0 ? (
                 <div className="rounded-[26px] bg-white p-12 text-center shadow-[0_8px_30px_rgba(83,46,32,.05)]">
                   <CalendarDays size={36} className="mx-auto text-[#dfd2c6]" />
@@ -1334,13 +1398,16 @@ export default function EspacePage() {
                 </div>
               ) : (
                 events.map((e) => (
-                  <div key={e.id} className="flex items-center justify-between rounded-2xl bg-white p-5 shadow-[0_6px_20px_rgba(83,46,32,.04)]">
-                    <div className="flex items-center gap-4">
-                      <div className="flex h-14 w-14 flex-col items-center justify-center rounded-2xl bg-[#fae4e2] text-[#ec3b78]"><CalendarDays size={18} /></div>
-                      <div><p className="font-display text-lg">{e.title}</p><p className="text-sm text-[#756960]">{formatDate(e.event_date)} · {e.location}</p></div>
+                  <article key={e.id} className="flex flex-col gap-4 rounded-[24px] border border-[#eadfd5] bg-white p-5 shadow-[0_10px_30px_rgba(83,46,32,.05)] dark:border-white/10 dark:bg-[#1c1b21] sm:flex-row sm:items-center sm:justify-between sm:p-6">
+                    <div className="flex min-w-0 items-center gap-4">
+                      <div className="flex h-14 w-14 shrink-0 flex-col items-center justify-center rounded-2xl bg-[#fae4e2] text-[#ec3b78] dark:bg-[#38232d]"><CalendarDays size={18} /></div>
+                      <div className="min-w-0"><p className="font-display text-xl text-[#241c18] dark:text-white">{e.title}</p><p className="mt-1 break-words text-sm text-[#756960] dark:text-white/60">{formatDate(e.event_date)} · {e.location}</p></div>
                     </div>
-                    <Link href="/evenements" className="rounded-full bg-[#1a6b68] px-5 py-2.5 text-xs font-extrabold text-white transition hover:bg-[#125552]">Détails</Link>
-                  </div>
+                    <div className="flex items-center gap-3 sm:shrink-0">
+                      {registeredEventIds.has(e.id) && <span className={`rounded-full px-3 py-2 text-xs font-bold ${eventRegistrationStatuses[e.id] === 'confirmed' ? 'bg-[#e5f0ed] text-[#1a6b68] dark:bg-[#173432] dark:text-[#8ce0cb]' : 'bg-[#fff3d9] text-[#8c5d12] dark:bg-[#332819] dark:text-[#f4c27a]'}`}>{eventRegistrationStatuses[e.id] === 'payment_pending' ? 'Paiement en attente' : 'Participation confirmée'}</span>}
+                      <button type="button" disabled={registeredEventIds.has(e.id) || eventRegistrationBusy === e.id} onClick={() => void registerForEvent(e.id)} className="min-h-11 rounded-full bg-[#ec3b78] px-5 py-2.5 text-xs font-extrabold text-white transition hover:bg-[#c92e63] disabled:cursor-default disabled:bg-[#1a6b68]">{eventRegistrationBusy === e.id ? 'Inscription…' : registeredEventIds.has(e.id) ? 'Inscrit' : 'Participer'}</button>
+                    </div>
+                  </article>
                 ))
               )}
             </div>
@@ -1363,6 +1430,8 @@ export default function EspacePage() {
               showNewPw={showNewPw}
               setShowNewPw={setShowNewPw}
               onGoToProfileTab={() => setTab('profile')}
+              onChangeTab={setTab}
+              subscriptionPlan={subscriptionPlan}
             />
           )}
         </div>
