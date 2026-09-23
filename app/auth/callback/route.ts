@@ -50,6 +50,46 @@ export async function GET(request: Request) {
   const identities = user.identities ?? [];
   const googleIdentity = identities.find((identity) => identity.provider === 'google');
   const otherIdentity = identities.find((identity) => identity.provider !== 'google');
+  const adminKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  // Do not silently authenticate a Google identity when a separate account
+  // already owns the same email. Supabase's admin API lets us distinguish a
+  // pre-existing password/phone account from a first-time Google user.
+  if (flow === 'signin' && user.email && adminKey) {
+    const { createClient } = await import('@supabase/supabase-js');
+    const admin = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL ?? '',
+      adminKey,
+      { auth: { persistSession: false, autoRefreshToken: false } }
+    );
+    const { data: usersPage, error: lookupError } = await admin.auth.admin.listUsers({
+      page: 1,
+      perPage: 1000,
+    });
+    const existingUser = usersPage?.users.find(
+      (candidate) => candidate.id !== user.id && candidate.email?.toLowerCase() === user.email?.toLowerCase()
+    );
+
+    if (lookupError) {
+      await supabase.auth.signOut();
+      const response = NextResponse.redirect(
+        `${origin}/connexion?error=${encodeURIComponent('Impossible de vérifier votre compte. Réessayez.')}`
+      );
+      cookieStore.getAll().forEach(({ name }) => response.cookies.delete(name));
+      return response;
+    }
+
+    if (existingUser) {
+      await supabase.auth.signOut();
+      const response = NextResponse.redirect(
+        `${origin}/connexion?error=${encodeURIComponent(
+          'Un compte existe déjà avec cette adresse e-mail. Connectez-vous avec votre méthode habituelle (e-mail ou téléphone), puis liez Google depuis votre profil.'
+        )}`
+      );
+      cookieStore.getAll().forEach(({ name }) => response.cookies.delete(name));
+      return response;
+    }
+  }
 
   // If Google was just attached to an older password/phone account, do not
   // leave the browser authenticated as that existing account after signup.
@@ -73,7 +113,6 @@ export async function GET(request: Request) {
     }
   }
 
-  const adminKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (adminKey) {
     const { createClient } = await import('@supabase/supabase-js');
     const admin = createClient(
