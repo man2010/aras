@@ -27,8 +27,9 @@ export default function ConnexionPage() {
     const errorParam = searchParams.get('error');
     if (errorParam) {
       setMessage(errorParam);
+      router.replace('/connexion', { scroll: false });
     }
-  }, [searchParams]);
+  }, [searchParams, router]);
 
   const handleGoogleAuth = async () => {
     setLoading(true);

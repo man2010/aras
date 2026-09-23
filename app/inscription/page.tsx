@@ -43,8 +43,9 @@ export default function InscriptionPage() {
     const errorParam = searchParams.get('error');
     if (errorParam) {
       setMessage(errorParam);
+      router.replace('/inscription', { scroll: false });
     }
-  }, [searchParams]);
+  }, [searchParams, router]);
 
   const handleGoogleAuth = async () => {
     setLoading(true);
