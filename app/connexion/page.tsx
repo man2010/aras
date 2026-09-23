@@ -8,7 +8,7 @@ import { ArrowRight, Chrome, Eye, EyeOff, LockKeyhole, Mail, Phone, X } from 'lu
 import { AuthPhoneInput } from '@/components/auth-phone-input';
 import { normalizePhone, isValidPhone } from '@/lib/phone';
 import { ensureProfile } from '@/lib/create-profile';
-import { supabase } from '@/lib/supabase';
+import { getAuthRedirectOrigin, supabase } from '@/lib/supabase';
 
 type Method = 'email' | 'phone';
 
@@ -26,7 +26,7 @@ export default function ConnexionPage() {
   useEffect(() => {
     const errorParam = searchParams.get('error');
     if (errorParam) {
-      setMessage(decodeURIComponent(errorParam));
+      setMessage(errorParam);
     }
   }, [searchParams]);
 
@@ -37,7 +37,7 @@ export default function ConnexionPage() {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: typeof window !== 'undefined' ? `${window.location.origin}/auth/callback?next=/espace` : undefined,
+        redirectTo: `${getAuthRedirectOrigin()}/auth/callback?next=/espace&flow=signin`,
       },
     });
 

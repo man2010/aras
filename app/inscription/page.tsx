@@ -10,7 +10,7 @@ import { normalizePhone, isValidPhone } from '@/lib/phone';
 import { HumanVerification } from '@/components/human-verification';
 import { createProfileAfterSignup } from '@/lib/create-profile';
 import { requestHumanVerification } from '@/lib/verify-human-client';
-import { supabase } from '@/lib/supabase';
+import { getAuthRedirectOrigin, supabase } from '@/lib/supabase';
 
 type Method = 'email' | 'phone';
 
@@ -42,7 +42,7 @@ export default function InscriptionPage() {
   useEffect(() => {
     const errorParam = searchParams.get('error');
     if (errorParam) {
-      setMessage(decodeURIComponent(errorParam));
+      setMessage(errorParam);
     }
   }, [searchParams]);
 
@@ -53,7 +53,7 @@ export default function InscriptionPage() {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: typeof window !== 'undefined' ? `${window.location.origin}/auth/callback?next=/onboarding` : undefined,
+        redirectTo: `${getAuthRedirectOrigin()}/auth/callback?next=/onboarding&flow=signup`,
       },
     });
 
