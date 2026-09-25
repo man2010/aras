@@ -36,7 +36,7 @@ export default function TarifsPage() {
     },
     {
       name: 'Premium',
-      price: '4 500',
+      price: '5 000',
       period: 'FCFA / mois',
       icon: Sparkles,
       bg: '#ec3b78',
@@ -63,8 +63,8 @@ export default function TarifsPage() {
     },
     {
       name: 'Elite',
-      price: '30 000',
-      period: 'FCFA',
+      price: '15 000',
+      period: 'FCFA / mois',
       icon: Crown,
       bg: '#241c18',
       accent: '#f4c27a',
@@ -95,7 +95,7 @@ export default function TarifsPage() {
 
   const faqs = [
     { q: 'La formule gratuite suffit-elle pour commencer ?', r: 'Oui, la formule gratuite permet déjà de créer votre profil, découvrir les profils et tester la plateforme avec les bases essentielles.' },
-    { q: 'Le Premium est-il gratuit pour les femmes ?', r: 'Oui, la formule Premium est à 4 500 FCFA par mois et gratuite pour les femmes.' },
+    { q: 'Le Premium est-il gratuit pour les femmes ?', r: 'Oui, la formule Premium est à 5 000 FCFA par mois et gratuite pour les femmes.' },
     { q: 'Qu\'est-ce que la formule Elite ?', r: 'La formule Elite donne accès aux avantages les plus complets, dont les événements VIP, l’incognito et le support prioritaire.' },
     { q: 'Mes données sont-elles protégées ?', r: 'Absolument. Vos informations personnelles restent confidentielles et ne sont jamais partagées sans votre accord.' },
   ];

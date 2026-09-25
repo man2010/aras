@@ -124,6 +124,11 @@ export function toProfile(row: ProfileRow): Profile {
     height: row.height,
     profile_status: row.profile_status as 'pending' | 'verified' | 'completed' | null,
     onboarding_completed: row.onboarding_completed,
+    languages: row.languages || [],
+    religion: row.religion,
+    caste: row.caste,
+    marital_status: row.marital_status,
+    smoking_habit: row.smoking_habit,
   };
 }
 

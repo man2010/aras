@@ -4,14 +4,14 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
-import { Menu, X, Heart, LogOut, LayoutDashboard, Bell, Moon, Sun, MessageCircle, CalendarDays, ChevronRight, Settings } from 'lucide-react';
+import { Menu, X, Heart, LogOut, LayoutDashboard, Bell, Moon, Sun, MessageCircle, CalendarDays, ChevronRight, Settings, User } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
 
 type NotificationPreview = {
   id: string;
-  type: 'message' | 'event';
+  type: 'message' | 'event' | 'like';
   title: string;
   message: string;
   href: string;
@@ -127,7 +127,7 @@ export function Navbar() {
     let cancelled = false;
     const readEventsKey = `aras-read-events-${user.id}`;
     const loadNotifications = async () => {
-      const [{ data: messageRows }, { data: eventRows }, { data: registrations }, { data: storedNotifications }] = await Promise.all([
+      const [{ data: messageRows }, { data: eventRows }, { data: registrations }, { data: storedNotifications }, { data: receivedLikes }] = await Promise.all([
         supabase
           .from('messages')
           .select('id, sender_id, content, created_at, match_id')
@@ -144,7 +144,8 @@ export function Navbar() {
           .order('date', { ascending: true })
           .limit(5),
         supabase.from('event_registrations').select('event_id').eq('user_id', user.id).eq('status', 'confirmed'),
-        supabase.from('user_notifications').select('id, title, body, created_at, read_at').eq('user_id', user.id).is('read_at', null).order('created_at', { ascending: false }).limit(20),
+        supabase.from('user_notifications').select('id, title, body, created_at, read_at, kind, actor_id').eq('user_id', user.id).is('read_at', null).order('created_at', { ascending: false }).limit(20),
+        supabase.from('swipes').select('id, swiper_id, created_at').eq('swiped_id', user.id).eq('type', 'like').order('created_at', { ascending: false }).limit(20),
       ]);
 
       const reminderFrom = new Date().toISOString();
@@ -162,6 +163,11 @@ export function Navbar() {
         row.id,
         { name: row.full_name || 'Nouveau message', avatarUrl: row.avatar_urls?.[0] },
       ]));
+      const likedBackRows = receivedLikes?.length ? await supabase.from('swipes').select('swiped_id').eq('swiper_id', user.id).in('swiped_id', receivedLikes.map((row: { swiper_id: string }) => row.swiper_id)).eq('type', 'like') : { data: [] };
+      const mutualIds = new Set((likedBackRows.data ?? []).map((row: { swiped_id: string }) => row.swiped_id));
+      const likeSenderIds = (receivedLikes ?? []).map((row: { swiper_id: string }) => row.swiper_id).filter((id: string) => !mutualIds.has(id));
+      const { data: likeSenders } = likeSenderIds.length ? await supabase.from('profiles').select('id, full_name, avatar_urls').in('id', likeSenderIds) : { data: [] };
+      const likeSenderMap = new Map((likeSenders ?? []).map((row: { id: string; full_name: string | null; avatar_urls: string[] | null }) => [row.id, { name: row.full_name || 'Nouveau like', avatarUrl: row.avatar_urls?.[0] }]));
       let readEventIds: string[] = [];
       try {
         readEventIds = JSON.parse(window.localStorage.getItem(readEventsKey) || '[]') as string[];
@@ -183,6 +189,10 @@ export function Navbar() {
           unread: true,
         };
       });
+      const likeNotifications: NotificationPreview[] = (receivedLikes ?? []).filter((row: { swiper_id: string }) => !mutualIds.has(row.swiper_id)).map((row: { id: string; swiper_id: string; created_at: string }) => {
+        const sender = likeSenderMap.get(row.swiper_id);
+        return { id: `like-${row.id}`, type: 'like', title: `${sender?.name || 'Une personne'} aime votre profil`, message: 'Consultez les likes reçus dans votre espace.', href: '/espace?tab=likes', createdAt: row.created_at, avatarUrl: sender?.avatarUrl, unread: true };
+      });
       const eventNotifications: NotificationPreview[] = (eventRows ?? []).map((row: { id: string; title: string; description: string | null; date: string; location: string; city: string | null; created_at: string }) => ({
         id: `event-${row.id}`,
         type: 'event' as const,
@@ -201,19 +211,19 @@ export function Navbar() {
         createdAt: row.created_at || row.date,
         unread: true,
       })).filter((notification) => !readEventSet.has(notification.id.replace('reminder-', 'reminder-')));
-      const storedEventNotifications: NotificationPreview[] = (storedNotifications ?? []).map((row: { id: string; title: string; body: string; created_at: string; read_at: string | null }) => ({
-        id: `db-event-${row.id}`,
-        type: 'event' as const,
+      const storedEventNotifications: NotificationPreview[] = (storedNotifications ?? []).map((row: { id: string; title: string; body: string; created_at: string; read_at: string | null; kind: string; actor_id: string | null }) => ({
+        id: `db-${row.id}`,
+        type: row.kind === 'like_received' ? 'like' as const : 'event' as const,
         title: row.title,
         message: row.body,
-        href: '/espace?tab=events',
+        href: row.kind === 'like_received' ? '/espace?tab=likes' : '/espace?tab=events',
         createdAt: row.created_at,
         unread: !row.read_at,
       }));
 
       if (!cancelled) {
-        setNotifications([...messageNotifications, ...storedEventNotifications, ...eventNotifications, ...reminderNotifications].sort((first, second) => new Date(second.createdAt).getTime() - new Date(first.createdAt).getTime()).slice(0, 8));
-        setUnreadEventCount([...storedEventNotifications, ...eventNotifications, ...reminderNotifications].filter((notification) => notification.unread).length);
+        setNotifications([...messageNotifications, ...likeNotifications, ...storedEventNotifications, ...eventNotifications, ...reminderNotifications].sort((first, second) => new Date(second.createdAt).getTime() - new Date(first.createdAt).getTime()).slice(0, 8));
+        setUnreadEventCount([...storedEventNotifications, ...eventNotifications, ...reminderNotifications, ...likeNotifications].filter((notification) => notification.unread).length);
       }
     };
 
@@ -240,8 +250,8 @@ export function Navbar() {
       await supabase.from('messages').update({ is_read: true }).eq('id', messageId).eq('receiver_id', user?.id);
       setUnreadCount(Math.max(0, unreadCount - 1));
     } else if (user) {
-      if (notification.id.startsWith('db-event-')) {
-        const notificationId = notification.id.replace('db-event-', '');
+      if (notification.id.startsWith('db-')) {
+        const notificationId = notification.id.replace('db-', '');
         await supabase.from('user_notifications').update({ read_at: new Date().toISOString() }).eq('id', notificationId).eq('user_id', user.id).is('read_at', null);
         setUnreadEventCount((count) => Math.max(0, count - (notification.unread ? 1 : 0)));
         setNotifications((current) => current.filter((item) => item.id !== notification.id));
@@ -413,11 +423,8 @@ export function Navbar() {
                       </div>
                     </div>
                     <div className="p-2">
-                      <Link href="/espace" onClick={() => setProfileMenuOpen(false)} className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-bold text-[#625852] transition hover:bg-[#fbf3ee]">
-                        <LayoutDashboard size={16} /> Mon espace
-                      </Link>
-                      <Link href="/espace?tab=settings-profile" onClick={() => setProfileMenuOpen(false)} className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-bold text-[#625852] transition hover:bg-[#fbf3ee]">
-                        <Settings size={16} /> Paramètres
+                      <Link href="/espace?tab=profile" onClick={() => setProfileMenuOpen(false)} className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-bold text-[#625852] transition hover:bg-[#fbf3ee]">
+                        <User size={16} /> Mon profil
                       </Link>
                       {isAdmin && (
                         <Link href="/admin" onClick={() => setProfileMenuOpen(false)} className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-bold text-[#625852] transition hover:bg-[#fbf3ee]">
@@ -458,7 +465,7 @@ export function Navbar() {
               {notificationOpen && (
                 <div className="fixed left-3 right-3 top-[72px] z-50 max-h-[calc(100dvh-88px)] overflow-hidden rounded-2xl border border-[#dfd2c6] bg-white shadow-[0_18px_50px_rgba(83,46,32,.18)] md:absolute md:left-auto md:right-0 md:top-full md:mt-3 md:max-h-none md:w-[min(360px,calc(100vw-2rem))]">
                   <div className="flex items-center justify-between border-b border-[#f0e5dc] px-4 py-3"><p className="text-sm font-extrabold text-[#241c18]">Notifications</p>{(unreadCount + unreadEventCount) > 0 && <span className="text-[10px] font-extrabold uppercase tracking-[.12em] text-[#ec3b78]">{unreadCount + unreadEventCount} nouvelle{unreadCount + unreadEventCount > 1 ? 's' : ''}</span>}</div>
-                  {notifications.length === 0 ? <div className="px-4 py-8 text-center"><Bell size={22} className="mx-auto text-[#d9c9ba]" /><p className="mt-3 text-sm font-bold text-[#756960]">Aucune notification</p><p className="mt-1 text-xs text-[#9a8b82]">Tout est à jour.</p></div> : <div className="max-h-[calc(100dvh-160px)] overflow-y-auto p-2 md:max-h-[min(440px,70vh)]">{notifications.map((notification) => <button key={notification.id} type="button" onClick={() => void handleNotificationClick(notification)} className={`flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left transition hover:bg-[#fbf3ee] ${notification.unread ? 'bg-[#fff7f4]' : ''}`}><div className="relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[#f3e9dc] text-[#1a6b68]">{notification.avatarUrl ? <img src={notification.avatarUrl} alt="" className="h-full w-full object-cover" /> : notification.type === 'message' ? <MessageCircle size={17} /> : <CalendarDays size={17} />}{notification.unread && <span className="absolute right-0 top-0 h-2.5 w-2.5 rounded-full border-2 border-white bg-[#ec3b78]" />}</div><div className="min-w-0 flex-1"><p className="truncate text-xs font-extrabold text-[#241c18]">{notification.title}</p><p className="mt-0.5 line-clamp-2 break-words text-xs leading-4 text-[#756960]">{notification.message}</p></div><ChevronRight size={15} className="shrink-0 text-[#b8aaa1]" /></button>)}</div>}
+                  {notifications.length === 0 ? <div className="px-4 py-8 text-center"><Bell size={22} className="mx-auto text-[#d9c9ba]" /><p className="mt-3 text-sm font-bold text-[#756960]">Aucune notification</p><p className="mt-1 text-xs text-[#9a8b82]">Tout est à jour.</p></div> : <div className="max-h-[calc(100dvh-160px)] overflow-y-auto p-2 md:max-h-[min(440px,70vh)]">{notifications.map((notification) => <button key={notification.id} type="button" onClick={() => void handleNotificationClick(notification)} className={`flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left transition hover:bg-[#fbf3ee] ${notification.unread ? 'bg-[#fff7f4]' : ''}`}><div className="relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[#f3e9dc] text-[#1a6b68]">{notification.avatarUrl ? <img src={notification.avatarUrl} alt="" className="h-full w-full object-cover" /> : notification.type === 'message' ? <MessageCircle size={17} /> : notification.type === 'like' ? <Heart size={17} /> : <CalendarDays size={17} />}{notification.unread && <span className="absolute right-0 top-0 h-2.5 w-2.5 rounded-full border-2 border-white bg-[#ec3b78]" />}</div><div className="min-w-0 flex-1"><p className="truncate text-xs font-extrabold text-[#241c18]">{notification.title}</p><p className="mt-0.5 line-clamp-2 break-words text-xs leading-4 text-[#756960]">{notification.message}</p></div><ChevronRight size={15} className="shrink-0 text-[#b8aaa1]" /></button>)}</div>}
                 </div>
               )}
             </div>
@@ -489,7 +496,7 @@ export function Navbar() {
               <>
                 {/* Résumé du profil connecté */}
                 <Link
-                  href="/espace"
+                  href="/espace?tab=profile"
                   onClick={() => setOpen(false)}
                   className="flex items-center gap-3 rounded-2xl border border-[#dfd2c6] bg-white p-3"
                 >
@@ -505,9 +512,6 @@ export function Navbar() {
                   </span>
                 </Link>
 
-                <Link href="/espace?tab=settings-profile" onClick={() => setOpen(false)} className="flex items-center gap-2 hover:text-[#ec3b78] transition-colors">
-                  <Settings size={16} /> Paramètres
-                </Link>
                 {isAdmin && (
                   <Link href="/admin" onClick={() => setOpen(false)} className="flex items-center gap-2 hover:text-[#ec3b78] transition-colors">
                     Admin

@@ -22,6 +22,11 @@ export type Profile = {
   height?: number | null;
   profile_status?: 'pending' | 'verified' | 'completed' | null;
   onboarding_completed?: boolean | null;
+  languages?: string[];
+  religion?: string | null;
+  caste?: string | null;
+  marital_status?: string | null;
+  smoking_habit?: string | null;
 };
 
 export type EventItem = {

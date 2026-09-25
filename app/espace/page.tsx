@@ -3,7 +3,7 @@
 import { Dispatch, FormEvent, SetStateAction, useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { User, MessageCircle, Heart, CalendarDays, ArrowRight, ArrowLeft, ShieldCheck, Send, Plus, Check, Upload, X, CheckCheck, Search, MapPin, Users, Eye, EyeOff, ChevronRight, Flag } from 'lucide-react';
+import { User, MessageCircle, Heart, CalendarDays, ArrowRight, ArrowLeft, ShieldCheck, Send, Plus, Check, Upload, X, CheckCheck, Search, MapPin, Users, Eye, EyeOff, ChevronRight, Flag, SlidersHorizontal, RotateCcw } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
 import type { Profile, Conversation, Message, Story } from '@/lib/types';
@@ -71,6 +71,7 @@ function SettingsPanels({
   onGoToProfileTab,
   onChangeTab,
   subscriptionPlan,
+  showTabs = true,
 }: {
   tab: Tab;
   profile: Profile | null;
@@ -88,6 +89,7 @@ function SettingsPanels({
   onGoToProfileTab: () => void;
   onChangeTab: (tab: Tab) => void;
   subscriptionPlan: 'discovery' | 'premium' | 'elite';
+  showTabs?: boolean;
 }) {
   const subTabs: { id: Tab; label: string }[] = [
     { id: 'settings-profile', label: 'Mon profil' },
@@ -99,7 +101,7 @@ function SettingsPanels({
 
   return (
     <div className="space-y-6">
-      <div className="flex snap-x gap-2 overflow-x-auto rounded-2xl bg-white p-2 shadow-[0_6px_20px_rgba(83,46,32,.04)] dark:bg-[#1c1b21]">
+      {showTabs && <div className="flex snap-x gap-2 overflow-x-auto rounded-2xl bg-white p-2 shadow-[0_6px_20px_rgba(83,46,32,.04)] dark:bg-[#1c1b21]">
         {subTabs.map((item) => (
           <button
             key={item.id}
@@ -110,7 +112,7 @@ function SettingsPanels({
             {item.label}
           </button>
         ))}
-      </div>
+      </div>}
 
       {tab === 'settings-profile' && (
         <div className="rounded-[26px] bg-white p-6 shadow-[0_8px_30px_rgba(83,46,32,.05)] sm:p-8">
@@ -255,9 +257,12 @@ export default function EspacePage() {
   const [showDiscoveryFilters, setShowDiscoveryFilters] = useState(true);
   const [discoveryPage, setDiscoveryPage] = useState(1);
   const [mobileDiscoveryIndex, setMobileDiscoveryIndex] = useState(0);
+  const [mobileDiscoveryHistory, setMobileDiscoveryHistory] = useState<number[]>([]);
+  const [expandedDiscoveryProfile, setExpandedDiscoveryProfile] = useState(false);
+  const [discoveryPhotoIndexes, setDiscoveryPhotoIndexes] = useState<Record<string, number>>({});
   const discoveryTouchStartX = useRef<number | null>(null);
   const [toggleBusyId, setToggleBusyId] = useState<string | null>(null);
-  const [profileForm, setProfileForm] = useState({ display_name: '', age: '', city: 'Dakar', bio: '', profession: '', photo_url: '', interests: '' });
+  const [profileForm, setProfileForm] = useState({ display_name: '', age: '', city: 'Dakar', bio: '', profession: '', photo_url: '', interests: '', languages: '', religion: '', caste: '', marital_status: '', smoking_habit: '' });
   const [profileSaved, setProfileSaved] = useState(false);
   const [galleryPhotos, setGalleryPhotos] = useState<Array<string | null>>(Array(6).fill(null));
   const [galleryUploadIndex, setGalleryUploadIndex] = useState<number | null>(null);
@@ -296,6 +301,26 @@ export default function EspacePage() {
   const [reportReason, setReportReason] = useState('comportement');
   const [reportDescription, setReportDescription] = useState('');
   const [reportSubmitting, setReportSubmitting] = useState(false);
+  const [profileVisitors, setProfileVisitors] = useState<Profile[]>([]);
+  const [visitorsLoading, setVisitorsLoading] = useState(false);
+  const [visitorsPage, setVisitorsPage] = useState(1);
+  const [profileSection, setProfileSection] = useState<'profile' | 'visitors' | 'privacy' | 'security' | 'subscription' | 'help'>('profile');
+  const [profilePreviewOpen, setProfilePreviewOpen] = useState(false);
+  const [discoveryVisitProfileId, setDiscoveryVisitProfileId] = useState<string | null>(null);
+
+  const loadProfileVisitors = useCallback(async () => {
+    if (!user) return;
+    setVisitorsLoading(true);
+    const { data: visits } = await supabase.from('profile_visits').select('visitor_id,last_viewed_at').eq('profile_id', user.id).order('last_viewed_at', { ascending: false });
+    const visitorIds = Array.from(new Set((visits ?? []).map((visit: { visitor_id: string }) => visit.visitor_id)));
+    if (visitorIds.length) {
+      const { data } = await supabase.from('profiles').select('*').in('id', visitorIds);
+      const profiles = (data ?? []).map((row) => toProfile(row as ProfileRow));
+      const byId = new Map(profiles.map((item) => [item.id, item]));
+      setProfileVisitors(visitorIds.map((id) => byId.get(id)).filter((item): item is Profile => Boolean(item)));
+    } else setProfileVisitors([]);
+    setVisitorsLoading(false);
+  }, [user]);
 
   const loadMemberEvents = useCallback(async () => {
     if (!user) return;
@@ -364,7 +389,7 @@ export default function EspacePage() {
         }
         setProfile(p);
         setSubscriptionPlan(p.is_premium ? 'premium' : 'discovery');
-        setProfileForm({ display_name: p.display_name, age: String(p.age), city: p.city, bio: p.bio, profession: p.profession, photo_url: p.photo_url, interests: p.interests.join(', ') });
+        setProfileForm({ display_name: p.display_name, age: String(p.age), city: p.city, bio: p.bio, profession: p.profession, photo_url: p.photo_url, interests: p.interests.join(', '), languages: p.languages?.join(', ') ?? '', religion: p.religion ?? '', caste: p.caste ?? '', marital_status: p.marital_status ?? '', smoking_habit: p.smoking_habit ?? '' });
         setGalleryPhotos(Array.from({ length: 6 }, (_, index) => p.avatar_urls?.[index] ?? (index === 0 ? p.photo_url : null)));
         const { data: subscription } = await supabase.from('user_subscriptions').select('plan_code').eq('user_id', user.id).eq('status', 'active').or(`ends_at.is.null,ends_at.gt.${new Date().toISOString()}`).order('created_at', { ascending: false }).limit(1).maybeSingle();
         if (subscription?.plan_code === 'premium' || subscription?.plan_code === 'elite') setSubscriptionPlan(subscription.plan_code);
@@ -388,14 +413,22 @@ export default function EspacePage() {
 
       if (discoveryData) {
         const allProfiles = (discoveryData as ProfileRow[]).map(toProfile);
+        const { data: sentSwipes } = await supabase.from('swipes').select('swiped_id').eq('swiper_id', user.id).eq('type', 'like');
+        const likedIds = new Set((sentSwipes ?? []).map((swipe: { swiped_id: string }) => swipe.swiped_id));
         const currentGender = existing?.gender?.trim().toLowerCase();
         const targetGender = currentGender === 'homme' ? 'femme' : currentGender === 'femme' ? 'homme' : null;
-        const filteredProfiles = allProfiles.filter((profileItem) => {
+        const candidates = allProfiles.filter((profileItem) => {
           if (profileItem.id === user.id) return false;
+          if (likedIds.has(profileItem.id)) return false;
           if (targetGender && profileItem.gender?.trim().toLowerCase() !== targetGender) return false;
           return true;
         });
-        setDiscoveryProfiles(filteredProfiles);
+        // Shuffle once per discovery load so newer accounts are not always prioritized.
+        for (let index = candidates.length - 1; index > 0; index--) {
+          const swapIndex = Math.floor(Math.random() * (index + 1));
+          [candidates[index], candidates[swapIndex]] = [candidates[swapIndex], candidates[index]];
+        }
+        setDiscoveryProfiles(candidates);
       } else {
         setDiscoveryProfiles([]);
       }
@@ -494,6 +527,14 @@ export default function EspacePage() {
   }, [user, loadMemberEvents]);
 
   useEffect(() => {
+    if (!user || tab !== 'decouverte' || !discoveryVisitProfileId) return;
+    void supabase.from('profile_visits').upsert(
+      { visitor_id: user.id, profile_id: discoveryVisitProfileId, last_viewed_at: new Date().toISOString() },
+      { onConflict: 'visitor_id,profile_id' },
+    );
+  }, [discoveryVisitProfileId, tab, user]);
+
+  useEffect(() => {
     if (!user || tab !== 'events') return;
     const channel = supabase.channel(`member-events-${user.id}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'events' }, () => void loadMemberEvents())
@@ -538,11 +579,16 @@ export default function EspacePage() {
       profession: profileForm.profession,
       avatar_urls: avatarUrls,
       interests: profileForm.interests.split(',').map((s) => s.trim()).filter(Boolean),
+      languages: profileForm.languages.split(',').map((s) => s.trim()).filter(Boolean),
+      religion: profileForm.religion || null,
+      caste: profileForm.caste || null,
+      marital_status: profileForm.marital_status || null,
+      smoking_habit: profileForm.smoking_habit || null,
     };
     if (profile) {
       const { error } = await supabase.from('profiles').update(payload).eq('id', profile.id);
       if (!error) {
-        const nextProfile = { ...profile, display_name: payload.full_name, city: payload.city, bio: payload.bio, profession: payload.profession, photo_url: avatarUrls[0], interests: payload.interests, avatar_urls: avatarUrls } as Profile;
+        const nextProfile = { ...profile, display_name: payload.full_name, city: payload.city, bio: payload.bio, profession: payload.profession, photo_url: avatarUrls[0], interests: payload.interests, avatar_urls: avatarUrls, languages: payload.languages, religion: payload.religion, caste: payload.caste, marital_status: payload.marital_status, smoking_habit: payload.smoking_habit } as Profile;
         setProfile(nextProfile);
         setProfileSaved(true);
       }
@@ -610,24 +656,21 @@ export default function EspacePage() {
     if (toggleBusyId === profileId) return;
 
     const wasLiked = discoveryLikedIds.has(profileId);
+    if (wasLiked) return;
     setToggleBusyId(profileId);
 
     setDiscoveryLikedIds((prev) => {
       const next = new Set(prev);
-      if (wasLiked) next.delete(profileId);
-      else next.add(profileId);
+      next.add(profileId);
       return next;
     });
 
-    const result = wasLiked
-      ? await supabase.from('swipes').delete().eq('swiper_id', user.id).eq('swiped_id', profileId).eq('type', 'like')
-      : await supabase.from('swipes').upsert({ swiper_id: user.id, swiped_id: profileId, type: 'like' }, { onConflict: 'swiper_id,swiped_id' });
+    const result = await supabase.from('swipes').upsert({ swiper_id: user.id, swiped_id: profileId, type: 'like' }, { onConflict: 'swiper_id,swiped_id' });
 
     if (result.error) {
       setDiscoveryLikedIds((prev) => {
         const next = new Set(prev);
-        if (wasLiked) next.add(profileId);
-        else next.delete(profileId);
+        next.delete(profileId);
         return next;
       });
       setInfoModal({ title: 'Like non enregistré', message: 'Le like n’a pas pu être enregistré. Merci de réessayer.', confirmLabel: 'OK' });
@@ -659,6 +702,28 @@ export default function EspacePage() {
     }
 
     setToggleBusyId(null);
+  };
+
+  const unlikeProfile = async (profile: Profile) => {
+    if (!user || toggleBusyId === profile.id) return;
+    setToggleBusyId(profile.id);
+    const { error } = await supabase.from('swipes').delete()
+      .eq('swiper_id', user.id)
+      .eq('swiped_id', profile.id)
+      .eq('type', 'like');
+    setToggleBusyId(null);
+    if (error) {
+      setInfoModal({ title: 'Like non annulé', message: 'Impossible d’annuler ce like pour le moment. Réessaie dans quelques instants.', confirmLabel: 'OK' });
+      return;
+    }
+    setDiscoveryLikedIds((current) => {
+      const next = new Set(current);
+      next.delete(profile.id);
+      return next;
+    });
+    setLikedProfiles((current) => current.filter((item) => item.id !== profile.id));
+    setDiscoveryProfiles((current) => current.some((item) => item.id === profile.id) ? current : [...current, profile]);
+    setSelectedLikedProfile((current) => current?.id === profile.id ? null : current);
   };
 
   const handleLikeBack = async (profileId: string) => {
@@ -904,9 +969,11 @@ export default function EspacePage() {
   };
 
   const handleDiscoveryMessage = (profileItem: Profile) => {
-    const isMatched = matches.some((matchProfile) => matchProfile.id === profileItem.id);
-
-    if (isMatched) {
+    const matchedConversation = conversations.find((conversation) =>
+      conversation.user_a === profileItem.id || conversation.user_b === profileItem.id,
+    );
+    if (matchedConversation) {
+      setActiveConv(matchedConversation.id);
       setTab('messages');
       return;
     }
@@ -936,9 +1003,19 @@ export default function EspacePage() {
 
     return matchesSearch && matchesCity;
   });
-  const mobileDiscoveryProfile = filteredDiscoveryProfiles[mobileDiscoveryIndex] ?? filteredDiscoveryProfiles[0];
+  const mobileDiscoveryProfile = filteredDiscoveryProfiles[mobileDiscoveryIndex];
   const advanceMobileDiscovery = () => {
-    setMobileDiscoveryIndex((index) => (index + 1) % Math.max(filteredDiscoveryProfiles.length, 1));
+    if (mobileDiscoveryIndex >= filteredDiscoveryProfiles.length - 1) {
+      setMobileDiscoveryHistory((history) => [...history, mobileDiscoveryIndex]);
+      setMobileDiscoveryIndex(filteredDiscoveryProfiles.length);
+      return;
+    }
+    setMobileDiscoveryHistory((history) => [...history, mobileDiscoveryIndex]);
+    setMobileDiscoveryIndex((index) => index + 1);
+  };
+  const goBackMobileDiscovery = () => {
+    setMobileDiscoveryIndex((index) => index >= filteredDiscoveryProfiles.length ? Math.max(0, index - 1) : mobileDiscoveryHistory.at(-1) ?? Math.max(0, index - 1));
+    setMobileDiscoveryHistory((history) => history.slice(0, -1));
   };
   const discoveryPageSize = 12;
   const discoveryTotalPages = Math.max(1, Math.ceil(filteredDiscoveryProfiles.length / discoveryPageSize));
@@ -964,7 +1041,6 @@ export default function EspacePage() {
         <AppSidebar
           active={tab}
           onChange={setTab}
-          badges={{ messages: totalUnread, likes: receivedLikes.length }}
         />
 
         <div className="min-w-0 flex-1 bg-[radial-gradient(ellipse_at_top_right,_rgba(236,59,120,0.08),_transparent_40%)] px-3 pb-28 pt-5 sm:px-6 sm:pt-8 lg:px-10 lg:pt-10 lg:pb-12">
@@ -1002,7 +1078,7 @@ export default function EspacePage() {
                       <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-[#9a8b82]" />
                       <input
                         value={discoverySearch}
-                        onChange={(event) => { setDiscoverySearch(event.target.value); setMobileDiscoveryIndex(0); }}
+                        onChange={(event) => { setDiscoverySearch(event.target.value); setMobileDiscoveryIndex(0); setMobileDiscoveryHistory([]); }}
                         placeholder="Rechercher par nom, ville, profession, intérêt…"
                         className="w-full rounded-2xl border border-[#e7d9ce] bg-white/80 py-3.5 pl-11 pr-4 text-sm outline-none transition placeholder:text-[#aa9c93] focus:border-[#ec3b78] focus:bg-white dark:border-white/10 dark:bg-black/20 dark:text-white dark:placeholder:text-white/40 dark:focus:bg-black/30"
                       />
@@ -1014,7 +1090,7 @@ export default function EspacePage() {
                         {discoveryCities.map((city) => (
                           <button
                             key={city}
-                            onClick={() => { setDiscoveryCityFilter(city); setMobileDiscoveryIndex(0); }}
+                            onClick={() => { setDiscoveryCityFilter(city); setMobileDiscoveryIndex(0); setMobileDiscoveryHistory([]); }}
                             className={`rounded-full px-4 py-2 text-xs font-extrabold transition ${
                               discoveryCityFilter === city
                                 ? 'bg-[#ec3b78] text-white'
@@ -1040,23 +1116,41 @@ export default function EspacePage() {
                 </div>
               ) : (
                 <>
+                {filteredDiscoveryProfiles.length > 0 && mobileDiscoveryIndex >= filteredDiscoveryProfiles.length && <section className="mx-auto flex min-h-[55dvh] w-full max-w-[560px] flex-col items-center justify-center rounded-[30px] bg-white px-6 text-center shadow dark:bg-[#19191f] lg:hidden">
+                  <Users size={44} className="text-[#9a8b82]" />
+                  <h3 className="mt-5 font-display text-2xl text-[#241c18] dark:text-white">Plus de profils autour de vous</h3>
+                  <p className="mt-2 text-sm text-[#756960] dark:text-white/60">Vous avez vu tous les profils disponibles avec ces filtres. Revenez en arrière ou modifiez votre recherche.</p>
+                  <div className="mt-5 flex flex-wrap justify-center gap-3"><button type="button" onClick={goBackMobileDiscovery} className="rounded-full border px-5 py-3 text-sm font-bold">Revenir au profil précédent</button><button type="button" onClick={() => { setMobileDiscoveryIndex(0); setMobileDiscoveryHistory([]); setShowDiscoveryFilters(true); }} className="rounded-full bg-[#ec3b78] px-5 py-3 text-sm font-bold text-white"><SlidersHorizontal size={15} className="mr-2 inline" /> Modifier les filtres</button></div>
+                </section>}
                 {mobileDiscoveryProfile && (
                   <section className="mx-auto w-full max-w-[560px] lg:hidden" aria-label="Profils à découvrir">
                     <article
                       key={mobileDiscoveryProfile.id}
+                      ref={() => { setDiscoveryVisitProfileId((currentId) => currentId === mobileDiscoveryProfile.id ? currentId : mobileDiscoveryProfile.id); }}
+                      onMouseEnter={() => { if (window.matchMedia('(min-width: 1024px)').matches) void supabase.from('profile_visits').upsert({ visitor_id: user!.id, profile_id: mobileDiscoveryProfile.id, last_viewed_at: new Date().toISOString() }, { onConflict: 'visitor_id,profile_id' }); }}
                       onTouchStart={(event) => { discoveryTouchStartX.current = event.touches[0]?.clientX ?? null; }}
+                      onClick={(event) => {
+                        if ((event.target as HTMLElement).closest('button')) return;
+                        const bounds = event.currentTarget.getBoundingClientRect();
+                        const photos = mobileDiscoveryProfile.avatar_urls?.filter(Boolean) ?? [];
+                        if (!photos.length) return;
+                        const delta = event.clientX > bounds.left + bounds.width / 2 ? 1 : -1;
+                        setDiscoveryPhotoIndexes((current) => ({ ...current, [mobileDiscoveryProfile.id]: ((current[mobileDiscoveryProfile.id] ?? 0) + delta + photos.length) % photos.length }));
+                      }}
                       onTouchEnd={(event) => {
                         const startX = discoveryTouchStartX.current;
                         const endX = event.changedTouches[0]?.clientX;
                         discoveryTouchStartX.current = null;
                         if (startX === null || endX === undefined || Math.abs(endX - startX) < 65) return;
-                        if (endX > startX) void toggleDiscoveryLike(mobileDiscoveryProfile.id);
+                        if (endX > startX) {
+                          if (!discoveryLikedIds.has(mobileDiscoveryProfile.id)) void toggleDiscoveryLike(mobileDiscoveryProfile.id);
+                        }
                         advanceMobileDiscovery();
                       }}
-                      className="relative isolate h-[min(68dvh,680px)] min-h-[430px] overflow-hidden rounded-[30px] border border-white/15 bg-[#202027] shadow-[0_22px_60px_rgba(0,0,0,.22)] touch-pan-y sm:h-[min(72dvh,760px)] sm:rounded-[36px]"
+                      className={`relative isolate ${expandedDiscoveryProfile ? 'min-h-[min(82dvh,820px)]' : 'h-[min(68dvh,680px)] min-h-[430px]'} overflow-hidden rounded-[30px] border border-white/15 bg-[#202027] shadow-[0_22px_60px_rgba(0,0,0,.22)] touch-pan-y sm:rounded-[36px]`}
                     >
-                      {mobileDiscoveryProfile.photo_url ? (
-                        <img src={mobileDiscoveryProfile.photo_url} alt={mobileDiscoveryProfile.display_name} className="absolute inset-0 h-full w-full object-cover" />
+                      {(mobileDiscoveryProfile.avatar_urls?.filter(Boolean).length ? mobileDiscoveryProfile.avatar_urls.filter(Boolean) : [mobileDiscoveryProfile.photo_url])[discoveryPhotoIndexes[mobileDiscoveryProfile.id] ?? 0] ? (
+                        <img src={(mobileDiscoveryProfile.avatar_urls?.filter(Boolean).length ? mobileDiscoveryProfile.avatar_urls.filter(Boolean) : [mobileDiscoveryProfile.photo_url])[discoveryPhotoIndexes[mobileDiscoveryProfile.id] ?? 0]} alt={mobileDiscoveryProfile.display_name} className="absolute inset-0 h-full w-full object-cover" />
                       ) : (
                         <div className="absolute inset-0 flex items-center justify-center bg-[#292832] text-7xl font-black text-white/70">{mobileDiscoveryProfile.display_name.charAt(0).toUpperCase()}</div>
                       )}
@@ -1064,27 +1158,40 @@ export default function EspacePage() {
                       <div className="absolute left-4 top-4 rounded-full border border-white/45 bg-black/35 px-4 py-2 text-sm font-extrabold text-white backdrop-blur-md">
                         <MapPin size={15} className="mr-1 inline" />{mobileDiscoveryProfile.city || 'Ville non renseignée'}
                       </div>
+                      {(mobileDiscoveryProfile.avatar_urls?.filter(Boolean).length ?? 0) > 1 && <div className="absolute inset-x-0 top-4 flex justify-center gap-1.5">{mobileDiscoveryProfile.avatar_urls!.filter(Boolean).map((photo, index) => <button key={photo} type="button" aria-label={`Afficher la photo ${index + 1}`} onClick={() => setDiscoveryPhotoIndexes((current) => ({ ...current, [mobileDiscoveryProfile.id]: index }))} className={`h-1.5 rounded-full ${index === (discoveryPhotoIndexes[mobileDiscoveryProfile.id] ?? 0) ? 'w-7 bg-white' : 'w-1.5 bg-white/55'}`} />)}</div>}
                       <div className="absolute inset-x-0 bottom-0 p-5 text-white sm:p-7">
                         <p className="text-xs font-extrabold uppercase tracking-[.18em] text-[#ff4b9b]">À découvrir</p>
                         <h3 className="mt-1 font-display text-4xl leading-tight sm:text-5xl">
                           {mobileDiscoveryProfile.display_name}{mobileDiscoveryProfile.age ? `, ${mobileDiscoveryProfile.age}` : ''}
                         </h3>
                         {mobileDiscoveryProfile.profession && <p className="mt-2 text-base font-semibold text-white/80">{mobileDiscoveryProfile.profession}</p>}
-                        {mobileDiscoveryProfile.bio && <p className="mt-2 line-clamp-2 max-w-prose text-sm leading-6 text-white/75">{mobileDiscoveryProfile.bio}</p>}
+                        {mobileDiscoveryProfile.bio && <p className={`mt-2 max-w-prose text-sm leading-6 text-white/75 ${expandedDiscoveryProfile ? '' : 'line-clamp-2'}`}>{mobileDiscoveryProfile.bio}</p>}
                         {mobileDiscoveryProfile.interests?.length ? (
                           <div className="mt-3 flex flex-wrap gap-2">
                             {mobileDiscoveryProfile.interests.slice(0, 3).map((interest) => <span key={interest} className="rounded-full border border-white/35 bg-white/10 px-3 py-1.5 text-xs font-bold text-white backdrop-blur">★ {interest}</span>)}
                           </div>
                         ) : null}
+                        <button type="button" onClick={() => setExpandedDiscoveryProfile((expanded) => !expanded)} className="mt-3 inline-flex min-h-10 items-center gap-2 rounded-full bg-[#ec1689] px-5 py-2 text-sm font-extrabold text-white shadow-lg">
+                          {expandedDiscoveryProfile ? 'Voir moins' : 'Voir plus'} <ChevronRight size={16} className={expandedDiscoveryProfile ? '-rotate-90' : 'rotate-90'} />
+                        </button>
+                        {expandedDiscoveryProfile && <div className="mt-3 grid grid-cols-2 gap-2 rounded-2xl bg-black/35 p-3 text-xs text-white/85 backdrop-blur">
+                          {mobileDiscoveryProfile.zone && <p>Quartier · {mobileDiscoveryProfile.zone}</p>}
+                          {mobileDiscoveryProfile.height && <p>Taille · {mobileDiscoveryProfile.height} cm</p>}
+                          {mobileDiscoveryProfile.religion && <p>Religion · {mobileDiscoveryProfile.religion}</p>}
+                          {mobileDiscoveryProfile.marital_status && <p>Situation · {mobileDiscoveryProfile.marital_status}</p>}
+                          {mobileDiscoveryProfile.profession && <p>Profession · {mobileDiscoveryProfile.profession}</p>}
+                          {mobileDiscoveryProfile.languages?.length ? <p>Langues · {mobileDiscoveryProfile.languages.join(', ')}</p> : null}
+                        </div>}
                         <div className="mt-5 flex items-center justify-center gap-5">
                           <button type="button" onClick={advanceMobileDiscovery} aria-label="Passer ce profil" className="flex h-14 w-14 items-center justify-center rounded-full bg-black/45 text-white ring-1 ring-white/15 backdrop-blur transition active:scale-95"><X size={25} /></button>
                           <button type="button" onClick={() => handleDiscoveryMessage(mobileDiscoveryProfile)} aria-label="Envoyer un message" className="flex h-16 w-16 items-center justify-center rounded-full bg-[#292746] text-white shadow-lg transition active:scale-95"><MessageCircle size={27} /></button>
-                          <button type="button" onClick={() => { void toggleDiscoveryLike(mobileDiscoveryProfile.id); advanceMobileDiscovery(); }} aria-label="Aimer ce profil" className="flex h-14 w-14 items-center justify-center rounded-full bg-[#ec1689] text-white shadow-[0_10px_28px_rgba(236,22,137,.32)] transition active:scale-95"><Heart size={25} fill="currentColor" /></button>
+                          <button type="button" onClick={() => { const profileId = mobileDiscoveryProfile.id; if (!discoveryLikedIds.has(profileId)) void toggleDiscoveryLike(profileId); advanceMobileDiscovery(); }} aria-label={discoveryLikedIds.has(mobileDiscoveryProfile.id) ? 'Profil aimé' : 'Aimer ce profil'} className={`flex h-14 w-14 items-center justify-center rounded-full text-white shadow-[0_10px_28px_rgba(236,22,137,.32)] transition active:scale-95 ${discoveryLikedIds.has(mobileDiscoveryProfile.id) ? 'bg-[#a20d5d]' : 'bg-[#ec1689]'}`}><Heart size={25} fill="currentColor" /></button>
                         </div>
                         <p className="mt-3 text-center text-xs font-semibold text-white/60">Balaye pour découvrir le profil suivant</p>
                       </div>
                     </article>
                     <div className="mt-3 flex items-center justify-between px-2 text-xs font-bold text-[#756960] dark:text-white/55">
+                      <button type="button" onClick={goBackMobileDiscovery} disabled={mobileDiscoveryIndex === 0} className="inline-flex items-center gap-1 disabled:opacity-30"><RotateCcw size={14} /> Retour</button>
                       <span>{mobileDiscoveryIndex + 1} / {filteredDiscoveryProfiles.length}</span>
                       <button type="button" onClick={() => setShowDiscoveryFilters(true)} className="rounded-full border border-[#dfd2c6] bg-white/80 px-3 py-1.5 dark:border-white/15 dark:bg-white/5">Modifier les filtres</button>
                     </div>
@@ -1195,7 +1302,22 @@ export default function EspacePage() {
 
           {/* PROFILE TAB */}
           {tab === 'profile' && (
-            <div className="grid gap-6 lg:grid-cols-[300px_1fr]">
+            <div className="space-y-5">
+              <div className="flex gap-2 overflow-x-auto rounded-2xl bg-white p-2 shadow dark:bg-[#1c1b21]">
+                {([{ id: 'profile', label: 'Mon profil' }, { id: 'visitors', label: `Visiteurs (${profileVisitors.length})` }, { id: 'privacy', label: 'Confidentialité' }, { id: 'security', label: 'Sécurité' }, { id: 'subscription', label: 'Abonnement' }, { id: 'help', label: 'Aide' }] as const).map((item) => <button key={item.id} type="button" onClick={() => { setProfileSection(item.id); if (item.id === 'visitors') void loadProfileVisitors(); }} className={`shrink-0 rounded-xl px-4 py-2.5 text-xs font-extrabold ${profileSection === item.id ? 'bg-[#ec3b78] text-white' : 'text-[#756960] dark:text-white/60'}`}>{item.label}</button>)}
+              </div>
+              {profileSection === 'visitors' && <section className="rounded-[26px] bg-white p-5 shadow dark:bg-[#1c1b21]">
+                <div className="mb-4 flex items-center justify-between"><h2 className="font-display text-2xl">Personnes qui ont visité votre profil</h2><button type="button" onClick={() => void loadProfileVisitors()} className="text-xs font-bold text-[#ec3b78]">Actualiser</button></div>
+                {visitorsLoading ? <p className="text-sm text-[#756960]">Chargement des visiteurs…</p> : profileVisitors.length === 0 ? <p className="rounded-2xl bg-[#fbf8f2] p-6 text-center text-sm text-[#756960] dark:bg-white/5">Aucune visite pour le moment.</p> : <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{profileVisitors.slice((visitorsPage - 1) * 12, visitorsPage * 12).map((visitor) => <article key={visitor.id} className="flex items-center gap-3 rounded-2xl border border-[#eadfd5] p-3 dark:border-white/10"><img src={visitor.photo_url} alt="" className="h-14 w-14 rounded-xl object-cover"/><div className="min-w-0"><p className="truncate font-bold">{visitor.display_name}{visitor.age ? `, ${visitor.age}` : ''}</p><p className="truncate text-xs text-[#756960]">{visitor.city}</p></div></article>)}</div>}
+                {profileSection === 'visitors' && profileVisitors.length > 12 && <div className="mt-4 flex items-center justify-between"><p className="text-xs text-[#756960]">Page {visitorsPage} / {Math.ceil(profileVisitors.length / 12)}</p><div className="flex gap-2"><button type="button" disabled={visitorsPage === 1} onClick={() => setVisitorsPage((page) => Math.max(1, page - 1))} className="rounded-full border px-4 py-2 text-xs font-bold disabled:opacity-40">Précédent</button><button type="button" disabled={visitorsPage >= Math.ceil(profileVisitors.length / 12)} onClick={() => setVisitorsPage((page) => Math.min(Math.ceil(profileVisitors.length / 12), page + 1))} className="rounded-full border px-4 py-2 text-xs font-bold disabled:opacity-40">Suivant</button></div></div>}
+              </section>}
+              {profileSection === 'privacy' && <SettingsPanels tab="settings-privacy" profile={profile} privacySettings={privacySettings} setPrivacySettings={setPrivacySettings} savePrivacy={savePrivacy} privacySaved={privacySaved} securityForm={securityForm} setSecurityForm={setSecurityForm} changePassword={changePassword} securityMessage={securityMessage} securityLoading={securityLoading} showNewPw={showNewPw} setShowNewPw={setShowNewPw} onGoToProfileTab={() => setProfileSection('profile')} onChangeTab={() => {}} subscriptionPlan={subscriptionPlan} showTabs={false} />}
+              {profileSection === 'security' && <SettingsPanels tab="settings-security" profile={profile} privacySettings={privacySettings} setPrivacySettings={setPrivacySettings} savePrivacy={savePrivacy} privacySaved={privacySaved} securityForm={securityForm} setSecurityForm={setSecurityForm} changePassword={changePassword} securityMessage={securityMessage} securityLoading={securityLoading} showNewPw={showNewPw} setShowNewPw={setShowNewPw} onGoToProfileTab={() => setProfileSection('profile')} onChangeTab={() => {}} subscriptionPlan={subscriptionPlan} showTabs={false} />}
+              {profileSection === 'subscription' && <SettingsPanels tab="settings-subscription" profile={profile} privacySettings={privacySettings} setPrivacySettings={setPrivacySettings} savePrivacy={savePrivacy} privacySaved={privacySaved} securityForm={securityForm} setSecurityForm={setSecurityForm} changePassword={changePassword} securityMessage={securityMessage} securityLoading={securityLoading} showNewPw={showNewPw} setShowNewPw={setShowNewPw} onGoToProfileTab={() => setProfileSection('profile')} onChangeTab={() => {}} subscriptionPlan={subscriptionPlan} showTabs={false} />}
+              {profileSection === 'help' && <SettingsPanels tab="settings-help" profile={profile} privacySettings={privacySettings} setPrivacySettings={setPrivacySettings} savePrivacy={savePrivacy} privacySaved={privacySaved} securityForm={securityForm} setSecurityForm={setSecurityForm} changePassword={changePassword} securityMessage={securityMessage} securityLoading={securityLoading} showNewPw={showNewPw} setShowNewPw={setShowNewPw} onGoToProfileTab={() => setProfileSection('profile')} onChangeTab={() => {}} subscriptionPlan={subscriptionPlan} showTabs={false} />}
+              {profileSection === 'profile' && <div className="grid gap-6 lg:grid-cols-[300px_1fr]">
+              <div className="lg:col-span-2 flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-white p-4 shadow dark:bg-[#1c1b21]"><div><p className="font-bold">Votre profil public</p><p className="text-xs text-[#756960]">Consultez les informations visibles par les autres membres.</p></div><button type="button" onClick={() => setProfilePreviewOpen((open) => !open)} className="rounded-full bg-[#292746] px-5 py-2.5 text-xs font-extrabold text-white">{profilePreviewOpen ? 'Masquer l’aperçu' : 'Voir mon profil'}</button></div>
+              {profilePreviewOpen && <section className="lg:col-span-2 overflow-hidden rounded-[26px] bg-white shadow dark:bg-[#1c1b21]"><img src={profile?.photo_url || profileForm.photo_url} alt="Votre photo de profil" className="h-64 w-full object-cover sm:h-80"/><div className="p-6"><h2 className="font-display text-3xl">{profileForm.display_name}, {profileForm.age}</h2><p className="mt-1 text-sm text-[#756960]">{profileForm.city} · {profileForm.profession}</p><p className="mt-4 whitespace-pre-line text-sm leading-6 text-[#756960]">{profileForm.bio || 'Aucune description ajoutée.'}</p><div className="mt-4 flex flex-wrap gap-2">{profileForm.interests.split(',').map((interest) => interest.trim()).filter(Boolean).map((interest) => <span key={interest} className="rounded-full bg-[#f6efe6] px-3 py-1.5 text-xs font-bold">{interest}</span>)}</div></div></section>}
               <div className="rounded-[26px] bg-white p-6 text-center shadow-[0_8px_30px_rgba(83,46,32,.05)]">
                 <div className="relative mx-auto h-32 w-32 overflow-hidden rounded-full border-4 border-[#f3e9dc]">
                   <img src={imagePreview || profileForm.photo_url || 'https://images.pexels.com/photos/733872/pexels-photo-733872.jpeg?auto=compress&cs=tinysrgb&w=300'} alt="Photo" className="h-full w-full object-cover" />
@@ -1225,7 +1347,7 @@ export default function EspacePage() {
                 <p className="mt-1 text-sm text-[#756960]">Renseignez votre profil pour augmenter vos chances de match.</p>
                 <div className="mt-6 grid gap-4 sm:grid-cols-2">
                   <label className="block text-xs font-extrabold text-[#625852]">Nom affiché<input value={profileForm.display_name} onChange={(e) => setProfileForm({ ...profileForm, display_name: e.target.value })} required placeholder="Votre nom" className="mt-2 w-full rounded-xl border border-[#dfd2c6] bg-[#fbf8f2] px-4 py-3 text-sm outline-none focus:border-[#ec3b78]" /></label>
-                  <label className="block text-xs font-extrabold text-[#625852]">Âge<input value={profileForm.age} onChange={(e) => setProfileForm({ ...profileForm, age: e.target.value })} type="number" min="18" max="99" required className="mt-2 w-full rounded-xl border border-[#dfd2c6] bg-[#fbf8f2] px-4 py-3 text-sm outline-none focus:border-[#ec3b78]" /></label>
+                  <label className="block text-xs font-extrabold text-[#625852]">Âge<input value={profileForm.age} readOnly aria-readonly="true" className="mt-2 w-full cursor-not-allowed rounded-xl border border-[#dfd2c6] bg-[#eee9e3] px-4 py-3 text-sm text-[#756960] outline-none dark:bg-white/5" /><span className="mt-1 block text-[10px] font-medium text-[#9a8b82]">L’âge est calculé à partir de votre date de naissance.</span></label>
                   <label className="block text-xs font-extrabold text-[#625852]">Ville<input value={profileForm.city} onChange={(e) => setProfileForm({ ...profileForm, city: e.target.value })} required className="mt-2 w-full rounded-xl border border-[#dfd2c6] bg-[#fbf8f2] px-4 py-3 text-sm outline-none focus:border-[#ec3b78]" /></label>
                   <label className="block text-xs font-extrabold text-[#625852]">Profession<input value={profileForm.profession} onChange={(e) => setProfileForm({ ...profileForm, profession: e.target.value })} className="mt-2 w-full rounded-xl border border-[#dfd2c6] bg-[#fbf8f2] px-4 py-3 text-sm outline-none focus:border-[#ec3b78]" /></label>
                   <div className="sm:col-span-2">
@@ -1233,6 +1355,11 @@ export default function EspacePage() {
                     <p className="mt-1 text-xs text-[#9a8b82]">Cliquez sur l&apos;image pour changer (PNG, JPG, max 5MB)</p>
                   </div>
                   <label className="block text-xs font-extrabold text-[#625852] sm:col-span-2">Centres d&apos;intérêt (séparés par des virgules)<input value={profileForm.interests} onChange={(e) => setProfileForm({ ...profileForm, interests: e.target.value })} placeholder="Voyage, Cuisine, Musique..." className="mt-2 w-full rounded-xl border border-[#dfd2c6] bg-[#fbf8f2] px-4 py-3 text-sm outline-none focus:border-[#ec3b78]" /></label>
+                  <label className="block text-xs font-extrabold text-[#625852]">Langues parlées<input value={profileForm.languages} onChange={(e) => setProfileForm({ ...profileForm, languages: e.target.value })} placeholder="Français, Wolof" className="mt-2 w-full rounded-xl border border-[#dfd2c6] bg-[#fbf8f2] px-4 py-3 text-sm outline-none focus:border-[#ec3b78]" /></label>
+                  <label className="block text-xs font-extrabold text-[#625852]">Religion<input value={profileForm.religion} onChange={(e) => setProfileForm({ ...profileForm, religion: e.target.value })} className="mt-2 w-full rounded-xl border border-[#dfd2c6] bg-[#fbf8f2] px-4 py-3 text-sm outline-none focus:border-[#ec3b78]" /></label>
+                  <label className="block text-xs font-extrabold text-[#625852]">Ethnie / caste<input value={profileForm.caste} onChange={(e) => setProfileForm({ ...profileForm, caste: e.target.value })} className="mt-2 w-full rounded-xl border border-[#dfd2c6] bg-[#fbf8f2] px-4 py-3 text-sm outline-none focus:border-[#ec3b78]" /></label>
+                  <label className="block text-xs font-extrabold text-[#625852]">Situation<select value={profileForm.marital_status} onChange={(e) => setProfileForm({ ...profileForm, marital_status: e.target.value })} className="mt-2 w-full rounded-xl border border-[#dfd2c6] bg-[#fbf8f2] px-4 py-3 text-sm outline-none focus:border-[#ec3b78]"><option value="">Préfère ne pas dire</option><option value="single">Célibataire</option><option value="married">Marié(e)</option><option value="divorced">Divorcé(e)</option><option value="widowed">Veuf/Veuve</option></select></label>
+                  <label className="block text-xs font-extrabold text-[#625852]">Tabac<input value={profileForm.smoking_habit} onChange={(e) => setProfileForm({ ...profileForm, smoking_habit: e.target.value })} placeholder="Non-fumeur, fumeur…" className="mt-2 w-full rounded-xl border border-[#dfd2c6] bg-[#fbf8f2] px-4 py-3 text-sm outline-none focus:border-[#ec3b78]" /></label>
                   <label className="block text-xs font-extrabold text-[#625852] sm:col-span-2">Bio<textarea value={profileForm.bio} onChange={(e) => setProfileForm({ ...profileForm, bio: e.target.value })} rows={4} placeholder="Parlez de vous..." className="mt-2 w-full rounded-xl border border-[#dfd2c6] bg-[#fbf8f2] px-4 py-3 text-sm outline-none focus:border-[#ec3b78]" /></label>
                 </div>
 
@@ -1304,6 +1431,7 @@ export default function EspacePage() {
                   {profileSaved && <span className="flex items-center gap-2 text-sm font-bold text-[#1a6b68]"><Check size={16} /> Profil mis à jour !</span>}
                 </div>
               </form>
+              </div>}
             </div>
           )}
 
@@ -1524,7 +1652,16 @@ export default function EspacePage() {
                             <p className="font-display text-base font-semibold truncate">{p.display_name}, <span className="text-[#9a8b82]">{p.age}</span></p>
                             <p className="text-xs text-[#756960]">{p.city} · {p.profession}</p>
                           </div>
-                          <div className="shrink-0 text-xs text-[#9a8b82]">En attente...</div>
+                          <button
+                            type="button"
+                            onClick={() => void unlikeProfile(p)}
+                            disabled={toggleBusyId === p.id}
+                            aria-label={`Retirer le like de ${p.display_name}`}
+                            title="Retirer ce like"
+                            className="group flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#fce6ee] text-[#ec3b78] transition hover:scale-105 hover:bg-[#ec3b78] hover:text-white disabled:cursor-wait disabled:opacity-50 dark:bg-[#3a1e2a]"
+                          >
+                            {toggleBusyId === p.id ? <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" /> : <Heart size={17} fill="currentColor" className="transition group-hover:scale-90" />}
+                          </button>
                         </div>
                       ))}
                       {likedProfiles.length > 10 && (
