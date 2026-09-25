@@ -93,6 +93,10 @@ html.dark [class*="bg-[#fae4e2]"] { background-color: #1e1e1e !important; }
 html.dark .bg-gradient-to-b,
 html.dark .bg-gradient-to-br,
 html.dark .bg-gradient-to-r { background-image: none !important; background-color: #121212 !important; }
+html.dark .discovery-image-overlay {
+  background-image: linear-gradient(to bottom, rgba(0,0,0,.18) 0%, transparent 38%, rgba(0,0,0,.88) 100%) !important;
+  background-color: transparent !important;
+}
 html.dark #concept { background-color: #1e1e1e !important; }
 html.dark #how-it-works { background-color: #121212 !important; }
 html.dark .home-stats { background-color: #1a1a1a !important; border-color: #353535 !important; }

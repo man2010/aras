@@ -3,7 +3,7 @@
 import { Dispatch, FormEvent, SetStateAction, useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { User, MessageCircle, Heart, CalendarDays, ArrowRight, ArrowLeft, ShieldCheck, Send, Plus, Check, Upload, X, CheckCheck, Search, MapPin, Users, Eye, EyeOff, ChevronRight, Flag, SlidersHorizontal, RotateCcw } from 'lucide-react';
+import { User, MessageCircle, Heart, CalendarDays, ArrowRight, ArrowLeft, ShieldCheck, Send, Plus, Check, Upload, X, CheckCheck, Search, MapPin, Users, Eye, EyeOff, ChevronRight, Flag, RotateCcw } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
 import type { Profile, Conversation, Message, Story } from '@/lib/types';
@@ -1065,7 +1065,7 @@ export default function EspacePage() {
                     </span>
                     <button
                       onClick={() => setShowDiscoveryFilters((value) => !value)}
-                      className="rounded-full border border-[#dfd2c6] bg-white/75 px-3 py-2 text-[11px] font-extrabold text-[#625852] transition hover:border-[#ec3b78] hover:text-[#c92e63] sm:px-4 sm:text-xs dark:border-white/15 dark:bg-white/5 dark:text-white/75"
+                      className="hidden rounded-full border border-[#dfd2c6] bg-white/75 px-3 py-2 text-[11px] font-extrabold text-[#625852] transition hover:border-[#ec3b78] hover:text-[#c92e63] sm:px-4 sm:text-xs dark:border-white/15 dark:bg-white/5 dark:text-white/75 lg:inline-flex"
                     >
                       {showDiscoveryFilters ? 'Masquer les filtres' : 'Afficher les filtres'}
                     </button>
@@ -1073,7 +1073,7 @@ export default function EspacePage() {
                 </div>
 
                 {showDiscoveryFilters && (
-                  <div className="mt-5 space-y-4 border-t border-[#f3e9dc] pt-5">
+                  <div className="mt-5 hidden space-y-4 border-t border-[#f3e9dc] pt-5 lg:block">
                     <div className="relative">
                       <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-[#9a8b82]" />
                       <input
@@ -1120,7 +1120,7 @@ export default function EspacePage() {
                   <Users size={44} className="text-[#9a8b82]" />
                   <h3 className="mt-5 font-display text-2xl text-[#241c18] dark:text-white">Plus de profils autour de vous</h3>
                   <p className="mt-2 text-sm text-[#756960] dark:text-white/60">Vous avez vu tous les profils disponibles avec ces filtres. Revenez en arrière ou modifiez votre recherche.</p>
-                  <div className="mt-5 flex flex-wrap justify-center gap-3"><button type="button" onClick={goBackMobileDiscovery} className="rounded-full border px-5 py-3 text-sm font-bold">Revenir au profil précédent</button><button type="button" onClick={() => { setMobileDiscoveryIndex(0); setMobileDiscoveryHistory([]); setShowDiscoveryFilters(true); }} className="rounded-full bg-[#ec3b78] px-5 py-3 text-sm font-bold text-white"><SlidersHorizontal size={15} className="mr-2 inline" /> Modifier les filtres</button></div>
+                  <div className="mt-5 flex flex-wrap justify-center gap-3"><button type="button" onClick={goBackMobileDiscovery} className="rounded-full border px-5 py-3 text-sm font-bold">Revenir au profil précédent</button><button type="button" onClick={() => { setMobileDiscoveryIndex(0); setMobileDiscoveryHistory([]); }} className="rounded-full bg-[#ec3b78] px-5 py-3 text-sm font-bold text-white">Recommencer</button></div>
                 </section>}
                 {mobileDiscoveryProfile && (
                   <section className="mx-auto w-full max-w-[560px] lg:hidden" aria-label="Profils à découvrir">
@@ -1154,7 +1154,7 @@ export default function EspacePage() {
                       ) : (
                         <div className="absolute inset-0 flex items-center justify-center bg-[#292832] text-7xl font-black text-white/70">{mobileDiscoveryProfile.display_name.charAt(0).toUpperCase()}</div>
                       )}
-                      <div className="absolute inset-0 bg-gradient-to-b from-black/25 via-transparent to-black/85" />
+                      <div className="discovery-image-overlay absolute inset-0 bg-gradient-to-b from-black/25 via-transparent to-black/85" />
                       <div className="absolute left-4 top-4 rounded-full border border-white/45 bg-black/35 px-4 py-2 text-sm font-extrabold text-white backdrop-blur-md">
                         <MapPin size={15} className="mr-1 inline" />{mobileDiscoveryProfile.city || 'Ville non renseignée'}
                       </div>
@@ -1193,7 +1193,7 @@ export default function EspacePage() {
                     <div className="mt-3 flex items-center justify-between px-2 text-xs font-bold text-[#756960] dark:text-white/55">
                       <button type="button" onClick={goBackMobileDiscovery} disabled={mobileDiscoveryIndex === 0} className="inline-flex items-center gap-1 disabled:opacity-30"><RotateCcw size={14} /> Retour</button>
                       <span>{mobileDiscoveryIndex + 1} / {filteredDiscoveryProfiles.length}</span>
-                      <button type="button" onClick={() => setShowDiscoveryFilters(true)} className="rounded-full border border-[#dfd2c6] bg-white/80 px-3 py-1.5 dark:border-white/15 dark:bg-white/5">Modifier les filtres</button>
+                      <span className="hidden lg:inline-flex rounded-full border border-[#dfd2c6] bg-white/80 px-3 py-1.5 dark:border-white/15 dark:bg-white/5">Filtres sur ordinateur</span>
                     </div>
                   </section>
                 )}
