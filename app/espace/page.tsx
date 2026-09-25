@@ -12,6 +12,7 @@ import { AppSidebar, type EspaceTab } from '@/components/app-sidebar';
 import { Slider } from '@/components/ui/slider';
 
 type Tab = EspaceTab;
+const PROFILE_CARD_SELECT = 'id,updated_at,full_name,gender,birthdate,city,zone,bio,interests,languages,religion,caste,marital_status,smoking_habit,avatar_urls,lat,lng,is_active,is_online,last_seen_at,is_verified,is_premium,created_at,height,profession,profile_status,onboarding_completed';
 
 type PrivacyState = {
   show_age: boolean;
@@ -317,7 +318,66 @@ export default function EspacePage() {
   const [visitorsPage, setVisitorsPage] = useState(1);
   const [profileSection, setProfileSection] = useState<'profile' | 'visitors' | 'privacy' | 'security' | 'subscription' | 'help'>('profile');
   const [profilePreviewOpen, setProfilePreviewOpen] = useState(false);
+  const [isAdminAccount, setIsAdminAccount] = useState(false);
   const [discoveryVisitProfileId, setDiscoveryVisitProfileId] = useState<string | null>(null);
+  const likeRefreshVersion = useRef(0);
+
+  const refreshLikeState = useCallback(async () => {
+    if (!user) return;
+    const refreshVersion = ++likeRefreshVersion.current;
+    const [{ data: sentRows, error: sentError }, { data: receivedRows, error: receivedError }, { data: matchRows, error: matchError }] = await Promise.all([
+      supabase.from('swipes').select('swiped_id').eq('swiper_id', user.id).eq('type', 'like'),
+      supabase.from('swipes').select('swiper_id').eq('swiped_id', user.id).eq('type', 'like'),
+      supabase.from('matches').select('user_1_id,user_2_id').or(`user_1_id.eq.${user.id},user_2_id.eq.${user.id}`),
+    ]);
+    if (sentError || receivedError || matchError || refreshVersion !== likeRefreshVersion.current) return;
+    const sentIds = (sentRows ?? []).map((row: { swiped_id: string }) => row.swiped_id);
+    const receivedIds = (receivedRows ?? []).map((row: { swiper_id: string }) => row.swiper_id);
+    const sentSet = new Set(sentIds);
+    const receivedSet = new Set(receivedIds);
+    const matchIds = new Set((matchRows ?? []).map((row: { user_1_id: string; user_2_id: string }) => row.user_1_id === user.id ? row.user_2_id : row.user_1_id));
+    setDiscoveryLikedIds(sentSet);
+    const profileIds = Array.from(new Set([...sentIds, ...receivedIds]));
+    if (!profileIds.length) {
+      if (refreshVersion !== likeRefreshVersion.current) return;
+      setLikedProfiles([]);
+      setReceivedLikes([]);
+      setMatches([]);
+      return;
+    }
+    const { data: profileRows, error: profileError } = await supabase.from('profiles').select(PROFILE_CARD_SELECT).in('id', profileIds);
+    if (profileError || !profileRows || refreshVersion !== likeRefreshVersion.current) return;
+    const profiles = (profileRows as ProfileRow[]).map(toProfile);
+    setLikedProfiles(profiles.filter((item) => sentSet.has(item.id) && !receivedSet.has(item.id)));
+    setReceivedLikes(profiles.filter((item) => receivedSet.has(item.id) && !sentSet.has(item.id)));
+    setMatches(profiles.filter((item) => matchIds.has(item.id)));
+  }, [user]);
+
+  useEffect(() => {
+    if (!user) return;
+    let refreshTimer: number | undefined;
+    const scheduleRefresh = () => {
+      window.clearTimeout(refreshTimer);
+      refreshTimer = window.setTimeout(() => void refreshLikeState(), 100);
+    };
+    const channel = supabase.channel(`profile-swipes-${user.id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'swipes', filter: `swiper_id=eq.${user.id}` }, scheduleRefresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'swipes', filter: `swiped_id=eq.${user.id}` }, scheduleRefresh)
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') scheduleRefresh();
+      });
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === 'visible') scheduleRefresh();
+    };
+    window.addEventListener('focus', refreshWhenVisible);
+    document.addEventListener('visibilitychange', refreshWhenVisible);
+    return () => {
+      window.clearTimeout(refreshTimer);
+      window.removeEventListener('focus', refreshWhenVisible);
+      document.removeEventListener('visibilitychange', refreshWhenVisible);
+      void supabase.removeChannel(channel);
+    };
+  }, [user, refreshLikeState]);
 
   const loadProfileVisitors = useCallback(async () => {
     if (!user) return;
@@ -369,6 +429,18 @@ export default function EspacePage() {
   useEffect(() => {
     if (!authLoading && !user) router.push('/connexion');
   }, [authLoading, user, router]);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!user) {
+      setIsAdminAccount(false);
+      return;
+    }
+    void supabase.rpc('is_admin').then(({ data }) => {
+      if (!cancelled) setIsAdminAccount(Boolean(data));
+    });
+    return () => { cancelled = true; };
+  }, [user]);
 
   useEffect(() => {
     window.dispatchEvent(new CustomEvent('aras:app-tab', { detail: tab }));
@@ -451,19 +523,16 @@ export default function EspacePage() {
 
       const { data: discoveryData } = await supabase
         .from('profiles')
-        .select('*')
+        .select(PROFILE_CARD_SELECT)
         .eq('is_active', true)
         .order('created_at', { ascending: false });
 
       if (discoveryData) {
         const allProfiles = (discoveryData as ProfileRow[]).map(toProfile);
-        const { data: sentSwipes } = await supabase.from('swipes').select('swiped_id').eq('swiper_id', user.id).eq('type', 'like');
-        const likedIds = new Set((sentSwipes ?? []).map((swipe: { swiped_id: string }) => swipe.swiped_id));
         const currentGender = existing?.gender?.trim().toLowerCase();
         const targetGender = currentGender === 'homme' ? 'femme' : currentGender === 'femme' ? 'homme' : null;
         const candidates = allProfiles.filter((profileItem) => {
           if (profileItem.id === user.id) return false;
-          if (likedIds.has(profileItem.id)) return false;
           if (targetGender && profileItem.gender?.trim().toLowerCase() !== targetGender) return false;
           return true;
         });
@@ -476,6 +545,7 @@ export default function EspacePage() {
       } else {
         setDiscoveryProfiles([]);
       }
+      await refreshLikeState();
       setDiscoveryLoading(false);
 
       const { data: convs } = await supabase.from('matches').select('*').or(`user_1_id.eq.${user.id},user_2_id.eq.${user.id}`).order('updated_at', { ascending: false });
@@ -495,59 +565,15 @@ export default function EspacePage() {
         }
         // Charger le dernier message pour chaque conversation
         const lastMsgs: Record<string, { content: string; time: string }> = {};
-        for (const conv of mappedConversations) {
-          const { data: lastMsg } = await supabase
-            .from('messages')
-            .select('content, created_at')
-            .eq('match_id', conv.id)
-            .order('created_at', { ascending: false })
-            .limit(1)
-            .maybeSingle();
-          if (lastMsg) {
-            const time = new Date(lastMsg.created_at);
-            const timeStr = time.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
-            lastMsgs[conv.id] = { content: lastMsg.content, time: timeStr };
+        if (mappedConversations.length) {
+          const { data: lastMessageRows } = await supabase.rpc('get_latest_match_messages', { target_match_ids: mappedConversations.map((conversation) => conversation.id) });
+          for (const lastMsg of lastMessageRows ?? []) {
+            if (lastMsgs[lastMsg.match_id]) continue;
+            const timeStr = new Date(lastMsg.created_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+            lastMsgs[lastMsg.match_id] = { content: lastMsg.content, time: timeStr };
           }
         }
         setLastMessages(lastMsgs);
-      }
-      const { data: likes } = await supabase.from('swipes').select('swiped_id').eq('swiper_id', user.id).eq('type', 'like');
-      if (likes) {
-        setDiscoveryLikedIds(new Set(likes.map((l: { swiped_id: string }) => l.swiped_id)));
-      }
-      if (likes && likes.length > 0) {
-        const ids = likes.map((l: { swiped_id: string }) => l.swiped_id);
-        const { data: likedProfs } = await supabase.from('profiles').select('*').in('id', ids);
-        if (likedProfs) {
-          const profiles = (likedProfs as ProfileRow[]).map(toProfile);
-          // Filtrer pour ne garder que ceux qui n'ont PAS liké en retour
-          const receivedSwipers = new Set();
-          const { data: receivedSwipes } = await supabase.from('swipes').select('swiper_id').eq('swiped_id', user.id).eq('type', 'like');
-          if (receivedSwipes) {
-            receivedSwipes.forEach((s: { swiper_id: string }) => receivedSwipers.add(s.swiper_id));
-          }
-          setLikedProfiles(profiles.filter((p) => !receivedSwipers.has(p.id)));
-        }
-      }
-      // Charger les likes reçus (personnes qui ont liké l'utilisateur)
-      const { data: receivedLikesData } = await supabase.from('swipes').select('swiper_id').eq('swiped_id', user.id).eq('type', 'like');
-      if (receivedLikesData && receivedLikesData.length > 0) {
-        const ids = receivedLikesData.map((l: { swiper_id: string }) => l.swiper_id);
-        const { data: receivedProfs } = await supabase.from('profiles').select('*').in('id', ids);
-        if (receivedProfs) {
-          const profiles = (receivedProfs as ProfileRow[]).map(toProfile);
-          // Filtrer pour ne garder que ceux que l'utilisateur n'a PAS liké en retour
-          const sentSwipes = new Set();
-          likes?.forEach((l: { swiped_id: string }) => sentSwipes.add(l.swiped_id));
-          setReceivedLikes(profiles.filter((p) => !sentSwipes.has(p.id)));
-        }
-      }
-      // Charger les matches (likes réciproques)
-      const { data: matchesData } = await supabase.from('matches').select('*').or(`user_1_id.eq.${user.id},user_2_id.eq.${user.id}`);
-      if (matchesData && matchesData.length > 0) {
-        const partnerIds = matchesData.map((m: any) => m.user_1_id === user.id ? m.user_2_id : m.user_1_id);
-        const { data: matchProfiles } = await supabase.from('profiles').select('*').in('id', partnerIds);
-        if (matchProfiles) setMatches((matchProfiles as ProfileRow[]).map(toProfile));
       }
       // Charger les comptes de messages non lus
       const { data: unreadData } = await supabase
@@ -568,7 +594,7 @@ export default function EspacePage() {
       }
       await loadMemberEvents();
     })();
-  }, [user, loadMemberEvents]);
+  }, [user, loadMemberEvents, refreshLikeState]);
 
   useEffect(() => {
     if (!user || tab !== 'decouverte' || !discoveryVisitProfileId) return;
@@ -696,11 +722,11 @@ export default function EspacePage() {
   };
 
   const toggleDiscoveryLike = async (profileId: string) => {
-    if (!user) return;
-    if (toggleBusyId === profileId) return;
+    if (!user) return false;
+    if (toggleBusyId === profileId) return false;
 
     const wasLiked = discoveryLikedIds.has(profileId);
-    if (wasLiked) return;
+    if (wasLiked) return false;
     setToggleBusyId(profileId);
 
     setDiscoveryLikedIds((prev) => {
@@ -719,8 +745,11 @@ export default function EspacePage() {
       });
       setInfoModal({ title: 'Like non enregistré', message: 'Le like n’a pas pu être enregistré. Merci de réessayer.', confirmLabel: 'OK' });
       setToggleBusyId(null);
-      return;
+      return false;
     }
+
+    const likedProfile = discoveryProfiles.find((profileItem) => profileItem.id === profileId);
+    setDiscoveryProfiles((current) => current.filter((profileItem) => profileItem.id !== profileId));
 
     if (!wasLiked) {
       const { data: reciprocalSwipe } = await supabase
@@ -737,15 +766,17 @@ export default function EspacePage() {
         });
 
         if (matchId) {
-          const matchedProfile = discoveryProfiles.find((profileItem) => profileItem.id === profileId);
-          if (matchedProfile) {
-            setMatches((prev) => (prev.some((p) => p.id === matchedProfile.id) ? prev : [...prev, matchedProfile]));
+          if (likedProfile) {
+            setMatches((prev) => (prev.some((p) => p.id === likedProfile.id) ? prev : [...prev, likedProfile]));
           }
+          setLikedProfiles((current) => current.filter((item) => item.id !== profileId));
         }
       }
     }
 
+    await refreshLikeState();
     setToggleBusyId(null);
+    return true;
   };
 
   const unlikeProfile = async (profile: Profile) => {
@@ -759,6 +790,9 @@ export default function EspacePage() {
       .maybeSingle();
     setToggleBusyId(null);
     if (error || !deletedLike) {
+      // The row may already have been removed from another tab/device; reload
+      // the canonical state so the sent-likes list and discovery deck agree.
+      await refreshLikeState();
       setInfoModal({ title: 'Like non annulé', message: 'Impossible d’annuler ce like pour le moment. Réessaie dans quelques instants.', confirmLabel: 'OK' });
       return;
     }
@@ -768,8 +802,11 @@ export default function EspacePage() {
       return next;
     });
     setLikedProfiles((current) => current.filter((item) => item.id !== profile.id));
-    setDiscoveryProfiles((current) => current.some((item) => item.id === profile.id) ? current : [...current, profile]);
+    setDiscoveryProfiles((current) => [profile, ...current.filter((item) => item.id !== profile.id)]);
+    setMobileDiscoveryIndex(0);
+    setMobileDiscoveryHistory([]);
     setSelectedLikedProfile((current) => current?.id === profile.id ? null : current);
+    await refreshLikeState();
   };
 
   const handleLikeBack = async (profileId: string) => {
@@ -808,6 +845,7 @@ export default function EspacePage() {
       }
       // Retirer de la liste des likes reçus
       setReceivedLikes((prev) => prev.filter((p) => p.id !== profileId));
+      await refreshLikeState();
     }
   };
 
@@ -1033,6 +1071,7 @@ export default function EspacePage() {
 
   const discoveryCities = ['all', ...Array.from(new Set(discoveryProfiles.map((profileItem) => profileItem.city).filter(Boolean)))];
   const filteredDiscoveryProfiles = discoveryProfiles.filter((profileItem) => {
+    if (discoveryLikedIds.has(profileItem.id)) return false;
     const term = discoverySearch.trim().toLowerCase();
     const phrase = [
       profileItem.display_name,
@@ -1173,12 +1212,10 @@ export default function EspacePage() {
                         const endX = event.changedTouches[0]?.clientX;
                         discoveryTouchStartX.current = null;
                         if (startX === null || endX === undefined || Math.abs(endX - startX) < 65) return;
-                        if (endX > startX) {
-                          if (!discoveryLikedIds.has(mobileDiscoveryProfile.id)) void toggleDiscoveryLike(mobileDiscoveryProfile.id);
-                        }
-                        advanceMobileDiscovery();
+                        if (endX > startX) goBackMobileDiscovery();
+                        else advanceMobileDiscovery();
                       }}
-                      className={`relative isolate ${expandedDiscoveryProfile ? 'min-h-[min(82dvh,820px)]' : 'h-[min(68dvh,680px)] min-h-[430px]'} overflow-hidden rounded-[30px] border border-white/15 bg-[#202027] shadow-[0_22px_60px_rgba(0,0,0,.22)] touch-pan-y sm:rounded-[36px]`}
+                      className={`relative isolate ${expandedDiscoveryProfile ? 'h-[min(84dvh,820px)]' : 'h-[min(68dvh,680px)] min-h-[430px]'} overflow-hidden rounded-[30px] border border-white/15 bg-[#202027] shadow-[0_22px_60px_rgba(0,0,0,.22)] touch-pan-y sm:rounded-[36px]`}
                     >
                       {(mobileDiscoveryProfile.avatar_urls?.filter(Boolean).length ? mobileDiscoveryProfile.avatar_urls.filter(Boolean) : [mobileDiscoveryProfile.photo_url])[discoveryPhotoIndexes[mobileDiscoveryProfile.id] ?? 0] ? (
                         <img src={(mobileDiscoveryProfile.avatar_urls?.filter(Boolean).length ? mobileDiscoveryProfile.avatar_urls.filter(Boolean) : [mobileDiscoveryProfile.photo_url])[discoveryPhotoIndexes[mobileDiscoveryProfile.id] ?? 0]} alt={mobileDiscoveryProfile.display_name} className="absolute inset-0 h-full w-full object-cover" />
@@ -1190,35 +1227,29 @@ export default function EspacePage() {
                         <MapPin size={15} className="mr-1 inline" />{mobileDiscoveryProfile.city || 'Ville non renseignée'}
                       </div>
                       {(mobileDiscoveryProfile.avatar_urls?.filter(Boolean).length ?? 0) > 1 && <div className="absolute inset-x-0 top-4 flex justify-center gap-1.5">{mobileDiscoveryProfile.avatar_urls!.filter(Boolean).map((photo, index) => <button key={photo} type="button" aria-label={`Afficher la photo ${index + 1}`} onClick={() => setDiscoveryPhotoIndexes((current) => ({ ...current, [mobileDiscoveryProfile.id]: index }))} className={`h-1.5 rounded-full ${index === (discoveryPhotoIndexes[mobileDiscoveryProfile.id] ?? 0) ? 'w-7 bg-white' : 'w-1.5 bg-white/55'}`} />)}</div>}
-                      <div className="absolute inset-x-0 bottom-0 p-5 text-white sm:p-7">
+                      <div className={`absolute inset-x-0 bottom-0 text-white sm:p-7 ${expandedDiscoveryProfile ? 'max-h-[78%] overflow-y-auto overscroll-contain rounded-t-[28px] border-t border-white/15 bg-[#111116]/90 p-5 shadow-[0_-18px_50px_rgba(0,0,0,.25)] backdrop-blur-xl' : 'p-5'}`}>
                         <p className="text-xs font-extrabold uppercase tracking-[.18em] text-[#ff4b9b]">À découvrir</p>
-                        <h3 className="mt-1 font-display text-4xl leading-tight sm:text-5xl">
+                        <h3 className={`mt-1 font-display leading-tight ${expandedDiscoveryProfile ? 'text-3xl sm:text-4xl' : 'text-4xl sm:text-5xl'}`}>
                           {mobileDiscoveryProfile.display_name}{mobileDiscoveryProfile.age ? `, ${mobileDiscoveryProfile.age}` : ''}
                         </h3>
                         {mobileDiscoveryProfile.profession && <p className="mt-2 text-base font-semibold text-white/80">{mobileDiscoveryProfile.profession}</p>}
-                        {mobileDiscoveryProfile.bio && <p className={`mt-2 max-w-prose text-sm leading-6 text-white/75 ${expandedDiscoveryProfile ? '' : 'line-clamp-2'}`}>{mobileDiscoveryProfile.bio}</p>}
-                        {mobileDiscoveryProfile.interests?.length ? (
-                          <div className="mt-3 flex flex-wrap gap-2">
-                            {mobileDiscoveryProfile.interests.slice(0, 3).map((interest) => <span key={interest} className="rounded-full border border-white/35 bg-white/10 px-3 py-1.5 text-xs font-bold text-white backdrop-blur">★ {interest}</span>)}
-                          </div>
-                        ) : null}
+                        {mobileDiscoveryProfile.bio && <section className="mt-3"><h4 className="text-[10px] font-extrabold uppercase tracking-[.16em] text-white/50">À propos</h4><p className={`mt-1 max-w-prose text-sm leading-6 text-white/80 ${expandedDiscoveryProfile ? '' : 'line-clamp-2'}`}>{mobileDiscoveryProfile.bio}</p></section>}
+                        {expandedDiscoveryProfile && <div className="mt-4 space-y-4">
+                          <section><h4 className="text-[10px] font-extrabold uppercase tracking-[.16em] text-white/50">Informations</h4><div className="mt-2 grid grid-cols-2 gap-2 text-xs">
+                            {[['Ville', mobileDiscoveryProfile.city], ['Quartier', mobileDiscoveryProfile.zone], ['Profession', mobileDiscoveryProfile.profession], ['Taille', mobileDiscoveryProfile.height ? `${mobileDiscoveryProfile.height} cm` : ''], ['Religion', mobileDiscoveryProfile.religion], ['Situation', mobileDiscoveryProfile.marital_status], ['Langues', mobileDiscoveryProfile.languages?.join(', ')], ['Tabac', mobileDiscoveryProfile.smoking_habit]].filter(([, value]) => Boolean(value)).map(([label, value]) => <div key={label} className="min-w-0 rounded-xl border border-white/10 bg-white/5 p-2.5"><p className="text-[10px] font-semibold text-white/50">{label}</p><p className="mt-1 break-words font-bold text-white/90">{value}</p></div>)}
+                          </div></section>
+                          <section><h4 className="text-[10px] font-extrabold uppercase tracking-[.16em] text-white/50">Centres d&apos;intérêt</h4>{mobileDiscoveryProfile.interests?.length ? <div className="mt-2 flex flex-wrap gap-2">{mobileDiscoveryProfile.interests.map((interest) => <span key={interest} className="rounded-full border border-white/15 bg-white/5 px-3 py-1.5 text-xs font-bold">{interest}</span>)}</div> : <p className="mt-2 text-xs text-white/60">Aucun centre d&apos;intérêt renseigné.</p>}</section>
+                        </div>}
+                        {mobileDiscoveryProfile.interests?.length && !expandedDiscoveryProfile ? <div className="mt-3 flex flex-wrap gap-2">{mobileDiscoveryProfile.interests.slice(0, 3).map((interest) => <span key={interest} className="rounded-full border border-white/35 bg-white/10 px-3 py-1.5 text-xs font-bold text-white backdrop-blur">★ {interest}</span>)}</div> : null}
                         <button type="button" onClick={() => setExpandedDiscoveryProfile((expanded) => !expanded)} className="mt-3 inline-flex min-h-10 items-center gap-2 rounded-full bg-[#ec1689] px-5 py-2 text-sm font-extrabold text-white shadow-lg">
                           {expandedDiscoveryProfile ? 'Voir moins' : 'Voir plus'} <ChevronRight size={16} className={expandedDiscoveryProfile ? '-rotate-90' : 'rotate-90'} />
                         </button>
-                        {expandedDiscoveryProfile && <div className="mt-3 grid grid-cols-2 gap-2 rounded-2xl bg-black/35 p-3 text-xs text-white/85 backdrop-blur">
-                          {mobileDiscoveryProfile.zone && <p>Quartier · {mobileDiscoveryProfile.zone}</p>}
-                          {mobileDiscoveryProfile.height && <p>Taille · {mobileDiscoveryProfile.height} cm</p>}
-                          {mobileDiscoveryProfile.religion && <p>Religion · {mobileDiscoveryProfile.religion}</p>}
-                          {mobileDiscoveryProfile.marital_status && <p>Situation · {mobileDiscoveryProfile.marital_status}</p>}
-                          {mobileDiscoveryProfile.profession && <p>Profession · {mobileDiscoveryProfile.profession}</p>}
-                          {mobileDiscoveryProfile.languages?.length ? <p>Langues · {mobileDiscoveryProfile.languages.join(', ')}</p> : null}
-                        </div>}
                         <div className="mt-5 flex items-center justify-center gap-5">
                           <button type="button" onClick={advanceMobileDiscovery} aria-label="Passer ce profil" className="flex h-14 w-14 items-center justify-center rounded-full bg-black/45 text-white ring-1 ring-white/15 backdrop-blur transition active:scale-95"><X size={25} /></button>
                           <button type="button" onClick={() => handleDiscoveryMessage(mobileDiscoveryProfile)} aria-label="Envoyer un message" className="flex h-16 w-16 items-center justify-center rounded-full bg-[#292746] text-white shadow-lg transition active:scale-95"><MessageCircle size={27} /></button>
-                          <button type="button" onClick={() => { const profileId = mobileDiscoveryProfile.id; if (!discoveryLikedIds.has(profileId)) void toggleDiscoveryLike(profileId); advanceMobileDiscovery(); }} aria-label={discoveryLikedIds.has(mobileDiscoveryProfile.id) ? 'Profil aimé' : 'Aimer ce profil'} className={`flex h-14 w-14 items-center justify-center rounded-full text-white shadow-[0_10px_28px_rgba(236,22,137,.32)] transition active:scale-95 ${discoveryLikedIds.has(mobileDiscoveryProfile.id) ? 'bg-[#a20d5d]' : 'bg-[#ec1689]'}`}><Heart size={25} fill="currentColor" /></button>
+                          <button type="button" onClick={() => { if (!discoveryLikedIds.has(mobileDiscoveryProfile.id)) void toggleDiscoveryLike(mobileDiscoveryProfile.id); }} aria-label={discoveryLikedIds.has(mobileDiscoveryProfile.id) ? 'Profil aimé' : 'Aimer ce profil'} className={`flex h-14 w-14 items-center justify-center rounded-full text-white shadow-[0_10px_28px_rgba(236,22,137,.32)] transition active:scale-95 ${discoveryLikedIds.has(mobileDiscoveryProfile.id) ? 'bg-[#a20d5d]' : 'bg-[#ec1689]'}`}><Heart size={25} fill="currentColor" /></button>
                         </div>
-                        <p className="mt-3 text-center text-xs font-semibold text-white/60">Balaye pour découvrir le profil suivant</p>
+                        <p className="mt-3 text-center text-xs font-semibold text-white/60">Glissez vers la gauche pour passer, vers la droite pour revenir.</p>
                       </div>
                     </article>
                     <div className="mt-3 flex items-center justify-between px-2 text-xs font-bold text-[#756960] dark:text-white/55">
@@ -1347,7 +1378,7 @@ export default function EspacePage() {
               {profileSection === 'subscription' && <SettingsPanels tab="settings-subscription" profile={profile} privacySettings={privacySettings} setPrivacySettings={setPrivacySettings} savePrivacy={savePrivacy} privacySaved={privacySaved} securityForm={securityForm} setSecurityForm={setSecurityForm} changePassword={changePassword} securityMessage={securityMessage} securityLoading={securityLoading} showNewPw={showNewPw} setShowNewPw={setShowNewPw} onGoToProfileTab={() => setProfileSection('profile')} onChangeTab={() => {}} subscriptionPlan={subscriptionPlan} showTabs={false} />}
               {profileSection === 'help' && <SettingsPanels tab="settings-help" profile={profile} privacySettings={privacySettings} setPrivacySettings={setPrivacySettings} savePrivacy={savePrivacy} privacySaved={privacySaved} securityForm={securityForm} setSecurityForm={setSecurityForm} changePassword={changePassword} securityMessage={securityMessage} securityLoading={securityLoading} showNewPw={showNewPw} setShowNewPw={setShowNewPw} onGoToProfileTab={() => setProfileSection('profile')} onChangeTab={() => {}} subscriptionPlan={subscriptionPlan} showTabs={false} />}
               {profileSection === 'profile' && <div className="grid gap-6 lg:grid-cols-[300px_1fr]">
-              <div className="lg:col-span-2 flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-white p-4 shadow dark:bg-[#1c1b21]"><div><p className="font-bold">Votre profil public</p><p className="text-xs text-[#756960]">Consultez les informations visibles par les autres membres.</p></div><div className="flex items-center gap-2"><button type="button" onClick={() => setProfilePreviewOpen((open) => !open)} className="rounded-full bg-[#292746] px-5 py-2.5 text-xs font-extrabold text-white">{profilePreviewOpen ? 'Masquer l’aperçu' : 'Voir mon profil'}</button><Link href="/admin" className="rounded-full border border-[#dfd2c6] px-4 py-2.5 text-xs font-extrabold text-[#756960] dark:border-white/15 dark:text-white/75">Admin</Link><button type="button" onClick={async () => { await signOut(); router.push('/'); }} className="rounded-full border border-[#dfd2c6] px-4 py-2.5 text-xs font-extrabold text-[#756960] dark:border-white/15 dark:text-white/75">Déconnexion</button></div></div>
+              <div className="lg:col-span-2 flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-white p-4 shadow dark:bg-[#1c1b21]"><div><p className="font-bold">Votre profil public</p><p className="text-xs text-[#756960]">Consultez les informations visibles par les autres membres.</p></div><div className="flex items-center gap-2"><button type="button" onClick={() => setProfilePreviewOpen((open) => !open)} className="rounded-full bg-[#292746] px-5 py-2.5 text-xs font-extrabold text-white">{profilePreviewOpen ? 'Masquer l’aperçu' : 'Voir mon profil'}</button>{isAdminAccount && <Link href="/admin" className="rounded-full border border-[#dfd2c6] px-4 py-2.5 text-xs font-extrabold text-[#756960] dark:border-white/15 dark:text-white/75">Administration</Link>}<button type="button" onClick={async () => { await signOut(); router.push('/'); }} className="rounded-full border border-[#dfd2c6] px-4 py-2.5 text-xs font-extrabold text-[#756960] dark:border-white/15 dark:text-white/75">Déconnexion</button></div></div>
               {profilePreviewOpen && <section className="lg:col-span-2 overflow-hidden rounded-[26px] bg-white shadow dark:bg-[#1c1b21]"><img src={profile?.photo_url || profileForm.photo_url} alt="Votre photo de profil" className="h-64 w-full object-cover sm:h-80"/><div className="p-6"><h2 className="font-display text-3xl">{profileForm.display_name}, {profileForm.age}</h2><p className="mt-1 text-sm text-[#756960]">{profileForm.city} · {profileForm.profession}</p><p className="mt-4 whitespace-pre-line text-sm leading-6 text-[#756960]">{profileForm.bio || 'Aucune description ajoutée.'}</p><div className="mt-4 flex flex-wrap gap-2">{profileForm.interests.split(',').map((interest) => interest.trim()).filter(Boolean).map((interest) => <span key={interest} className="rounded-full bg-[#f6efe6] px-3 py-1.5 text-xs font-bold">{interest}</span>)}</div></div></section>}
               <div className="rounded-[26px] bg-white p-6 text-center shadow-[0_8px_30px_rgba(83,46,32,.05)]">
                 <div className="relative mx-auto h-32 w-32 overflow-hidden rounded-full border-4 border-[#f3e9dc]">
