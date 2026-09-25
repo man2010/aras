@@ -304,6 +304,7 @@ export default function EspacePage() {
   const [registeredEventIds, setRegisteredEventIds] = useState<Set<string>>(new Set());
   const [eventRegistrationStatuses, setEventRegistrationStatuses] = useState<Record<string, string>>({});
   const [eventRegistrationBusy, setEventRegistrationBusy] = useState<string | null>(null);
+  const [eventActionEventId, setEventActionEventId] = useState<string | null>(null);
   const [eventToCancel, setEventToCancel] = useState<{ id: string; title: string } | null>(null);
   const [eventActionMessage, setEventActionMessage] = useState('');
   const [uploadingImage, setUploadingImage] = useState(false);
@@ -873,9 +874,10 @@ export default function EspacePage() {
   const registerForEvent = async (eventId: string) => {
     if (!user || registeredEventIds.has(eventId)) return;
     setEventActionMessage('');
+    setEventActionEventId(eventId);
     setEventRegistrationBusy(eventId);
     let data: any = null;
-    let error: { message: string } | null = null;
+    let error: { message: string; code?: string; details?: string; hint?: string } | null = null;
     try {
       const result = await supabase.rpc('register_for_event', { target_event_id: eventId });
       data = result.data;
@@ -887,6 +889,8 @@ export default function EspacePage() {
     }
     if (error) {
       const reason = error.message.toLowerCase();
+      const errorCode = error.code?.toUpperCase() ?? '';
+      console.error('[events] registration RPC failed', { code: error.code, message: error.message, details: error.details, hint: error.hint });
       setEventActionMessage(
         reason.includes('event_full')
           ? 'Désolé, toutes les places viennent d’être prises. Cet événement est complet.'
@@ -894,10 +898,17 @@ export default function EspacePage() {
             ? 'Cet événement n’accepte plus de participations.'
             : reason.includes('auth_required')
               ? 'Ta session a expiré. Reconnecte-toi avant de participer.'
-              : reason.includes('register_for_event') && (reason.includes('schema cache') || reason.includes('does not exist') || reason.includes('could not find'))
-                ? 'Le service d’inscription est momentanément indisponible. Réessaie plus tard ou contacte contact@aras.sn.'
-                : 'Inscription impossible pour le moment. Vérifie ta connexion puis réessaie.'
+              : errorCode === 'PGRST202' || reason.includes('register_for_event') && (reason.includes('schema cache') || reason.includes('does not exist') || reason.includes('could not find'))
+                ? 'Le service d’inscription n’est pas publié par la base. La migration des inscriptions doit être appliquée puis le schéma Supabase rechargé.'
+              : errorCode === '42501' || reason.includes('permission denied') || reason.includes('not allowed')
+                ? 'La base refuse cette inscription (permission manquante). La configuration des droits Supabase doit être corrigée.'
+                : errorCode === '42703'
+                  ? `Le schéma Supabase est incomplet pour l’inscription. Détail PostgreSQL : ${error.message.slice(0, 180)}`
+                : errorCode === '23505'
+                    ? 'Cette inscription existe déjà. Actualisation de ton statut…'
+                    : `Inscription refusée par le service (${errorCode || 'erreur réseau'}). Réessaie; si le problème persiste, transmets ce code au support ARAS.`
       );
+      if (errorCode === '23505') await loadMemberEvents();
       return;
     }
     const result = Array.isArray(data) ? data[0] : data;
@@ -952,6 +963,7 @@ export default function EspacePage() {
     const event = events.find((item) => item.id === eventId);
     if (!event || event.price_fcfa !== 0) return;
     setEventRegistrationBusy(eventId);
+    setEventActionEventId(eventId);
     setEventActionMessage('');
     const { data, error } = await supabase.rpc('cancel_free_event_registration', { target_event_id: eventId });
     setEventRegistrationBusy(null);
@@ -1870,6 +1882,7 @@ export default function EspacePage() {
                             <div className="flex items-center gap-2"><MapPin size={14} className="shrink-0 text-[#d89b52]" /> {e.location}{e.city ? ` · ${e.city}` : ''}</div>
                             <div className="flex items-center gap-2"><Users size={14} className="shrink-0 text-[#d89b52]" /> {e.capacity} places restantes</div>
                           </div>
+                          {eventActionEventId === e.id && eventActionMessage && <p role="status" className="mt-4 rounded-xl border border-[#eadfd5] bg-[#fbf8f2] px-3 py-2.5 text-xs font-semibold leading-5 text-[#625852] dark:border-white/10 dark:bg-black/20 dark:text-white/80">{eventActionMessage}</p>}
                           <div className="mt-auto flex flex-wrap items-center justify-between gap-3 border-t border-[#eadfd5] pt-5 dark:border-white/10">
                             <span className="text-sm font-extrabold text-[#241c18] dark:text-white">{e.price_fcfa === 0 ? 'Gratuit' : `${new Intl.NumberFormat('fr-FR').format(e.price_fcfa)} FCFA`}</span>
                             {registered && e.price_fcfa === 0 && status === 'confirmed' ? (

@@ -23,6 +23,26 @@ CREATE UNIQUE INDEX IF NOT EXISTS event_registrations_user_event_unique
   ON public.event_registrations (user_id, event_id);
 
 ALTER TABLE public.event_registrations
+  ADD COLUMN IF NOT EXISTS created_at timestamptz NOT NULL DEFAULT now();
+ALTER TABLE public.event_registrations
+  ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT now();
+
+CREATE OR REPLACE FUNCTION public.set_event_registrations_updated_at()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  NEW.updated_at = now();
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS event_registrations_set_updated_at ON public.event_registrations;
+CREATE TRIGGER event_registrations_set_updated_at
+  BEFORE UPDATE ON public.event_registrations
+  FOR EACH ROW EXECUTE FUNCTION public.set_event_registrations_updated_at();
+
+ALTER TABLE public.event_registrations
   ADD COLUMN IF NOT EXISTS status text NOT NULL DEFAULT 'confirmed';
 
 ALTER TABLE public.event_registrations
