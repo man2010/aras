@@ -27,6 +27,8 @@ export type Profile = {
   caste?: string | null;
   marital_status?: string | null;
   smoking_habit?: string | null;
+  lat?: number | null;
+  lng?: number | null;
 };
 
 export type EventItem = {

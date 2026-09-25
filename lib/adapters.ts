@@ -129,6 +129,8 @@ export function toProfile(row: ProfileRow): Profile {
     caste: row.caste,
     marital_status: row.marital_status,
     smoking_habit: row.smoking_habit,
+    lat: row.lat,
+    lng: row.lng,
   };
 }
 

@@ -3,12 +3,13 @@
 import { Dispatch, FormEvent, SetStateAction, useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { User, MessageCircle, Heart, CalendarDays, ArrowRight, ArrowLeft, ShieldCheck, Send, Plus, Check, Upload, X, CheckCheck, Search, MapPin, Users, Eye, EyeOff, ChevronRight, Flag, RotateCcw } from 'lucide-react';
+import { User, MessageCircle, Heart, CalendarDays, ArrowRight, ArrowLeft, ShieldCheck, Send, Plus, Check, Upload, X, CheckCheck, Search, MapPin, Users, Eye, EyeOff, ChevronRight, Flag, RotateCcw, Volume2 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
 import type { Profile, Conversation, Message, Story } from '@/lib/types';
 import { toConversation, toEvent, toMessage, toProfile, toStory, type EventRow, type MatchRow, type MessageRow, type ProfileRow, type StoryRow } from '@/lib/adapters';
 import { AppSidebar, type EspaceTab } from '@/components/app-sidebar';
+import { Slider } from '@/components/ui/slider';
 
 type Tab = EspaceTab;
 
@@ -244,7 +245,7 @@ function SettingsPanels({
 }
 
 export default function EspacePage() {
-  const { user, loading: authLoading, setUnreadCount } = useAuth();
+  const { user, loading: authLoading, setUnreadCount, signOut } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
   const [tab, setTab] = useState<Tab>('decouverte');
@@ -254,7 +255,17 @@ export default function EspacePage() {
   const [discoveryLikedIds, setDiscoveryLikedIds] = useState<Set<string>>(new Set());
   const [discoverySearch, setDiscoverySearch] = useState('');
   const [discoveryCityFilter, setDiscoveryCityFilter] = useState('all');
-  const [showDiscoveryFilters, setShowDiscoveryFilters] = useState(true);
+  const [showDiscoveryFilters, setShowDiscoveryFilters] = useState(false);
+  const [filterAgeMin, setFilterAgeMin] = useState(18);
+  const [filterAgeMax, setFilterAgeMax] = useState(100);
+  const [filterDistance, setFilterDistance] = useState(100000);
+  const [filterHeightMin, setFilterHeightMin] = useState(140);
+  const [filterHeightMax, setFilterHeightMax] = useState(220);
+  const [filterProfession, setFilterProfession] = useState('');
+  const [filterReligion, setFilterReligion] = useState('');
+  const [filterPreference, setFilterPreference] = useState('');
+  const [filterSituation, setFilterSituation] = useState('');
+  const [filterInterests, setFilterInterests] = useState('');
   const [discoveryPage, setDiscoveryPage] = useState(1);
   const [mobileDiscoveryIndex, setMobileDiscoveryIndex] = useState(0);
   const [mobileDiscoveryHistory, setMobileDiscoveryHistory] = useState<number[]>([]);
@@ -358,6 +369,39 @@ export default function EspacePage() {
   useEffect(() => {
     if (!authLoading && !user) router.push('/connexion');
   }, [authLoading, user, router]);
+
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent('aras:app-tab', { detail: tab }));
+    if (tab !== 'decouverte') setShowDiscoveryFilters(false);
+  }, [tab]);
+
+  useEffect(() => {
+    const openFilters = () => {
+      if (tab === 'decouverte') setShowDiscoveryFilters(true);
+    };
+    window.addEventListener('aras:open-discovery-filters', openFilters);
+    return () => window.removeEventListener('aras:open-discovery-filters', openFilters);
+  }, [tab]);
+
+  useEffect(() => {
+    setMobileDiscoveryIndex(0);
+    setMobileDiscoveryHistory([]);
+    setDiscoveryPage(1);
+  }, [discoverySearch, discoveryCityFilter, filterAgeMin, filterAgeMax, filterDistance, filterHeightMin, filterHeightMax, filterProfession, filterReligion, filterPreference, filterSituation, filterInterests]);
+
+  useEffect(() => {
+    if (!showDiscoveryFilters) return;
+    const previousOverflow = document.body.style.overflow;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setShowDiscoveryFilters(false);
+    };
+    document.body.style.overflow = 'hidden';
+    window.addEventListener('keydown', closeOnEscape);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener('keydown', closeOnEscape);
+    };
+  }, [showDiscoveryFilters]);
 
   useEffect(() => {
     // Handle URL parameters for tab and conversation
@@ -707,12 +751,14 @@ export default function EspacePage() {
   const unlikeProfile = async (profile: Profile) => {
     if (!user || toggleBusyId === profile.id) return;
     setToggleBusyId(profile.id);
-    const { error } = await supabase.from('swipes').delete()
+    const { data: deletedLike, error } = await supabase.from('swipes').delete()
       .eq('swiper_id', user.id)
       .eq('swiped_id', profile.id)
-      .eq('type', 'like');
+      .eq('type', 'like')
+      .select('id')
+      .maybeSingle();
     setToggleBusyId(null);
-    if (error) {
+    if (error || !deletedLike) {
       setInfoModal({ title: 'Like non annulé', message: 'Impossible d’annuler ce like pour le moment. Réessaie dans quelques instants.', confirmLabel: 'OK' });
       return;
     }
@@ -1000,8 +1046,24 @@ export default function EspacePage() {
 
     const matchesSearch = !term || phrase.includes(term);
     const matchesCity = discoveryCityFilter === 'all' || profileItem.city === discoveryCityFilter;
+    const matchesAge = profileItem.age >= filterAgeMin && profileItem.age <= filterAgeMax;
+    const matchesProfession = !filterProfession.trim() || profileItem.profession.toLocaleLowerCase('fr').includes(filterProfession.trim().toLocaleLowerCase('fr'));
+    const matchesHeight = profileItem.height == null || (profileItem.height >= filterHeightMin && profileItem.height <= filterHeightMax);
+    const matchesReligion = !filterReligion.trim() || (profileItem.religion ?? '').toLocaleLowerCase('fr').includes(filterReligion.trim().toLocaleLowerCase('fr'));
+    const matchesPreference = !filterPreference.trim() || (profileItem.caste ?? '').toLocaleLowerCase('fr').includes(filterPreference.trim().toLocaleLowerCase('fr'));
+    const matchesSituation = !filterSituation || profileItem.marital_status === filterSituation;
+    const wantedInterests = filterInterests.split(',').map((interest) => interest.trim().toLocaleLowerCase('fr')).filter(Boolean);
+    const matchesInterests = wantedInterests.length === 0 || wantedInterests.some((interest) => (profileItem.interests ?? []).some((value) => value.toLocaleLowerCase('fr').includes(interest)));
+    let matchesDistance = true;
+    if (filterDistance < 100000 && profile?.lat != null && profile?.lng != null && profileItem.lat != null && profileItem.lng != null) {
+      const radians = (value: number) => value * Math.PI / 180;
+      const dLat = radians(profileItem.lat - profile.lat);
+      const dLng = radians(profileItem.lng - profile.lng);
+      const a = Math.sin(dLat / 2) ** 2 + Math.cos(radians(profile.lat)) * Math.cos(radians(profileItem.lat)) * Math.sin(dLng / 2) ** 2;
+      matchesDistance = 6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)) <= filterDistance;
+    }
 
-    return matchesSearch && matchesCity;
+    return matchesSearch && matchesCity && matchesAge && matchesProfession && matchesHeight && matchesReligion && matchesPreference && matchesSituation && matchesInterests && matchesDistance;
   });
   const mobileDiscoveryProfile = filteredDiscoveryProfiles[mobileDiscoveryIndex];
   const advanceMobileDiscovery = () => {
@@ -1047,61 +1109,30 @@ export default function EspacePage() {
           {/* DISCOVERY TAB */}
           {tab === 'decouverte' && (
             <div className="space-y-6">
-              <div className="relative overflow-hidden rounded-[22px] border border-white/80 bg-[linear-gradient(125deg,#fffdfa_0%,#fff7f2_58%,#f9e9ee_100%)] p-3 shadow-[0_12px_35px_rgba(83,46,32,.08)] sm:rounded-[32px] sm:p-8 sm:shadow-[0_18px_55px_rgba(83,46,32,.08)] dark:border-white/10 dark:bg-[linear-gradient(125deg,#201a20_0%,#19171c_58%,#261821_100%)]">
-                <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="hidden h-12 w-12 items-center justify-center rounded-2xl bg-[#fbe8ec] text-[#ec3b78] sm:flex">
-                      <Search size={20} />
-                    </div>
-                    <div>
-                      <p className="hidden text-[11px] font-extrabold uppercase tracking-[.18em] text-[#ec3b78] sm:block">Découverte</p>
-                      <h2 className="max-w-2xl font-display text-xl leading-tight text-[#24171b] sm:text-3xl lg:text-4xl dark:text-white">Découvrir</h2>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-2 self-start xl:self-auto">
-                    <span className="rounded-full border border-[#efdae0] bg-white/80 px-3 py-1.5 text-xs font-extrabold text-[#756960] shadow-sm dark:border-white/10 dark:bg-white/5 dark:text-white/75">
-                      {filteredDiscoveryProfiles.length} profils
-                    </span>
-                    <button
-                      onClick={() => setShowDiscoveryFilters((value) => !value)}
-                      className="hidden rounded-full border border-[#dfd2c6] bg-white/75 px-3 py-2 text-[11px] font-extrabold text-[#625852] transition hover:border-[#ec3b78] hover:text-[#c92e63] sm:px-4 sm:text-xs dark:border-white/15 dark:bg-white/5 dark:text-white/75 lg:inline-flex"
-                    >
-                      {showDiscoveryFilters ? 'Masquer les filtres' : 'Afficher les filtres'}
-                    </button>
-                  </div>
-                </div>
-
+              <div className="contents">
                 {showDiscoveryFilters && (
-                  <div className="mt-5 hidden space-y-4 border-t border-[#f3e9dc] pt-5 lg:block">
-                    <div className="relative">
-                      <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-[#9a8b82]" />
-                      <input
-                        value={discoverySearch}
-                        onChange={(event) => { setDiscoverySearch(event.target.value); setMobileDiscoveryIndex(0); setMobileDiscoveryHistory([]); }}
-                        placeholder="Rechercher par nom, ville, profession, intérêt…"
-                        className="w-full rounded-2xl border border-[#e7d9ce] bg-white/80 py-3.5 pl-11 pr-4 text-sm outline-none transition placeholder:text-[#aa9c93] focus:border-[#ec3b78] focus:bg-white dark:border-white/10 dark:bg-black/20 dark:text-white dark:placeholder:text-white/40 dark:focus:bg-black/30"
-                      />
+                  <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/65 p-3 backdrop-blur-sm sm:p-6" onClick={() => setShowDiscoveryFilters(false)}>
+                    <section role="dialog" aria-modal="true" aria-labelledby="discovery-filter-title" onClick={(event) => event.stopPropagation()} className="max-h-[calc(100dvh-1rem)] min-w-0 w-full max-w-4xl overscroll-contain overflow-y-auto rounded-[26px] border border-[#eadfd5] bg-[#fffdfa] shadow-[0_24px_90px_rgba(0,0,0,.35)] sm:max-h-[min(92dvh,860px)] dark:border-white/10 dark:bg-[#1c1b21]">
+                    <div className="sticky top-0 z-10 flex items-center justify-between border-b border-[#f3e9dc] bg-[#fffdfa]/95 px-4 py-4 backdrop-blur dark:border-white/10 dark:bg-[#1c1b21]/95 sm:px-6">
+                      <div><p className="text-[10px] font-extrabold uppercase tracking-[.18em] text-[#ec3b78]">Découverte</p><h2 id="discovery-filter-title" className="mt-1 font-display text-2xl text-[#241c18] dark:text-white">Filtres de recherche</h2></div>
+                      <button type="button" aria-label="Fermer les filtres" onClick={() => setShowDiscoveryFilters(false)} className="rounded-full border border-[#dfd2c6] p-2 text-[#625852] dark:border-white/15 dark:text-white"><X size={20} /></button>
                     </div>
-
-                    <div>
-                      <p className="mb-2 text-xs font-extrabold uppercase tracking-[.18em] text-[#756960]">Ville</p>
-                      <div className="flex flex-wrap gap-2">
-                        {discoveryCities.map((city) => (
-                          <button
-                            key={city}
-                            onClick={() => { setDiscoveryCityFilter(city); setMobileDiscoveryIndex(0); setMobileDiscoveryHistory([]); }}
-                            className={`rounded-full px-4 py-2 text-xs font-extrabold transition ${
-                              discoveryCityFilter === city
-                                ? 'bg-[#ec3b78] text-white'
-                                : 'bg-white/75 text-[#756960] hover:bg-[#f3e9dc] dark:bg-white/5 dark:text-white/65 dark:hover:bg-white/10'
-                            }`}
-                          >
-                            {city === 'all' ? 'Toutes les villes' : city}
-                          </button>
-                        ))}
-                      </div>
+                    <div className="space-y-4 p-4 sm:p-6">
+                    <div className="relative"><Search size={17} className="absolute left-4 top-1/2 -translate-y-1/2 text-[#9a8b82]" /><input value={discoverySearch} onChange={(event) => { setDiscoverySearch(event.target.value); setMobileDiscoveryIndex(0); setMobileDiscoveryHistory([]); }} placeholder="Nom, ville, profession ou intérêt…" className="w-full rounded-2xl border border-[#e7d9ce] bg-white/80 py-3 pl-11 pr-4 text-sm outline-none focus:border-[#ec3b78] dark:border-white/10 dark:bg-black/20 dark:text-white" /></div>
+                    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                      <div className="min-w-0 rounded-2xl border border-[#e7d9ce] bg-white/65 p-3 text-xs font-bold dark:border-white/10 dark:bg-black/15"><span className="mb-3 flex items-center gap-2"><Volume2 size={15} className="shrink-0 text-[#ec3b78]" />Âge · {filterAgeMin}–{filterAgeMax} ans</span><Slider aria-label="Tranche d’âge" min={18} max={100} step={1} minStepsBetweenThumbs={1} value={[filterAgeMin, filterAgeMax]} onValueChange={([minimum, maximum]) => { setFilterAgeMin(minimum); setFilterAgeMax(maximum); }} className="px-2" /></div>
+                      <div className="min-w-0 rounded-2xl border border-[#e7d9ce] bg-white/65 p-3 text-xs font-bold dark:border-white/10 dark:bg-black/15"><span className="mb-3 block">Distance maximale · {filterDistance.toLocaleString('fr-FR')} km</span><Slider aria-label="Distance maximale" min={0} max={100000} step={100} value={[filterDistance]} onValueChange={([distance]) => setFilterDistance(distance)} className="px-2" /></div>
+                      <div className="min-w-0 rounded-2xl border border-[#e7d9ce] bg-white/65 p-3 text-xs font-bold dark:border-white/10 dark:bg-black/15"><span className="mb-3 block">Taille · {filterHeightMin}–{filterHeightMax} cm</span><Slider aria-label="Taille minimale et maximale" min={140} max={220} step={1} minStepsBetweenThumbs={1} value={[filterHeightMin, filterHeightMax]} onValueChange={([minimum, maximum]) => { setFilterHeightMin(minimum); setFilterHeightMax(maximum); }} className="px-2" /></div>
+                      <label className="text-xs font-bold">Profession<input value={filterProfession} onChange={(event) => setFilterProfession(event.target.value)} placeholder="Toutes" className="mt-1.5 w-full rounded-xl border border-[#e7d9ce] bg-white px-3 py-2.5 text-sm outline-none focus:border-[#ec3b78] dark:border-white/10 dark:bg-black/20 dark:text-white" /></label>
+                      <label className="text-xs font-bold">Ville<select value={discoveryCityFilter} onChange={(event) => setDiscoveryCityFilter(event.target.value)} className="mt-1.5 w-full rounded-xl border border-[#e7d9ce] bg-white px-3 py-2.5 text-sm outline-none dark:border-white/10 dark:bg-[#201a20] dark:text-white">{discoveryCities.map((city) => <option key={city} value={city}>{city === 'all' ? 'Toutes les villes' : city}</option>)}</select></label>
+                      <label className="text-xs font-bold">Religion<input value={filterReligion} onChange={(event) => setFilterReligion(event.target.value)} placeholder="Toutes" className="mt-1.5 w-full rounded-xl border border-[#e7d9ce] bg-white px-3 py-2.5 text-sm outline-none focus:border-[#ec3b78] dark:border-white/10 dark:bg-black/20 dark:text-white" /></label>
+                      <label className="text-xs font-bold">Préférence<input value={filterPreference} onChange={(event) => setFilterPreference(event.target.value)} placeholder="Toutes" className="mt-1.5 w-full rounded-xl border border-[#e7d9ce] bg-white px-3 py-2.5 text-sm outline-none focus:border-[#ec3b78] dark:border-white/10 dark:bg-black/20 dark:text-white" /></label>
+                      <label className="text-xs font-bold">Situation<select value={filterSituation} onChange={(event) => setFilterSituation(event.target.value)} className="mt-1.5 w-full rounded-xl border border-[#e7d9ce] bg-white px-3 py-2.5 text-sm outline-none dark:border-white/10 dark:bg-[#201a20] dark:text-white"><option value="">Toutes</option><option value="single">Célibataire</option><option value="married">Marié(e)</option><option value="divorced">Divorcé(e)</option><option value="widowed">Veuf/Veuve</option></select></label>
+                      <label className="text-xs font-bold">Centres d&apos;intérêt<input value={filterInterests} onChange={(event) => setFilterInterests(event.target.value)} placeholder="Musique, voyage…" className="mt-1.5 w-full rounded-xl border border-[#e7d9ce] bg-white px-3 py-2.5 text-sm outline-none focus:border-[#ec3b78] dark:border-white/10 dark:bg-black/20 dark:text-white" /></label>
                     </div>
+                    <div className="sticky bottom-0 flex flex-col-reverse justify-between gap-3 border-t border-[#f3e9dc] bg-[#fffdfa]/95 pt-4 dark:border-white/10 dark:bg-[#1c1b21]/95 sm:flex-row"><button type="button" onClick={() => { setDiscoverySearch(''); setDiscoveryCityFilter('all'); setFilterAgeMin(18); setFilterAgeMax(100); setFilterDistance(100000); setFilterHeightMin(140); setFilterHeightMax(220); setFilterProfession(''); setFilterReligion(''); setFilterPreference(''); setFilterSituation(''); setFilterInterests(''); setMobileDiscoveryIndex(0); setMobileDiscoveryHistory([]); }} className="inline-flex items-center justify-center gap-2 rounded-full border border-[#dfd2c6] px-4 py-3 text-xs font-extrabold text-[#625852] dark:border-white/15 dark:text-white/75"><RotateCcw size={14} />Réinitialiser</button><button type="button" onClick={() => setShowDiscoveryFilters(false)} className="rounded-full bg-[#ec3b78] px-6 py-3 text-xs font-extrabold text-white">Valider les filtres</button></div>
+                    </div>
+                    </section>
                   </div>
                 )}
               </div>
@@ -1316,7 +1347,7 @@ export default function EspacePage() {
               {profileSection === 'subscription' && <SettingsPanels tab="settings-subscription" profile={profile} privacySettings={privacySettings} setPrivacySettings={setPrivacySettings} savePrivacy={savePrivacy} privacySaved={privacySaved} securityForm={securityForm} setSecurityForm={setSecurityForm} changePassword={changePassword} securityMessage={securityMessage} securityLoading={securityLoading} showNewPw={showNewPw} setShowNewPw={setShowNewPw} onGoToProfileTab={() => setProfileSection('profile')} onChangeTab={() => {}} subscriptionPlan={subscriptionPlan} showTabs={false} />}
               {profileSection === 'help' && <SettingsPanels tab="settings-help" profile={profile} privacySettings={privacySettings} setPrivacySettings={setPrivacySettings} savePrivacy={savePrivacy} privacySaved={privacySaved} securityForm={securityForm} setSecurityForm={setSecurityForm} changePassword={changePassword} securityMessage={securityMessage} securityLoading={securityLoading} showNewPw={showNewPw} setShowNewPw={setShowNewPw} onGoToProfileTab={() => setProfileSection('profile')} onChangeTab={() => {}} subscriptionPlan={subscriptionPlan} showTabs={false} />}
               {profileSection === 'profile' && <div className="grid gap-6 lg:grid-cols-[300px_1fr]">
-              <div className="lg:col-span-2 flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-white p-4 shadow dark:bg-[#1c1b21]"><div><p className="font-bold">Votre profil public</p><p className="text-xs text-[#756960]">Consultez les informations visibles par les autres membres.</p></div><button type="button" onClick={() => setProfilePreviewOpen((open) => !open)} className="rounded-full bg-[#292746] px-5 py-2.5 text-xs font-extrabold text-white">{profilePreviewOpen ? 'Masquer l’aperçu' : 'Voir mon profil'}</button></div>
+              <div className="lg:col-span-2 flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-white p-4 shadow dark:bg-[#1c1b21]"><div><p className="font-bold">Votre profil public</p><p className="text-xs text-[#756960]">Consultez les informations visibles par les autres membres.</p></div><div className="flex items-center gap-2"><button type="button" onClick={() => setProfilePreviewOpen((open) => !open)} className="rounded-full bg-[#292746] px-5 py-2.5 text-xs font-extrabold text-white">{profilePreviewOpen ? 'Masquer l’aperçu' : 'Voir mon profil'}</button><Link href="/admin" className="rounded-full border border-[#dfd2c6] px-4 py-2.5 text-xs font-extrabold text-[#756960] dark:border-white/15 dark:text-white/75">Admin</Link><button type="button" onClick={async () => { await signOut(); router.push('/'); }} className="rounded-full border border-[#dfd2c6] px-4 py-2.5 text-xs font-extrabold text-[#756960] dark:border-white/15 dark:text-white/75">Déconnexion</button></div></div>
               {profilePreviewOpen && <section className="lg:col-span-2 overflow-hidden rounded-[26px] bg-white shadow dark:bg-[#1c1b21]"><img src={profile?.photo_url || profileForm.photo_url} alt="Votre photo de profil" className="h-64 w-full object-cover sm:h-80"/><div className="p-6"><h2 className="font-display text-3xl">{profileForm.display_name}, {profileForm.age}</h2><p className="mt-1 text-sm text-[#756960]">{profileForm.city} · {profileForm.profession}</p><p className="mt-4 whitespace-pre-line text-sm leading-6 text-[#756960]">{profileForm.bio || 'Aucune description ajoutée.'}</p><div className="mt-4 flex flex-wrap gap-2">{profileForm.interests.split(',').map((interest) => interest.trim()).filter(Boolean).map((interest) => <span key={interest} className="rounded-full bg-[#f6efe6] px-3 py-1.5 text-xs font-bold">{interest}</span>)}</div></div></section>}
               <div className="rounded-[26px] bg-white p-6 text-center shadow-[0_8px_30px_rgba(83,46,32,.05)]">
                 <div className="relative mx-auto h-32 w-32 overflow-hidden rounded-full border-4 border-[#f3e9dc]">
@@ -1657,7 +1688,6 @@ export default function EspacePage() {
                             onClick={() => void unlikeProfile(p)}
                             disabled={toggleBusyId === p.id}
                             aria-label={`Retirer le like de ${p.display_name}`}
-                            title="Retirer ce like"
                             className="group flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#fce6ee] text-[#ec3b78] transition hover:scale-105 hover:bg-[#ec3b78] hover:text-white disabled:cursor-wait disabled:opacity-50 dark:bg-[#3a1e2a]"
                           >
                             {toggleBusyId === p.id ? <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" /> : <Heart size={17} fill="currentColor" className="transition group-hover:scale-90" />}

@@ -30,6 +30,14 @@ CREATE POLICY "Members can view visitors of their profile"
 
 GRANT SELECT, INSERT, UPDATE ON public.profile_visits TO authenticated;
 
+-- Members may remove only likes they sent; without this policy PostgREST can
+-- return an empty successful DELETE and the like reappears after a refresh.
+DROP POLICY IF EXISTS "Users can delete own swipes" ON public.swipes;
+CREATE POLICY "Users can delete own swipes"
+  ON public.swipes FOR DELETE TO authenticated
+  USING (auth.uid() = swiper_id);
+GRANT DELETE ON public.swipes TO authenticated;
+
 ALTER TABLE public.user_notifications
   ADD COLUMN IF NOT EXISTS actor_id uuid REFERENCES public.profiles(id) ON DELETE SET NULL;
 

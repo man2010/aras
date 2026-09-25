@@ -2,9 +2,9 @@
 
 import Link from 'next/link';
 import Image from 'next/image';
-import { useRouter } from 'next/navigation';
-import { useEffect, useRef, useState } from 'react';
-import { Menu, X, Heart, LogOut, LayoutDashboard, Bell, Moon, Sun, MessageCircle, CalendarDays, ChevronRight, Settings, User } from 'lucide-react';
+import { usePathname, useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
+import { Menu, X, Heart, LogOut, LayoutDashboard, Bell, Moon, Sun, MessageCircle, CalendarDays, ChevronRight, Settings, User, SlidersHorizontal } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
@@ -38,10 +38,10 @@ export function Navbar() {
   const [notifications, setNotifications] = useState<NotificationPreview[]>([]);
   const [unreadEventCount, setUnreadEventCount] = useState(0);
   const [miniProfile, setMiniProfile] = useState<MiniProfile | null>(null);
-  const [profileMenuOpen, setProfileMenuOpen] = useState(false);
-  const profileMenuRef = useRef<HTMLDivElement | null>(null);
+  const [appTab, setAppTab] = useState('');
   const { user, signOut, unreadCount, setUnreadCount } = useAuth();
   const router = useRouter();
+  const pathname = usePathname();
   const { resolvedTheme, setTheme } = useTheme();
   const isConnected = Boolean(user);
   // Le thème sauvegardé n'existe que dans le navigateur : conserver le rendu
@@ -51,6 +51,13 @@ export function Navbar() {
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  useEffect(() => {
+    const onAppTab = (event: Event) => setAppTab((event as CustomEvent<string>).detail ?? '');
+    window.addEventListener('aras:app-tab', onAppTab);
+    setAppTab(pathname === '/espace' ? (new URLSearchParams(window.location.search).get('tab') || 'decouverte') : '');
+    return () => window.removeEventListener('aras:app-tab', onAppTab);
+  }, [pathname]);
 
   useEffect(() => {
     let cancelled = false;
@@ -108,16 +115,6 @@ export function Navbar() {
   }, [user]);
 
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (profileMenuRef.current && !profileMenuRef.current.contains(event.target as Node)) {
-        setProfileMenuOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
-  useEffect(() => {
     if (!user) {
       setNotifications([]);
       setUnreadEventCount(0);
@@ -127,7 +124,7 @@ export function Navbar() {
     let cancelled = false;
     const readEventsKey = `aras-read-events-${user.id}`;
     const loadNotifications = async () => {
-      const [{ data: messageRows }, { data: eventRows }, { data: registrations }, { data: storedNotifications }, { data: receivedLikes }] = await Promise.all([
+      const [{ data: messageRows }, { data: eventRows }, { data: registrations }, { data: storedNotifications }] = await Promise.all([
         supabase
           .from('messages')
           .select('id, sender_id, content, created_at, match_id')
@@ -145,7 +142,6 @@ export function Navbar() {
           .limit(5),
         supabase.from('event_registrations').select('event_id').eq('user_id', user.id).eq('status', 'confirmed'),
         supabase.from('user_notifications').select('id, title, body, created_at, read_at, kind, actor_id').eq('user_id', user.id).is('read_at', null).order('created_at', { ascending: false }).limit(20),
-        supabase.from('swipes').select('id, swiper_id, created_at').eq('swiped_id', user.id).eq('type', 'like').order('created_at', { ascending: false }).limit(20),
       ]);
 
       const reminderFrom = new Date().toISOString();
@@ -163,11 +159,9 @@ export function Navbar() {
         row.id,
         { name: row.full_name || 'Nouveau message', avatarUrl: row.avatar_urls?.[0] },
       ]));
-      const likedBackRows = receivedLikes?.length ? await supabase.from('swipes').select('swiped_id').eq('swiper_id', user.id).in('swiped_id', receivedLikes.map((row: { swiper_id: string }) => row.swiper_id)).eq('type', 'like') : { data: [] };
-      const mutualIds = new Set((likedBackRows.data ?? []).map((row: { swiped_id: string }) => row.swiped_id));
-      const likeSenderIds = (receivedLikes ?? []).map((row: { swiper_id: string }) => row.swiper_id).filter((id: string) => !mutualIds.has(id));
-      const { data: likeSenders } = likeSenderIds.length ? await supabase.from('profiles').select('id, full_name, avatar_urls').in('id', likeSenderIds) : { data: [] };
-      const likeSenderMap = new Map((likeSenders ?? []).map((row: { id: string; full_name: string | null; avatar_urls: string[] | null }) => [row.id, { name: row.full_name || 'Nouveau like', avatarUrl: row.avatar_urls?.[0] }]));
+      const notificationActorIds = Array.from(new Set((storedNotifications ?? []).map((row: { actor_id: string | null }) => row.actor_id).filter((id: string | null): id is string => Boolean(id))));
+      const { data: notificationActors } = notificationActorIds.length ? await supabase.from('profiles').select('id, avatar_urls').in('id', notificationActorIds) : { data: [] };
+      const notificationActorAvatars = new Map((notificationActors ?? []).map((row: { id: string; avatar_urls: string[] | null }) => [row.id, row.avatar_urls?.[0] ?? undefined]));
       let readEventIds: string[] = [];
       try {
         readEventIds = JSON.parse(window.localStorage.getItem(readEventsKey) || '[]') as string[];
@@ -188,10 +182,6 @@ export function Navbar() {
           avatarUrl: sender?.avatarUrl,
           unread: true,
         };
-      });
-      const likeNotifications: NotificationPreview[] = (receivedLikes ?? []).filter((row: { swiper_id: string }) => !mutualIds.has(row.swiper_id)).map((row: { id: string; swiper_id: string; created_at: string }) => {
-        const sender = likeSenderMap.get(row.swiper_id);
-        return { id: `like-${row.id}`, type: 'like', title: `${sender?.name || 'Une personne'} aime votre profil`, message: 'Consultez les likes reçus dans votre espace.', href: '/espace?tab=likes', createdAt: row.created_at, avatarUrl: sender?.avatarUrl, unread: true };
       });
       const eventNotifications: NotificationPreview[] = (eventRows ?? []).map((row: { id: string; title: string; description: string | null; date: string; location: string; city: string | null; created_at: string }) => ({
         id: `event-${row.id}`,
@@ -218,12 +208,13 @@ export function Navbar() {
         message: row.body,
         href: row.kind === 'like_received' ? '/espace?tab=likes' : '/espace?tab=events',
         createdAt: row.created_at,
+        avatarUrl: row.actor_id ? notificationActorAvatars.get(row.actor_id) : undefined,
         unread: !row.read_at,
       }));
 
       if (!cancelled) {
-        setNotifications([...messageNotifications, ...likeNotifications, ...storedEventNotifications, ...eventNotifications, ...reminderNotifications].sort((first, second) => new Date(second.createdAt).getTime() - new Date(first.createdAt).getTime()).slice(0, 8));
-        setUnreadEventCount([...storedEventNotifications, ...eventNotifications, ...reminderNotifications, ...likeNotifications].filter((notification) => notification.unread).length);
+        setNotifications([...messageNotifications, ...storedEventNotifications, ...eventNotifications, ...reminderNotifications].sort((first, second) => new Date(second.createdAt).getTime() - new Date(first.createdAt).getTime()).slice(0, 8));
+        setUnreadEventCount([...storedEventNotifications, ...eventNotifications, ...reminderNotifications].filter((notification) => notification.unread).length);
       }
     };
 
@@ -247,12 +238,14 @@ export function Navbar() {
   const handleNotificationClick = async (notification: NotificationPreview) => {
     if (notification.type === 'message') {
       const messageId = notification.id.replace('message-', '');
-      await supabase.from('messages').update({ is_read: true }).eq('id', messageId).eq('receiver_id', user?.id);
+      const { data: updatedMessage, error } = await supabase.from('messages').update({ is_read: true }).eq('id', messageId).eq('receiver_id', user?.id).select('id').maybeSingle();
+      if (error || !updatedMessage) return;
       setUnreadCount(Math.max(0, unreadCount - 1));
     } else if (user) {
       if (notification.id.startsWith('db-')) {
         const notificationId = notification.id.replace('db-', '');
-        await supabase.from('user_notifications').update({ read_at: new Date().toISOString() }).eq('id', notificationId).eq('user_id', user.id).is('read_at', null);
+        const { data: updatedNotification, error } = await supabase.from('user_notifications').update({ read_at: new Date().toISOString() }).eq('id', notificationId).eq('user_id', user.id).is('read_at', null).select('id').maybeSingle();
+        if (error || !updatedNotification) return;
         setUnreadEventCount((count) => Math.max(0, count - (notification.unread ? 1 : 0)));
         setNotifications((current) => current.filter((item) => item.id !== notification.id));
         router.push(notification.href);
@@ -281,7 +274,6 @@ export function Navbar() {
   };
 
   const handleSignOut = async () => {
-    setProfileMenuOpen(false);
     await signOut();
     router.push('/');
   };
@@ -289,9 +281,16 @@ export function Navbar() {
   return (
     <nav className="fixed left-0 right-0 top-0 z-40 border-b border-black/5 bg-[#fbf8f2]/90 backdrop-blur-xl">
       <div className="mx-auto flex h-[60px] max-w-[1240px] items-center justify-between px-5 lg:px-8">
-        <Link href="/" className="flex items-center" aria-label="ARAS">
-          <Image src="/aras-logo.jpeg" alt="ARAS" width={140} height={56} className="h-11 w-auto object-contain sm:h-12" priority />
-        </Link>
+        {user ? (
+          <Link href="/espace?tab=profile" className="flex min-w-0 items-center gap-2" aria-label="Mon profil">
+            <span className="relative h-9 w-9 shrink-0 overflow-hidden rounded-full border-2 border-[#ec3b78] bg-white sm:h-10 sm:w-10"><img src={miniProfile?.photo_url || fallbackAvatar} alt="" className="h-full w-full object-cover" /></span>
+            <span className="hidden max-w-32 truncate text-sm font-extrabold text-[#241c18] sm:block">{miniProfile?.display_name || 'Mon profil'}</span>
+          </Link>
+        ) : (
+          <Link href="/" className="flex items-center" aria-label="ARAS">
+            <Image src="/aras-logo.jpeg" alt="ARAS" width={140} height={56} className="h-11 w-auto object-contain sm:h-12" priority />
+          </Link>
+        )}
 
         <div className="hidden items-center gap-7 text-[13px] font-bold text-[#625852] md:flex">
           {!isConnected && (
@@ -307,6 +306,7 @@ export function Navbar() {
         </div>
 
         <div className="hidden items-center gap-3 md:flex">
+          {user && appTab === 'decouverte' && <button type="button" aria-label="Filtres de recherche" onClick={() => window.dispatchEvent(new Event('aras:open-discovery-filters'))} className="rounded-full border border-[#dfd2c6] p-2.5 text-[#625852] transition hover:border-[#ec3b78] hover:text-[#ec3b78]"><SlidersHorizontal size={16} /></button>}
           <button onClick={() => setTheme(isDark ? 'light' : 'dark')} aria-label={isDark ? 'Activer le mode clair' : 'Activer le mode sombre'} className="rounded-full border border-[#dfd2c6] p-2.5 text-[#625852] transition hover:border-[#ec3b78] hover:text-[#ec3b78]">
             {isDark ? <Sun size={16} /> : <Moon size={16} />}
           </button>
@@ -380,64 +380,6 @@ export function Navbar() {
                   )}
                 </div>
 
-              {/* PROFIL CONNECTÉ : photo + statut, carte au survol/clic */}
-              <div
-                ref={profileMenuRef}
-                className="relative"
-                onMouseEnter={() => setProfileMenuOpen(true)}
-                onMouseLeave={() => setProfileMenuOpen(false)}
-              >
-                <button
-                  type="button"
-                  onClick={() => setProfileMenuOpen((o) => !o)}
-                  aria-expanded={profileMenuOpen}
-                  className="flex items-center gap-2 rounded-full border border-[#dfd2c6] bg-white py-1 pl-1 pr-3 transition hover:border-[#ec3b78]"
-                >
-                  <span className="relative h-8 w-8 shrink-0 overflow-hidden rounded-full bg-[#f3e9dc]">
-                    <img src={miniProfile?.photo_url || fallbackAvatar} alt="" className="h-full w-full object-cover" />
-                    <span className={`absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-white ${miniProfile?.is_online ? 'bg-[#1a6b68]' : 'bg-[#b8aaa1]'}`} />
-                  </span>
-                  <span className="hidden text-left lg:block">
-                    <span className="block max-w-[110px] truncate text-xs font-extrabold text-[#241c18]">
-                      {miniProfile?.display_name ?? '...'}
-                    </span>
-                    <span className={`block text-[10px] font-bold ${miniProfile?.is_online ? 'text-[#1a6b68]' : 'text-[#9a8b82]'}`}>
-                      {miniProfile?.is_online ? 'En ligne' : 'Hors ligne'}
-                    </span>
-                  </span>
-                </button>
-
-                {profileMenuOpen && (
-                  <div className="absolute right-0 top-full z-50 mt-2 w-[270px] overflow-hidden rounded-2xl border border-[#dfd2c6] bg-white shadow-[0_18px_50px_rgba(83,46,32,.18)]">
-                    <div className="flex items-center gap-3 border-b border-[#f0e5dc] px-4 py-4">
-                      <span className="relative h-12 w-12 shrink-0 overflow-hidden rounded-full bg-[#f3e9dc]">
-                        <img src={miniProfile?.photo_url || fallbackAvatar} alt="" className="h-full w-full object-cover" />
-                        <span className={`absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-white ${miniProfile?.is_online ? 'bg-[#1a6b68]' : 'bg-[#b8aaa1]'}`} />
-                      </span>
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-extrabold text-[#241c18]">{miniProfile?.display_name ?? 'Mon profil'}</p>
-                        <p className={`text-xs font-bold ${miniProfile?.is_online ? 'text-[#1a6b68]' : 'text-[#9a8b82]'}`}>
-                          {miniProfile?.is_online ? 'En ligne' : 'Hors ligne'}
-                          {miniProfile?.city ? ` · ${miniProfile.city}` : ''}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="p-2">
-                      <Link href="/espace?tab=profile" onClick={() => setProfileMenuOpen(false)} className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-bold text-[#625852] transition hover:bg-[#fbf3ee]">
-                        <User size={16} /> Mon profil
-                      </Link>
-                      {isAdmin && (
-                        <Link href="/admin" onClick={() => setProfileMenuOpen(false)} className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-bold text-[#625852] transition hover:bg-[#fbf3ee]">
-                          <ChevronRight size={16} /> Admin
-                        </Link>
-                      )}
-                      <button onClick={handleSignOut} className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-bold text-[#c92e63] transition hover:bg-[#fae4e2]">
-                        <LogOut size={16} /> Déconnexion
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
             </>
           ) : (
             <>
@@ -450,6 +392,7 @@ export function Navbar() {
         </div>
 
         <div className="flex items-center gap-1 md:hidden">
+          {user && appTab === 'decouverte' && <button type="button" aria-label="Filtres de recherche" onClick={() => window.dispatchEvent(new Event('aras:open-discovery-filters'))} className="rounded-full border border-[#dfd2c6] p-2.5 text-[#625852] transition hover:border-[#ec3b78] hover:text-[#ec3b78]"><SlidersHorizontal size={18} /></button>}
           {user && (
             <div className="relative">
               <button
@@ -470,13 +413,13 @@ export function Navbar() {
               )}
             </div>
           )}
-          <button aria-label="Menu" aria-expanded={open} onClick={() => setOpen(!open)} className="rounded-full p-2 text-[#1e1916] md:hidden">
-            {open ? <X size={22} /> : <Menu size={22} />}
-          </button>
+          {user ? <>
+            <button type="button" onClick={() => setTheme(isDark ? 'light' : 'dark')} aria-label={isDark ? 'Activer le mode clair' : 'Activer le mode sombre'} className="rounded-full border border-[#dfd2c6] p-2.5 text-[#625852]"><Sun size={18} className={isDark ? '' : 'hidden'} /><Moon size={18} className={isDark ? 'hidden' : ''} /></button>
+          </> : <button aria-label="Menu" aria-expanded={open} onClick={() => setOpen(!open)} className="rounded-full p-2 text-[#1e1916] md:hidden">{open ? <X size={22} /> : <Menu size={22} />}</button>}
         </div>
       </div>
 
-      {open && (
+      {open && !user && (
         <div className="border-t border-black/5 bg-[#fbf8f2] px-5 pb-5 pt-3 md:hidden animate-in slide-in-from-top-2 duration-300">
           <div className="flex flex-col gap-4 text-sm font-bold">
             {!isConnected && (
