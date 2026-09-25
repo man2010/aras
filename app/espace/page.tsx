@@ -874,11 +874,30 @@ export default function EspacePage() {
     if (!user || registeredEventIds.has(eventId)) return;
     setEventActionMessage('');
     setEventRegistrationBusy(eventId);
-    const { data, error } = await supabase.rpc('register_for_event', { target_event_id: eventId });
-    setEventRegistrationBusy(null);
+    let data: any = null;
+    let error: { message: string } | null = null;
+    try {
+      const result = await supabase.rpc('register_for_event', { target_event_id: eventId });
+      data = result.data;
+      error = result.error;
+    } catch (requestError) {
+      error = { message: requestError instanceof Error ? requestError.message : 'NETWORK_ERROR' };
+    } finally {
+      setEventRegistrationBusy(null);
+    }
     if (error) {
-      const full = error.message.includes('EVENT_FULL');
-      setEventActionMessage(full ? 'Désolé, toutes les places sont déjà attribuées. Cet événement est complet.' : error.message.includes('EVENT_UNAVAILABLE') ? 'Cet événement n’accepte plus de participations.' : 'Inscription impossible pour le moment. Réessaie dans quelques instants.');
+      const reason = error.message.toLowerCase();
+      setEventActionMessage(
+        reason.includes('event_full')
+          ? 'Désolé, toutes les places viennent d’être prises. Cet événement est complet.'
+          : reason.includes('event_unavailable')
+            ? 'Cet événement n’accepte plus de participations.'
+            : reason.includes('auth_required')
+              ? 'Ta session a expiré. Reconnecte-toi avant de participer.'
+              : reason.includes('register_for_event') && (reason.includes('schema cache') || reason.includes('does not exist') || reason.includes('could not find'))
+                ? 'Le service d’inscription est momentanément indisponible. Réessaie plus tard ou contacte contact@aras.sn.'
+                : 'Inscription impossible pour le moment. Vérifie ta connexion puis réessaie.'
+      );
       return;
     }
     const result = Array.isArray(data) ? data[0] : data;
@@ -888,15 +907,29 @@ export default function EspacePage() {
     await loadMemberEvents();
     window.dispatchEvent(new Event('aras:notifications-refresh'));
     if (status === 'confirmed') {
-      const { data: sessionData } = await supabase.auth.getSession();
-      const notice = await fetch('/api/events/registration-notification', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(sessionData.session?.access_token ? { Authorization: `Bearer ${sessionData.session.access_token}` } : {}),
-        },
-        body: JSON.stringify({ eventId }),
-      }).then((response) => response.json()).catch(() => ({ sent: false, reason: 'notification_request_failed' }));
+      setEventActionMessage('Participation confirmée ! Préparation de l’e-mail de confirmation…');
+      let notice: { sent?: boolean; channel?: string | null; reason?: string } = { sent: false, reason: 'notification_request_failed' };
+      try {
+        const { data: sessionData } = await supabase.auth.getSession();
+        const controller = new AbortController();
+        const timeout = window.setTimeout(() => controller.abort(), 12_000);
+        try {
+          const response = await fetch('/api/events/registration-notification', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              ...(sessionData.session?.access_token ? { Authorization: `Bearer ${sessionData.session.access_token}` } : {}),
+            },
+            body: JSON.stringify({ eventId }),
+            signal: controller.signal,
+          });
+          notice = await response.json();
+        } finally {
+          window.clearTimeout(timeout);
+        }
+      } catch {
+        notice = { sent: false, reason: 'notification_request_failed' };
+      }
       if (notice.sent) {
         const channelName = notice.channel === 'sms' ? 'SMS' : 'e-mail';
         setEventActionMessage(`Participation confirmée ! La confirmation a été envoyée par ${channelName}. Un rappel apparaîtra aussi dans tes notifications à l’approche de l’événement.`);
