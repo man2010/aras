@@ -1457,10 +1457,7 @@ export default function EspacePage() {
                   <label className="block text-xs font-extrabold text-[#625852]">Âge<input value={profileForm.age} readOnly aria-readonly="true" className="mt-2 w-full cursor-not-allowed rounded-xl border border-[#dfd2c6] bg-[#eee9e3] px-4 py-3 text-sm text-[#756960] outline-none dark:bg-white/5" /><span className="mt-1 block text-[10px] font-medium text-[#9a8b82]">L’âge est calculé à partir de votre date de naissance.</span></label>
                   <label className="block text-xs font-extrabold text-[#625852]">Ville<input value={profileForm.city} onChange={(e) => setProfileForm({ ...profileForm, city: e.target.value })} required className="mt-2 w-full rounded-xl border border-[#dfd2c6] bg-[#fbf8f2] px-4 py-3 text-sm outline-none focus:border-[#ec3b78]" /></label>
                   <label className="block text-xs font-extrabold text-[#625852]">Profession<input value={profileForm.profession} onChange={(e) => setProfileForm({ ...profileForm, profession: e.target.value })} className="mt-2 w-full rounded-xl border border-[#dfd2c6] bg-[#fbf8f2] px-4 py-3 text-sm outline-none focus:border-[#ec3b78]" /></label>
-                  <div className="sm:col-span-2">
-                    <p className="text-xs font-extrabold text-[#625852]">Photo de profil</p>
-                    <p className="mt-1 text-xs text-[#9a8b82]">Cliquez sur l&apos;image pour changer (PNG, JPG, max 5MB)</p>
-                  </div>
+
                   <label className="block text-xs font-extrabold text-[#625852] sm:col-span-2">Centres d&apos;intérêt (séparés par des virgules)<input value={profileForm.interests} onChange={(e) => setProfileForm({ ...profileForm, interests: e.target.value })} placeholder="Voyage, Cuisine, Musique..." className="mt-2 w-full rounded-xl border border-[#dfd2c6] bg-[#fbf8f2] px-4 py-3 text-sm outline-none focus:border-[#ec3b78]" /></label>
                   <label className="block text-xs font-extrabold text-[#625852]">Langues parlées<input value={profileForm.languages} onChange={(e) => setProfileForm({ ...profileForm, languages: e.target.value })} placeholder="Français, Wolof" className="mt-2 w-full rounded-xl border border-[#dfd2c6] bg-[#fbf8f2] px-4 py-3 text-sm outline-none focus:border-[#ec3b78]" /></label>
                   <label className="block text-xs font-extrabold text-[#625852]">Religion<input value={profileForm.religion} onChange={(e) => setProfileForm({ ...profileForm, religion: e.target.value })} className="mt-2 w-full rounded-xl border border-[#dfd2c6] bg-[#fbf8f2] px-4 py-3 text-sm outline-none focus:border-[#ec3b78]" /></label>
@@ -1493,7 +1490,7 @@ export default function EspacePage() {
                       if (file && galleryUploadIndex !== null) void handleProfileImageSelection(file, galleryUploadIndex);
                     }}
                   />
-                  <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                  <div className="mt-4 grid gap-3 grid-cols-3">
                     {Array.from({ length: 6 }, (_, index) => (
                       <button
                         key={`gallery-slot-${index}`}
