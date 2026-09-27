@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Menu, X, Heart, LogOut, LayoutDashboard, Bell, Moon, Sun, MessageCircle, CalendarDays, ChevronRight, Settings, User, SlidersHorizontal } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { supabase } from '@/lib/supabase';
@@ -42,9 +42,8 @@ export function Navbar() {
   const { user, loading: authLoading, signOut, unreadCount, setUnreadCount } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
-  const previousUserId = useRef<string | null>(null);
   const { resolvedTheme, setTheme } = useTheme();
-  const isConnected = Boolean(user);
+  const isConnected = Boolean(user) && pathname !== '/';
   // Le thème sauvegardé n'existe que dans le navigateur : conserver le rendu
   // clair jusqu'au montage évite une divergence serveur/client (icône SVG).
   const isDark = mounted && resolvedTheme === 'dark';
@@ -52,18 +51,6 @@ export function Navbar() {
   useEffect(() => {
     setMounted(true);
   }, []);
-
-  useEffect(() => {
-    if (user) {
-      previousUserId.current = user.id;
-      return;
-    }
-
-    if (!authLoading && previousUserId.current) {
-      previousUserId.current = null;
-      router.replace('/');
-    }
-  }, [authLoading, router, user]);
 
   useEffect(() => {
     const onAppTab = (event: Event) => setAppTab((event as CustomEvent<string>).detail ?? '');
@@ -327,7 +314,7 @@ export function Navbar() {
   return (
     <nav className="fixed left-0 right-0 top-0 z-40 border-b border-black/5 bg-[#f8f9fd]/90 backdrop-blur-xl">
       <div className="mx-auto flex h-[60px] max-w-[1240px] items-center justify-between px-5 lg:px-8">
-        {user ? (
+        {isConnected ? (
           <Link
             href="/espace?tab=profile"
             onClick={() => {
@@ -346,7 +333,7 @@ export function Navbar() {
         )}
 
         <div className="hidden items-center gap-7 text-[13px] font-bold text-[#625852] md:flex">
-          {!isConnected && (
+          {!user && (
             <>
               <Link href="/decouverte" className="transition hover:text-[#ec3b78]">Découverte</Link>
               <Link href="/evenements" className="transition hover:text-[#ec3b78]">Événements</Link>
@@ -359,11 +346,11 @@ export function Navbar() {
         </div>
 
         <div className="hidden items-center gap-3 md:flex">
-          {user && appTab === 'decouverte' && <button type="button" aria-label="Filtres de recherche" onClick={() => window.dispatchEvent(new Event('aras:open-discovery-filters'))} className="rounded-full border border-[#dfd2c6] p-2.5 text-[#625852] transition hover:border-[#ec3b78] hover:text-[#ec3b78]"><SlidersHorizontal size={16} /></button>}
+          {isConnected && appTab === 'decouverte' && <button type="button" aria-label="Filtres de recherche" onClick={() => window.dispatchEvent(new Event('aras:open-discovery-filters'))} className="rounded-full border border-[#dfd2c6] p-2.5 text-[#625852] transition hover:border-[#ec3b78] hover:text-[#ec3b78]"><SlidersHorizontal size={16} /></button>}
           <button onClick={() => setTheme(isDark ? 'light' : 'dark')} aria-label={isDark ? 'Activer le mode clair' : 'Activer le mode sombre'} className="rounded-full border border-[#dfd2c6] p-2.5 text-[#625852] transition hover:border-[#ec3b78] hover:text-[#ec3b78]">
             {isDark ? <Sun size={16} /> : <Moon size={16} />}
           </button>
-          {user ? (
+          {isConnected ? (
             <>
                 <div
                   className="relative"
@@ -409,19 +396,19 @@ export function Navbar() {
                 </div>
 
             </>
-          ) : (
+          ) : !user ? (
             <>
               <Link href="/connexion" className="px-4 py-2.5 text-[13px] font-bold text-[#625852] transition hover:text-[#ec3b78]">Se connecter</Link>
               <Link href="/inscription" className="rounded-full bg-[#ec3b78] px-5 py-2.5 text-[13px] font-bold text-white shadow-[0_8px_20px_rgba(233,81,95,.2)] transition hover:-translate-y-0.5 hover:bg-[#c92e63]">
                 Créer mon compte
               </Link>
             </>
-          )}
+          ) : null}
         </div>
 
         <div className="flex items-center gap-1 md:hidden">
-          {user && appTab === 'decouverte' && <button type="button" aria-label="Filtres de recherche" onClick={() => window.dispatchEvent(new Event('aras:open-discovery-filters'))} className="rounded-full border border-[#dfd2c6] p-2.5 text-[#625852] transition hover:border-[#ec3b78] hover:text-[#ec3b78]"><SlidersHorizontal size={18} /></button>}
-          {user && (
+          {isConnected && appTab === 'decouverte' && <button type="button" aria-label="Filtres de recherche" onClick={() => window.dispatchEvent(new Event('aras:open-discovery-filters'))} className="rounded-full border border-[#dfd2c6] p-2.5 text-[#625852] transition hover:border-[#ec3b78] hover:text-[#ec3b78]"><SlidersHorizontal size={18} /></button>}
+          {isConnected && (
             <div className="relative">
               <button
                 type="button"
@@ -441,16 +428,16 @@ export function Navbar() {
               )}
             </div>
           )}
-          {user ? <>
+          {isConnected ? <>
             <button type="button" onClick={() => setTheme(isDark ? 'light' : 'dark')} aria-label={isDark ? 'Activer le mode clair' : 'Activer le mode sombre'} className="rounded-full border border-[#dfd2c6] p-2.5 text-[#625852]"><Sun size={18} className={isDark ? '' : 'hidden'} /><Moon size={18} className={isDark ? 'hidden' : ''} /></button>
-          </> : <button aria-label="Menu" aria-expanded={open} onClick={() => setOpen(!open)} className="rounded-full p-2 text-[#1e1916] md:hidden">{open ? <X size={22} /> : <Menu size={22} />}</button>}
+          </> : !user ? <button aria-label="Menu" aria-expanded={open} onClick={() => setOpen(!open)} className="rounded-full p-2 text-[#1e1916] md:hidden">{open ? <X size={22} /> : <Menu size={22} />}</button> : null}
         </div>
       </div>
 
       {open && !user && (
         <div className="border-t border-black/5 bg-[#f8f9fd] px-5 pb-5 pt-3 md:hidden animate-in slide-in-from-top-2 duration-300">
           <div className="flex flex-col gap-4 text-sm font-bold">
-            {!isConnected && (
+            {!user && (
               <>
                 <Link href="/decouverte" onClick={() => setOpen(false)} className="hover:text-[#ec3b78] transition-colors">Découverte</Link>
                 <Link href="/evenements" onClick={() => setOpen(false)} className="hover:text-[#ec3b78] transition-colors">Événements</Link>

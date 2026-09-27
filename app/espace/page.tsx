@@ -1261,6 +1261,7 @@ export default function EspacePage() {
     : null;
   const activeConversationProfile = activeConversationPartnerId ? conversationProfiles[activeConversationPartnerId] : null;
   const filteredConversations = conversations.filter((c) => {
+    if (!user) return false;
     const otherId = c.user_a === user.id ? c.user_b : c.user_a;
     const name = conversationProfiles[otherId]?.display_name || '';
     return name.toLowerCase().includes(messageSearch.trim().toLowerCase());

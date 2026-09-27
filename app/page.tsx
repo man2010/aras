@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useTheme } from 'next-themes';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 import {
@@ -11,12 +12,15 @@ import {
 import { supabase } from '@/lib/supabase';
 import type { Profile, EventItem, Testimonial } from '@/lib/types';
 import { toEvent, toProfile, type EventRow, type ProfileRow } from '@/lib/adapters';
+import { useAuth } from '@/lib/auth-context';
 
 const formatDate = (d: string) => { const date = new Date(d); return isNaN(date.getTime()) ? '—' : new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'long' }).format(date); };
 const formatPrice = (p: number) => p === 0 ? 'Gratuit' : `${new Intl.NumberFormat('fr-FR').format(p)} FCFA`;
 
 export default function Home() {
   const { resolvedTheme } = useTheme();
+  const { user, loading: authLoading } = useAuth();
+  const router = useRouter();
   const [mounted, setMounted] = useState(false);
   const isDark = mounted && resolvedTheme === 'dark';
   const [profiles, setProfiles] = useState<Profile[]>([]);
@@ -28,6 +32,10 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
+    if (!authLoading && user) router.replace('/espace?tab=profile');
+  }, [authLoading, router, user]);
+
+  useEffect(() => {
     (async () => {
       const [{ data: p }, { data: e }] = await Promise.all([
         supabase.from('profiles').select('*').eq('is_active', true).eq('is_premium', true).limit(8),
@@ -37,6 +45,17 @@ export default function Home() {
       if (e) setEvents((e as EventRow[]).map(toEvent));
     })();
   }, []);
+
+  if (authLoading || user) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-[#f8f9fd] px-5 text-[#515565] dark:bg-[#111116] dark:text-white/70" aria-live="polite">
+        <div className="flex items-center gap-3 rounded-full bg-white px-5 py-3 text-sm font-bold shadow-sm dark:bg-white/5">
+          <span className="h-4 w-4 animate-spin rounded-full border-2 border-[#ec3b78] border-t-transparent" />
+          {user ? 'Ouverture de votre espace…' : 'Chargement…'}
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="min-h-screen">
