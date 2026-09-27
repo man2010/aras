@@ -45,7 +45,7 @@ export default function Pagination({
         <button
           onClick={() => onPageChange(currentPage - 1)}
           disabled={currentPage === 1}
-          className="flex h-10 w-10 items-center justify-center rounded-xl border border-[#dfd2c6] bg-white text-[#756960] transition hover:bg-[#f3e9dc] disabled:opacity-50 disabled:cursor-not-allowed"
+          className="flex h-10 w-10 items-center justify-center rounded-xl border border-[#dfd2c6] bg-white text-[#756960] transition hover:bg-[#f8f9fd] disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <ChevronLeft size={18} />
         </button>
@@ -54,7 +54,7 @@ export default function Pagination({
           <>
             <button
               onClick={() => onPageChange(1)}
-              className="flex h-10 w-10 items-center justify-center rounded-xl border border-[#dfd2c6] bg-white text-sm font-bold text-[#625852] transition hover:bg-[#f3e9dc]"
+              className="flex h-10 w-10 items-center justify-center rounded-xl border border-[#dfd2c6] bg-white text-sm font-bold text-[#625852] transition hover:bg-[#f8f9fd]"
             >
               1
             </button>
@@ -69,7 +69,7 @@ export default function Pagination({
             className={`flex h-10 w-10 items-center justify-center rounded-xl text-sm font-bold transition ${
               currentPage === page
                 ? 'bg-[#ec3b78] text-white'
-                : 'border border-[#dfd2c6] bg-white text-[#625852] hover:bg-[#f3e9dc]'
+                : 'border border-[#dfd2c6] bg-white text-[#625852] hover:bg-[#f8f9fd]'
             }`}
           >
             {page}
@@ -81,7 +81,7 @@ export default function Pagination({
             {endPage < totalPages - 1 && <span className="px-2 text-[#9a8b82]">...</span>}
             <button
               onClick={() => onPageChange(totalPages)}
-              className="flex h-10 w-10 items-center justify-center rounded-xl border border-[#dfd2c6] bg-white text-sm font-bold text-[#625852] transition hover:bg-[#f3e9dc]"
+              className="flex h-10 w-10 items-center justify-center rounded-xl border border-[#dfd2c6] bg-white text-sm font-bold text-[#625852] transition hover:bg-[#f8f9fd]"
             >
               {totalPages}
             </button>
@@ -91,7 +91,7 @@ export default function Pagination({
         <button
           onClick={() => onPageChange(currentPage + 1)}
           disabled={currentPage === totalPages}
-          className="flex h-10 w-10 items-center justify-center rounded-xl border border-[#dfd2c6] bg-white text-[#756960] transition hover:bg-[#f3e9dc] disabled:opacity-50 disabled:cursor-not-allowed"
+          className="flex h-10 w-10 items-center justify-center rounded-xl border border-[#dfd2c6] bg-white text-[#756960] transition hover:bg-[#f8f9fd] disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <ChevronRight size={18} />
         </button>

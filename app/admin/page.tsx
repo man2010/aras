@@ -365,11 +365,11 @@ export default function AdminPage() {
   };
 
   if (authLoading || !user) {
-    return <main className="flex min-h-screen items-center justify-center bg-[#fbf8f2] pt-[72px]"><p className="text-sm font-bold text-[#9a8b82]">Chargement...</p></main>;
+    return <main className="flex min-h-screen items-center justify-center bg-[#f8f9fd] pt-[72px]"><p className="text-sm font-bold text-[#9a8b82]">Chargement...</p></main>;
   }
 
   if (!isAdmin) {
-    return <main className="flex min-h-screen items-center justify-center bg-[#fbf8f2] pt-[72px]"><p className="text-sm font-bold text-[#9a8b82]">Accès non autorisé</p></main>;
+    return <main className="flex min-h-screen items-center justify-center bg-[#f8f9fd] pt-[72px]"><p className="text-sm font-bold text-[#9a8b82]">Accès non autorisé</p></main>;
   }
 
   return (

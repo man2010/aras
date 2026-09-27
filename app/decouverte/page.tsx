@@ -47,16 +47,16 @@ export default function DecouvertePage() {
 
   if (authLoading) {
     return (
-      <main className="min-h-screen bg-[#fbf8f2] px-5 pb-24 pt-[76px] lg:px-8 lg:pt-[76px]">
+      <main className="min-h-screen bg-[#f8f9fd] px-5 pb-24 pt-[76px] lg:px-8 lg:pt-[76px]">
         <div className="mx-auto max-w-[1120px]">
-          <div className="h-8 w-40 animate-pulse rounded-full bg-[#e7d9ce]" />
+          <div className="h-8 w-40 animate-pulse rounded-full bg-[#f8f9fd]" />
         </div>
       </main>
     );
   }
 
   return (
-    <main className="min-h-screen bg-[#fbf8f2] px-5 pb-24 pt-[76px] lg:px-8 lg:pt-[76px]">
+    <main className="min-h-screen bg-[#f8f9fd] px-5 pb-24 pt-[76px] lg:px-8 lg:pt-[76px]">
       <div className="mx-auto max-w-[1120px]">
         <section>
           <div className="mb-4 flex items-center justify-between">
@@ -71,10 +71,10 @@ export default function DecouvertePage() {
               <div className="discovery-marquee-track flex w-max gap-4">
               {Array.from({ length: 6 }).map((_, index) => (
                 <div key={index} className="min-w-[260px] animate-pulse rounded-[28px] border border-[#e5d6c9] bg-white p-5 shadow-[0_10px_30px_rgba(83,46,32,.04)]">
-                  <div className="h-16 w-16 rounded-full bg-[#efe2d7]" />
-                  <div className="mt-5 h-4 w-24 rounded-full bg-[#efe2d7]" />
-                  <div className="mt-3 h-8 w-20 rounded-full bg-[#efe2d7]" />
-                  <div className="mt-5 h-3 w-32 rounded-full bg-[#efe2d7]" />
+                  <div className="h-16 w-16 rounded-full bg-[#f8f9fd]" />
+                  <div className="mt-5 h-4 w-24 rounded-full bg-[#f8f9fd]" />
+                  <div className="mt-3 h-8 w-20 rounded-full bg-[#f8f9fd]" />
+                  <div className="mt-5 h-3 w-32 rounded-full bg-[#f8f9fd]" />
                 </div>
               ))}
               </div>
@@ -93,7 +93,7 @@ export default function DecouvertePage() {
                 >
                   <div className="flex items-center justify-between">
                     {/* Photo réelle, mais floutée : on donne un aperçu sans révéler l'identité tant que la personne n'a pas de compte. */}
-                    <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-full border-2 border-[#f3e9dc] bg-[#f3e9dc]">
+                    <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-full border-2 border-[#f3e9dc] bg-[#f8f9fd]">
                       <img
                         src={profile.photo_url}
                         alt=""
@@ -130,7 +130,7 @@ export default function DecouvertePage() {
 
                   <div className="mt-5 flex flex-wrap gap-2">
                     {profile.profession ? (
-                      <span className="rounded-full bg-[#f3e9dc] px-2.5 py-1 text-[10px] font-bold text-[#9a682f]">
+                      <span className="rounded-full bg-[#f8f9fd] px-2.5 py-1 text-[10px] font-bold text-[#9a682f]">
                         {profile.profession}
                       </span>
                     ) : (

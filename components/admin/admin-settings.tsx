@@ -33,7 +33,7 @@ export function AdminSettings({ settings, onSaveSettings }: AdminSettingsProps) 
             </div>
             <button
               onClick={() => setLocalSettings({ ...localSettings, maintenanceMode: !localSettings.maintenanceMode })}
-              className={`w-12 h-6 rounded-full transition ${localSettings.maintenanceMode ? 'bg-[#ec3b78]' : 'bg-[#f3e9dc]'}`}
+              className={`w-12 h-6 rounded-full transition ${localSettings.maintenanceMode ? 'bg-[#ec3b78]' : 'bg-[#f8f9fd]'}`}
             >
               <div className={`h-5 w-5 rounded-full bg-white transition ${localSettings.maintenanceMode ? 'translate-x-6' : 'translate-x-1'}`} />
             </button>
@@ -46,7 +46,7 @@ export function AdminSettings({ settings, onSaveSettings }: AdminSettingsProps) 
             </div>
             <button
               onClick={() => setLocalSettings({ ...localSettings, allowRegistration: !localSettings.allowRegistration })}
-              className={`w-12 h-6 rounded-full transition ${localSettings.allowRegistration ? 'bg-[#1a6b68]' : 'bg-[#f3e9dc]'}`}
+              className={`w-12 h-6 rounded-full transition ${localSettings.allowRegistration ? 'bg-[#1a6b68]' : 'bg-[#f8f9fd]'}`}
             >
               <div className={`h-5 w-5 rounded-full bg-white transition ${localSettings.allowRegistration ? 'translate-x-6' : 'translate-x-1'}`} />
             </button>
@@ -67,7 +67,7 @@ export function AdminSettings({ settings, onSaveSettings }: AdminSettingsProps) 
               type="number"
               value={localSettings.maxUploadSize}
               onChange={(e) => setLocalSettings({ ...localSettings, maxUploadSize: parseInt(e.target.value) })}
-              className="w-full rounded-xl border border-[#dfd2c6] bg-[#fbf8f2] px-4 py-2.5 text-sm outline-none focus:border-[#ec3b78]"
+              className="w-full rounded-xl border border-[#dfd2c6] bg-[#f8f9fd] px-4 py-2.5 text-sm outline-none focus:border-[#ec3b78]"
             />
           </div>
         </div>
@@ -86,7 +86,7 @@ export function AdminSettings({ settings, onSaveSettings }: AdminSettingsProps) 
               type="email"
               value={localSettings.notificationEmail}
               onChange={(e) => setLocalSettings({ ...localSettings, notificationEmail: e.target.value })}
-              className="w-full rounded-xl border border-[#dfd2c6] bg-[#fbf8f2] px-4 py-2.5 text-sm outline-none focus:border-[#ec3b78]"
+              className="w-full rounded-xl border border-[#dfd2c6] bg-[#f8f9fd] px-4 py-2.5 text-sm outline-none focus:border-[#ec3b78]"
             />
           </div>
         </div>

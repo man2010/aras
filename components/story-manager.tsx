@@ -167,7 +167,7 @@ export function StoryManager({ userId, stories, onStoriesChange }: StoryManagerP
           <div className="w-full max-w-lg rounded-[28px] bg-white p-4 sm:p-6 shadow-[0_20px_60px_rgba(0,0,0,.3)] max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between">
               <h3 className="font-display text-xl sm:text-2xl">Créer une story</h3>
-              <button onClick={() => setShowCreateModal(false)} className="rounded-full bg-[#f3e9dc] p-2 text-[#756960] transition hover:bg-[#e7cfc0]">
+              <button onClick={() => setShowCreateModal(false)} className="rounded-full bg-[#f8f9fd] p-2 text-[#756960] transition hover:bg-[#f8f9fd]">
                 <X size={20} />
               </button>
             </div>
@@ -178,13 +178,13 @@ export function StoryManager({ userId, stories, onStoriesChange }: StoryManagerP
                 <div className="flex gap-2">
                   <button
                     onClick={() => setMediaType('image')}
-                    className={`flex items-center gap-2 rounded-full px-3 sm:px-4 py-2 text-[10px] sm:text-xs font-extrabold transition ${mediaType === 'image' ? 'bg-[#ec3b78] text-white' : 'bg-[#f3e9dc] text-[#756960] hover:bg-[#e7cfc0]'}`}
+                    className={`flex items-center gap-2 rounded-full px-3 sm:px-4 py-2 text-[10px] sm:text-xs font-extrabold transition ${mediaType === 'image' ? 'bg-[#ec3b78] text-white' : 'bg-[#f8f9fd] text-[#756960] hover:bg-[#f8f9fd]'}`}
                   >
                     <ImageIcon size={14} /> Image
                   </button>
                   <button
                     onClick={() => setMediaType('video')}
-                    className={`flex items-center gap-2 rounded-full px-3 sm:px-4 py-2 text-[10px] sm:text-xs font-extrabold transition ${mediaType === 'video' ? 'bg-[#ec3b78] text-white' : 'bg-[#f3e9dc] text-[#756960] hover:bg-[#e7cfc0]'}`}
+                    className={`flex items-center gap-2 rounded-full px-3 sm:px-4 py-2 text-[10px] sm:text-xs font-extrabold transition ${mediaType === 'video' ? 'bg-[#ec3b78] text-white' : 'bg-[#f8f9fd] text-[#756960] hover:bg-[#f8f9fd]'}`}
                   >
                     <Video size={14} /> Vidéo
                   </button>
@@ -193,7 +193,7 @@ export function StoryManager({ userId, stories, onStoriesChange }: StoryManagerP
 
               <div>
                 <label className="block text-xs font-extrabold text-[#625852] mb-2">Média</label>
-                <div className="relative rounded-xl border-2 border-dashed border-[#dfd2c6] bg-[#fbf8f2] p-4 sm:p-8 text-center min-h-[200px]">
+                <div className="relative rounded-xl border-2 border-dashed border-[#dfd2c6] bg-[#f8f9fd] p-4 sm:p-8 text-center min-h-[200px]">
                   {mediaPreview ? (
                     <div className="relative">
                       {mediaType === 'image' ? (
@@ -231,7 +231,7 @@ export function StoryManager({ userId, stories, onStoriesChange }: StoryManagerP
                   onChange={(e) => setCaption(e.target.value)}
                   placeholder="Ajoutez une description..."
                   rows={3}
-                  className="w-full rounded-xl border border-[#dfd2c6] bg-[#fbf8f2] px-4 py-3 text-sm outline-none focus:border-[#ec3b78]"
+                  className="w-full rounded-xl border border-[#dfd2c6] bg-[#f8f9fd] px-4 py-3 text-sm outline-none focus:border-[#ec3b78]"
                 />
               </div>
             </div>

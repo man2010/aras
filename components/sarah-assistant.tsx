@@ -87,7 +87,7 @@ export function SarahAssistant() {
                 <p className="text-xs font-extrabold uppercase tracking-[.18em] text-[#ec3b78]">ARAS Assistant</p>
                 <h3 className="mt-1 font-display text-2xl text-[#24171b]">SARA</h3>
               </div>
-              <button onClick={() => setOpen(false)} className="rounded-full bg-[#f6efe6] p-2 text-[#756960]">
+              <button onClick={() => setOpen(false)} className="rounded-full bg-[#f8f9fd] p-2 text-[#756960]">
                 <X size={18} />
               </button>
             </div>
@@ -98,7 +98,7 @@ export function SarahAssistant() {
                   key={`${message.role}-${index}`}
                   className={`max-w-[85%] rounded-3xl px-4 py-3 text-sm leading-6 ${
                     message.role === 'assistant'
-                      ? 'bg-[#fbf8f2] text-[#4f4138]'
+                      ? 'bg-[#f8f9fd] text-[#4f4138]'
                       : 'ml-auto bg-[#1a6b68] text-white'
                   }`}
                 >
@@ -106,7 +106,7 @@ export function SarahAssistant() {
                 </div>
               ))}
               {loading && (
-                <div className="max-w-[85%] rounded-3xl bg-[#fbf8f2] px-4 py-3 text-sm text-[#756960]">
+                <div className="max-w-[85%] rounded-3xl bg-[#f8f9fd] px-4 py-3 text-sm text-[#756960]">
                   SARA réfléchit…
                 </div>
               )}
@@ -130,7 +130,7 @@ export function SarahAssistant() {
                   }}
                   rows={2}
                   placeholder="Écrivez votre message..."
-                  className="min-h-[54px] flex-1 resize-none rounded-[20px] border border-[#dfd2c6] bg-[#fbf8f2] px-4 py-3 text-sm outline-none focus:border-[#1a6b68]"
+                  className="min-h-[54px] flex-1 resize-none rounded-[20px] border border-[#dfd2c6] bg-[#f8f9fd] px-4 py-3 text-sm outline-none focus:border-[#1a6b68]"
                 />
                 <button
                   onClick={() => void sendMessage()}

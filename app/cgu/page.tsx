@@ -126,7 +126,7 @@ const sections = [
 
 export default function CguPage() {
   return (
-    <main className="min-h-screen bg-[#fbf8f2] px-5 pb-24 pt-[105px] lg:px-8 lg:pt-[130px]">
+    <main className="min-h-screen bg-[#f8f9fd] px-5 pb-24 pt-[105px] lg:px-8 lg:pt-[130px]">
       <div className="mx-auto max-w-[1120px]">
         <div className="text-center">
           <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[#fbe8ec] text-[#ec3b78]">
@@ -156,7 +156,7 @@ export default function CguPage() {
                   <li key={section.id}>
                     <a
                       href={`#${section.id}`}
-                      className="block rounded-lg px-2 py-1.5 text-[#756960] transition hover:bg-[#f3e9dc] hover:text-[#241c18]"
+                      className="block rounded-lg px-2 py-1.5 text-[#756960] transition hover:bg-[#f8f9fd] hover:text-[#241c18]"
                     >
                       {section.title}
                     </a>

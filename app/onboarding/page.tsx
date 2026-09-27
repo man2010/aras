@@ -195,7 +195,7 @@ export default function OnboardingPage() {
   if (!user) return null;
 
   return (
-    <main className="min-h-screen overflow-x-hidden bg-[#f7f1e9] px-3 py-5 text-[#241c18] transition-colors dark:bg-[#0d0d10] dark:text-white sm:px-6 sm:py-10 lg:px-10">
+    <main className="min-h-screen overflow-x-hidden bg-[#f8f9fd] px-3 py-5 text-[#241c18] transition-colors dark:bg-[#0d0d10] dark:text-white sm:px-6 sm:py-10 lg:px-10">
       <input
         ref={hiddenFileInputRef}
         type="file"
@@ -204,13 +204,13 @@ export default function OnboardingPage() {
         onChange={(event) => handleSelectFile(event.target.files?.[0])}
       />
 
-      <div className="mx-auto max-w-6xl rounded-[24px] border border-[#eadfd5] bg-[#fffdfa] p-4 shadow-[0_24px_70px_rgba(83,46,32,0.10)] dark:border-white/10 dark:bg-[#111214] dark:shadow-[0_40px_120px_rgba(0,0,0,0.55)] sm:rounded-[30px] sm:p-6 lg:p-8">
+      <div className="mx-auto max-w-6xl rounded-[24px] border border-[#eadfd5] bg-[#f8f9fd] p-4 shadow-[0_24px_70px_rgba(83,46,32,0.10)] dark:border-white/10 dark:bg-[#111214] dark:shadow-[0_40px_120px_rgba(0,0,0,0.55)] sm:rounded-[30px] sm:p-6 lg:p-8">
         <div className="flex flex-col items-start justify-between gap-4 border-b border-[#eadfd5] pb-5 dark:border-white/10 sm:flex-row sm:items-center sm:pb-6">
           <div>
             <p className="text-[11px] font-extrabold uppercase tracking-[0.22em] text-[#d63373] dark:text-[#ff7ab3]">Finaliser le profil</p>
             <h1 className="mt-2 font-display text-3xl tracking-[-0.05em] text-[#241c18] dark:text-white sm:mt-3 sm:text-4xl lg:text-5xl">Bienvenue chez ARAS</h1>
           </div>
-          <div className="self-start rounded-full border border-[#eadfd5] bg-[#f7f1e9] px-3 py-2 text-[10px] font-bold uppercase tracking-[0.12em] text-[#625852] dark:border-white/10 dark:bg-white/5 dark:text-white/80 sm:self-auto sm:px-4 sm:text-xs sm:tracking-[0.18em]">
+          <div className="self-start rounded-full border border-[#eadfd5] bg-[#f8f9fd] px-3 py-2 text-[10px] font-bold uppercase tracking-[0.12em] text-[#625852] dark:border-white/10 dark:bg-white/5 dark:text-white/80 sm:self-auto sm:px-4 sm:text-xs sm:tracking-[0.18em]">
             Étape {step + 1} / {steps.length}
           </div>
         </div>
@@ -251,7 +251,7 @@ export default function OnboardingPage() {
                   <input
                     value={name}
                     onChange={(event) => setName(event.target.value)}
-                    className="mt-2 w-full min-w-0 rounded-2xl border border-[#dfd2c6] bg-[#fffdfa] px-4 py-3.5 text-base text-[#241c18] outline-none transition placeholder:text-[#9a8b82] focus:border-[#ec3b78] dark:border-white/10 dark:bg-[#1d1f24] dark:text-white dark:placeholder:text-white/35 dark:focus:border-[#ff7ab3]"
+                    className="mt-2 w-full min-w-0 rounded-2xl border border-[#dfd2c6] bg-[#f8f9fd] px-4 py-3.5 text-base text-[#241c18] outline-none transition placeholder:text-[#9a8b82] focus:border-[#ec3b78] dark:border-white/10 dark:bg-[#1d1f24] dark:text-white dark:placeholder:text-white/35 dark:focus:border-[#ff7ab3]"
                     placeholder="Ton prénom"
                   />
                 </label>
@@ -265,7 +265,7 @@ export default function OnboardingPage() {
                         type="button"
                         onClick={() => setGender(option)}
                         className={`rounded-2xl border px-4 py-3.5 text-sm font-bold transition ${
-                          gender === option ? 'border-[#ec3b78] bg-[#ffedf4] text-[#d63373] dark:border-[#ff7ab3]' : 'border-[#dfd2c6] bg-[#fffdfa] text-[#625852] dark:border-white/10 dark:bg-[#1d1f24] dark:text-white/70'
+                          gender === option ? 'border-[#ec3b78] bg-[#ffedf4] text-[#d63373] dark:border-[#ff7ab3]' : 'border-[#dfd2c6] bg-[#f8f9fd] text-[#625852] dark:border-white/10 dark:bg-[#1d1f24] dark:text-white/70'
                         }`}
                       >
                         {option}
@@ -280,7 +280,7 @@ export default function OnboardingPage() {
                     value={birthdate}
                     onChange={(event) => setBirthdate(event.target.value)}
                     type="date"
-                    className="mt-2 w-full min-w-0 rounded-2xl border border-[#dfd2c6] bg-[#fffdfa] px-4 py-3.5 text-base text-[#241c18] outline-none transition focus:border-[#ec3b78] dark:border-white/10 dark:bg-[#1d1f24] dark:text-white dark:focus:border-[#ff7ab3]"
+                    className="mt-2 w-full min-w-0 rounded-2xl border border-[#dfd2c6] bg-[#f8f9fd] px-4 py-3.5 text-base text-[#241c18] outline-none transition focus:border-[#ec3b78] dark:border-white/10 dark:bg-[#1d1f24] dark:text-white dark:focus:border-[#ff7ab3]"
                   />
                   {birthdate && (
                     <p className={`mt-2 text-xs font-bold ${isAdult ? 'text-[#7fe4cb]' : 'text-[#ff9fb6]'}`}>
@@ -309,13 +309,13 @@ export default function OnboardingPage() {
                 <button
                   type="button"
                   onClick={detectLocation}
-                  className="flex min-w-0 items-center justify-center gap-3 rounded-2xl border border-[#dfd2c6] bg-[#fffdfa] px-4 py-4 text-center text-sm font-bold text-[#241c18] transition hover:border-[#1d857a] dark:border-white/10 dark:bg-[#1d1f24] dark:text-white dark:hover:border-[#7fe4cb]"
+                  className="flex min-w-0 items-center justify-center gap-3 rounded-2xl border border-[#dfd2c6] bg-[#f8f9fd] px-4 py-4 text-center text-sm font-bold text-[#241c18] transition hover:border-[#1d857a] dark:border-white/10 dark:bg-[#1d1f24] dark:text-white dark:hover:border-[#7fe4cb]"
                 >
                   <MapPin size={16} className="text-[#7fe4cb]" />
                   Activer la géolocalisation
                 </button>
 
-                <div className="min-w-0 rounded-2xl border border-dashed border-[#dfd2c6] bg-[#fffdfa] p-4 dark:border-white/10 dark:bg-[#1d1f24]">
+                <div className="min-w-0 rounded-2xl border border-dashed border-[#dfd2c6] bg-[#f8f9fd] p-4 dark:border-white/10 dark:bg-[#1d1f24]">
                   <p className="text-xs font-extrabold uppercase tracking-[0.18em] text-[#756960] dark:text-white/50">Localisation actuelle</p>
                   <p className="mt-3 break-words text-sm text-[#625852] dark:text-white/80">
                     {locationLabel || 'Tu peux passer cette étape si tu préfères remplir ta ville plus tard.'}
@@ -402,7 +402,7 @@ export default function OnboardingPage() {
                 ))}
               </div>
 
-              <div className="rounded-2xl border border-[#eadfd5] bg-[#f7f1e9] p-4 text-sm text-[#625852] dark:border-white/10 dark:bg-[#1d1f24] dark:text-white/65">
+              <div className="rounded-2xl border border-[#eadfd5] bg-[#f8f9fd] p-4 text-sm text-[#625852] dark:border-white/10 dark:bg-[#1d1f24] dark:text-white/65">
                 Tu as ajouté {photoCount} photo{photoCount > 1 ? 's' : ''} optionnelle{photoCount > 1 ? 's' : ''} sur 6.
               </div>
             </div>
@@ -420,7 +420,7 @@ export default function OnboardingPage() {
                 </div>
               </div>
 
-              <div className="rounded-[24px] border border-[#eadfd5] bg-[#fffdfa] p-4 shadow-[0_20px_60px_rgba(83,46,32,0.08)] dark:border-white/10 dark:bg-[#1d1f24] dark:shadow-[0_40px_120px_rgba(0,0,0,0.35)] sm:rounded-[30px] sm:p-6">
+              <div className="rounded-[24px] border border-[#eadfd5] bg-[#f8f9fd] p-4 shadow-[0_20px_60px_rgba(83,46,32,0.08)] dark:border-white/10 dark:bg-[#1d1f24] dark:shadow-[0_40px_120px_rgba(0,0,0,0.35)] sm:rounded-[30px] sm:p-6">
                 <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
                   <div className="flex items-center gap-4">
                     <div className="relative flex h-24 w-24 items-center justify-center overflow-hidden rounded-full border-4 border-[#ff7ab3] bg-[#ffedf4] text-2xl font-black text-[#d63373] shadow-lg shadow-[#ff7ab3]/20">
@@ -435,8 +435,8 @@ export default function OnboardingPage() {
                         {name || 'Ton profil'}{birthdate ? `, ${age}` : ''}
                       </h3>
                       <div className="mt-2 flex flex-wrap gap-2 text-xs font-bold uppercase tracking-[0.12em] text-[#625852] dark:text-white/70">
-                        {gender && <span className="rounded-full border border-[#eadfd5] bg-[#f7f1e9] px-2.5 py-1 dark:border-white/10 dark:bg-white/5">{gender}</span>}
-                        {locationLabel && <span className="max-w-full break-words rounded-full border border-[#eadfd5] bg-[#f7f1e9] px-2.5 py-1 dark:border-white/10 dark:bg-white/5">{locationLabel.split(',')[0]}</span>}
+                        {gender && <span className="rounded-full border border-[#eadfd5] bg-[#f8f9fd] px-2.5 py-1 dark:border-white/10 dark:bg-white/5">{gender}</span>}
+                        {locationLabel && <span className="max-w-full break-words rounded-full border border-[#eadfd5] bg-[#f8f9fd] px-2.5 py-1 dark:border-white/10 dark:bg-white/5">{locationLabel.split(',')[0]}</span>}
                       </div>
                     </div>
                   </div>
@@ -448,7 +448,7 @@ export default function OnboardingPage() {
 
                 <div className="mt-6 grid gap-3 sm:grid-cols-3">
                   {extraPhotos.map((photo, index) => (
-                  <div key={`preview-${index}`} className="overflow-hidden rounded-[22px] border border-[#eadfd5] bg-[#f7f1e9] dark:border-white/10 dark:bg-[#1d1f24]">
+                  <div key={`preview-${index}`} className="overflow-hidden rounded-[22px] border border-[#eadfd5] bg-[#f8f9fd] dark:border-white/10 dark:bg-[#1d1f24]">
                       {photo ? (
                         <img src={photo} alt={`Photo optionnelle ${index + 1}`} className="h-40 w-full object-cover" />
                       ) : (
@@ -481,7 +481,7 @@ export default function OnboardingPage() {
               <button
                 type="button"
                 onClick={prevStep}
-                className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-full border border-[#dfd2c6] bg-[#fffdfa] px-5 py-3 text-sm font-bold text-[#625852] transition hover:border-[#ec3b78] dark:border-white/10 dark:bg-[#1d1f24] dark:text-white dark:hover:border-white/20 sm:w-auto"
+                className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-full border border-[#dfd2c6] bg-[#f8f9fd] px-5 py-3 text-sm font-bold text-[#625852] transition hover:border-[#ec3b78] dark:border-white/10 dark:bg-[#1d1f24] dark:text-white dark:hover:border-white/20 sm:w-auto"
               >
                 <ArrowLeft size={16} />
                 Retour

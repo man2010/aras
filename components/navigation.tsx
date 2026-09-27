@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Menu, X, Heart, LogOut, LayoutDashboard, Bell, Moon, Sun, MessageCircle, CalendarDays, ChevronRight, Settings, User, SlidersHorizontal } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { supabase } from '@/lib/supabase';
@@ -39,9 +39,10 @@ export function Navbar() {
   const [unreadEventCount, setUnreadEventCount] = useState(0);
   const [miniProfile, setMiniProfile] = useState<MiniProfile | null>(null);
   const [appTab, setAppTab] = useState('');
-  const { user, signOut, unreadCount, setUnreadCount } = useAuth();
+  const { user, loading: authLoading, signOut, unreadCount, setUnreadCount } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
+  const previousUserId = useRef<string | null>(null);
   const { resolvedTheme, setTheme } = useTheme();
   const isConnected = Boolean(user);
   // Le thème sauvegardé n'existe que dans le navigateur : conserver le rendu
@@ -51,6 +52,18 @@ export function Navbar() {
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  useEffect(() => {
+    if (user) {
+      previousUserId.current = user.id;
+      return;
+    }
+
+    if (!authLoading && previousUserId.current) {
+      previousUserId.current = null;
+      router.replace('/');
+    }
+  }, [authLoading, router, user]);
 
   useEffect(() => {
     const onAppTab = (event: Event) => setAppTab((event as CustomEvent<string>).detail ?? '');
@@ -278,11 +291,51 @@ export function Navbar() {
     router.push('/');
   };
 
+  const notificationGroups = [
+    { type: 'like' as const, label: 'Likes reçus', Icon: Heart },
+    { type: 'message' as const, label: 'Messages', Icon: MessageCircle },
+    { type: 'event' as const, label: 'Événements à venir', Icon: CalendarDays },
+  ].map((group) => ({ ...group, items: notifications.filter((notification) => notification.type === group.type) }));
+
+  const renderNotificationGroups = () => (
+    <div className="max-h-[calc(100dvh-160px)] overflow-y-auto p-2 md:max-h-[min(440px,70vh)]">
+      {notificationGroups.filter((group) => group.items.length > 0).map(({ type, label, Icon, items }) => (
+        <section key={type} aria-label={label} className="mb-2 last:mb-0">
+          <h3 className="flex items-center gap-2 px-3 pb-1 pt-2 text-[10px] font-extrabold uppercase tracking-[.12em] text-[#747888] dark:text-white/50">
+            <Icon size={13} className={type === 'like' ? 'text-[#ec3b78]' : type === 'message' ? 'text-sky-500' : 'text-amber-500'} />
+            {label}
+            <span className="ml-auto rounded-full bg-[#eef0f5] px-2 py-0.5 text-[10px] text-[#515565] dark:bg-white/10 dark:text-white/70">{items.length}</span>
+          </h3>
+          {items.map((notification) => (
+            <button key={notification.id} type="button" onClick={() => void handleNotificationClick(notification)} className={`flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left transition hover:bg-[#f1f2f7] dark:hover:bg-white/5 ${notification.unread ? 'bg-[#fdf0f6] dark:bg-[#ec3b78]/10' : ''}`}>
+              <div className={`relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full ${type === 'like' ? 'bg-[#fce6ef] text-[#ec3b78]' : type === 'message' ? 'bg-sky-50 text-sky-600 dark:bg-sky-500/15 dark:text-sky-300' : 'bg-amber-50 text-amber-600 dark:bg-amber-500/15 dark:text-amber-300'}`}>
+                {notification.avatarUrl ? <img src={notification.avatarUrl} alt="" className="h-full w-full object-cover" /> : <Icon size={17} />}
+                {notification.unread && <span className="absolute right-0 top-0 h-2.5 w-2.5 rounded-full border-2 border-white bg-[#ec3b78] dark:border-[#1c1b21]" />}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-xs font-extrabold text-[#252532] dark:text-white">{notification.title}</p>
+                <p className="mt-0.5 line-clamp-2 break-words text-xs leading-4 text-[#626779] dark:text-white/65">{notification.message}</p>
+              </div>
+              <ChevronRight size={15} className="shrink-0 text-[#85899a] dark:text-white/45" />
+            </button>
+          ))}
+        </section>
+      ))}
+    </div>
+  );
+
   return (
-    <nav className="fixed left-0 right-0 top-0 z-40 border-b border-black/5 bg-[#fbf8f2]/90 backdrop-blur-xl">
+    <nav className="fixed left-0 right-0 top-0 z-40 border-b border-black/5 bg-[#f8f9fd]/90 backdrop-blur-xl">
       <div className="mx-auto flex h-[60px] max-w-[1240px] items-center justify-between px-5 lg:px-8">
         {user ? (
-          <Link href="/espace?tab=profile" className="flex min-w-0 items-center gap-2" aria-label="Mon profil">
+          <Link
+            href="/espace?tab=profile"
+            onClick={() => {
+              if (pathname === '/espace') window.dispatchEvent(new Event('aras:show-profile-tab'));
+            }}
+            className="flex min-w-0 items-center gap-2"
+            aria-label="Mon profil"
+          >
             <span className="relative h-9 w-9 shrink-0 overflow-hidden rounded-full border-2 border-[#ec3b78] bg-white sm:h-10 sm:w-10"><img src={miniProfile?.photo_url || fallbackAvatar} alt="" className="h-full w-full object-cover" /></span>
             <span className="hidden max-w-32 truncate text-sm font-extrabold text-[#241c18] sm:block">{miniProfile?.display_name || 'Mon profil'}</span>
           </Link>
@@ -322,7 +375,7 @@ export function Navbar() {
                     onClick={() => setNotificationOpen((openState) => !openState)}
                     aria-label="Ouvrir les notifications"
                     aria-expanded={notificationOpen}
-                    className="relative flex items-center gap-2 px-4 py-2.5 text-[13px] font-bold text-[#625852] transition hover:text-[#ec3b78]"
+                    className="relative flex items-center gap-2 px-4 py-2.5 text-[13px] font-bold text-[#515565] transition hover:text-[#ec3b78] dark:text-white/75"
                   >
                     <Bell size={16} />
                     {(unreadCount + unreadEventCount) > 0 && (
@@ -333,9 +386,9 @@ export function Navbar() {
                   </button>
 
                   {notificationOpen && (
-                    <div className="fixed left-3 right-3 top-[72px] z-50 max-h-[calc(100dvh-88px)] overflow-hidden rounded-2xl border border-[#dfd2c6] bg-white text-[#241c18] shadow-[0_18px_50px_rgba(83,46,32,.18)] dark:border-white/10 dark:bg-[#1c1b21] dark:text-white dark:shadow-[0_18px_50px_rgba(0,0,0,.45)] md:absolute md:left-auto md:right-0 md:top-full md:mt-2 md:max-h-none md:w-[min(360px,calc(100vw-2rem))]">
-                      <div className="flex items-center justify-between border-b border-[#f0e5dc] px-4 py-3 dark:border-white/10">
-                        <p className="text-sm font-extrabold text-[#241c18] dark:text-white">Notifications</p>
+                    <div className="fixed left-3 right-3 top-[72px] z-50 max-h-[calc(100dvh-88px)] overflow-hidden rounded-2xl border border-[#e1e3eb] bg-white text-[#252532] shadow-[0_18px_50px_rgba(35,38,55,.16)] dark:border-white/10 dark:bg-[#1c1b21] dark:text-white dark:shadow-[0_18px_50px_rgba(0,0,0,.45)] md:absolute md:left-auto md:right-0 md:top-full md:mt-2 md:max-h-none md:w-[min(360px,calc(100vw-2rem))]">
+                      <div className="flex items-center justify-between border-b border-[#e8eaf0] px-4 py-3 dark:border-white/10">
+                        <p className="text-sm font-extrabold text-[#252532] dark:text-white">Notifications</p>
                         {(unreadCount + unreadEventCount) > 0 && (
                           <span className="text-[10px] font-extrabold uppercase tracking-[.12em] text-[#ec3b78]">
                             {unreadCount + unreadEventCount} nouvelle{unreadCount + unreadEventCount > 1 ? 's' : ''}
@@ -344,37 +397,12 @@ export function Navbar() {
                       </div>
                       {notifications.length === 0 ? (
                         <div className="px-4 py-8 text-center">
-                          <Bell size={22} className="mx-auto text-[#d9c9ba]" />
-                          <p className="mt-3 text-sm font-bold text-[#756960] dark:text-white/75">Aucune notification</p>
-                          <p className="mt-1 text-xs text-[#9a8b82] dark:text-white/50">Tout est à jour.</p>
+                          <Bell size={22} className="mx-auto text-[#85899a] dark:text-white/40" />
+                          <p className="mt-3 text-sm font-bold text-[#4f5362] dark:text-white/75">Aucune notification</p>
+                          <p className="mt-1 text-xs text-[#747888] dark:text-white/50">Tout est à jour.</p>
                         </div>
                       ) : (
-                      <div className="max-h-[calc(100dvh-160px)] overflow-y-auto p-2 md:max-h-[min(440px,70vh)]">
-                          {notifications.map((notification) => (
-                            <button
-                              key={notification.id}
-                              type="button"
-                              onClick={() => void handleNotificationClick(notification)}
-                              className={`flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left transition hover:bg-[#fbf3ee] dark:hover:bg-white/5 ${notification.unread ? 'bg-[#fff7f4] dark:bg-[#ec3b78]/10' : ''}`}
-                            >
-                              <div className="relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[#f3e9dc] text-[#1a6b68] dark:bg-white/10 dark:text-[#ff6aa0]">
-                                {notification.avatarUrl ? (
-                                  <img src={notification.avatarUrl} alt="" className="h-full w-full object-cover" />
-                                ) : notification.type === 'message' ? (
-                                  <MessageCircle size={17} />
-                                ) : (
-                                  <CalendarDays size={17} />
-                                )}
-                                {notification.unread && <span className="absolute right-0 top-0 h-2.5 w-2.5 rounded-full border-2 border-white bg-[#ec3b78] dark:border-[#1c1b21]" />}
-                              </div>
-                              <div className="min-w-0 flex-1">
-                                <p className="truncate text-xs font-extrabold text-[#241c18] dark:text-white">{notification.title}</p>
-                                <p className="mt-0.5 line-clamp-2 text-xs leading-4 text-[#756960] dark:text-white/65">{notification.message}</p>
-                              </div>
-                              <ChevronRight size={15} className="shrink-0 text-[#b8aaa1]" />
-                            </button>
-                          ))}
-                        </div>
+                        renderNotificationGroups()
                       )}
                     </div>
                   )}
@@ -400,15 +428,15 @@ export function Navbar() {
                 onClick={() => setNotificationOpen((openState) => !openState)}
                 aria-label={`Ouvrir les notifications${(unreadCount + unreadEventCount) > 0 ? `, ${unreadCount + unreadEventCount} non lues` : ''}`}
                 aria-expanded={notificationOpen}
-                className="relative rounded-full border border-[#dfd2c6] p-2.5 text-[#625852] transition hover:border-[#ec3b78] hover:text-[#ec3b78]"
+                className="relative rounded-full border border-[#e1e3eb] p-2.5 text-[#515565] transition hover:border-[#ec3b78] hover:text-[#ec3b78] dark:border-white/15 dark:text-white/75"
               >
                 <Bell size={18} />
                 {(unreadCount + unreadEventCount) > 0 && <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-[#ec3b78] px-1 text-[10px] font-extrabold text-white">{(unreadCount + unreadEventCount) > 9 ? '9+' : unreadCount + unreadEventCount}</span>}
               </button>
               {notificationOpen && (
-                <div className="fixed left-3 right-3 top-[72px] z-50 max-h-[calc(100dvh-88px)] overflow-hidden rounded-2xl border border-[#dfd2c6] bg-white text-[#241c18] shadow-[0_18px_50px_rgba(83,46,32,.18)] dark:border-white/10 dark:bg-[#1c1b21] dark:text-white dark:shadow-[0_18px_50px_rgba(0,0,0,.45)] md:absolute md:left-auto md:right-0 md:top-full md:mt-3 md:max-h-none md:w-[min(360px,calc(100vw-2rem))]">
-                  <div className="flex items-center justify-between border-b border-[#f0e5dc] px-4 py-3 dark:border-white/10"><p className="text-sm font-extrabold text-[#241c18] dark:text-white">Notifications</p>{(unreadCount + unreadEventCount) > 0 && <span className="text-[10px] font-extrabold uppercase tracking-[.12em] text-[#ec3b78]">{unreadCount + unreadEventCount} nouvelle{unreadCount + unreadEventCount > 1 ? 's' : ''}</span>}</div>
-                  {notifications.length === 0 ? <div className="px-4 py-8 text-center"><Bell size={22} className="mx-auto text-[#d9c9ba] dark:text-white/40" /><p className="mt-3 text-sm font-bold text-[#756960] dark:text-white/75">Aucune notification</p><p className="mt-1 text-xs text-[#9a8b82] dark:text-white/50">Tout est à jour.</p></div> : <div className="max-h-[calc(100dvh-160px)] overflow-y-auto p-2 md:max-h-[min(440px,70vh)]">{notifications.map((notification) => <button key={notification.id} type="button" onClick={() => void handleNotificationClick(notification)} className={`flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left transition hover:bg-[#fbf3ee] dark:hover:bg-white/5 ${notification.unread ? 'bg-[#fff7f4] dark:bg-[#ec3b78]/10' : ''}`}><div className="relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[#f3e9dc] text-[#1a6b68] dark:bg-white/10 dark:text-[#ff6aa0]">{notification.avatarUrl ? <img src={notification.avatarUrl} alt="" className="h-full w-full object-cover" /> : notification.type === 'message' ? <MessageCircle size={17} /> : notification.type === 'like' ? <Heart size={17} /> : <CalendarDays size={17} />}{notification.unread && <span className="absolute right-0 top-0 h-2.5 w-2.5 rounded-full border-2 border-white bg-[#ec3b78] dark:border-[#1c1b21]" />}</div><div className="min-w-0 flex-1"><p className="truncate text-xs font-extrabold text-[#241c18] dark:text-white">{notification.title}</p><p className="mt-0.5 line-clamp-2 break-words text-xs leading-4 text-[#756960] dark:text-white/65">{notification.message}</p></div><ChevronRight size={15} className="shrink-0 text-[#b8aaa1] dark:text-white/45" /></button>)}</div>}
+                <div className="fixed left-3 right-3 top-[72px] z-50 max-h-[calc(100dvh-88px)] overflow-hidden rounded-2xl border border-[#e1e3eb] bg-white text-[#252532] shadow-[0_18px_50px_rgba(35,38,55,.16)] dark:border-white/10 dark:bg-[#1c1b21] dark:text-white dark:shadow-[0_18px_50px_rgba(0,0,0,.45)] md:absolute md:left-auto md:right-0 md:top-full md:mt-3 md:max-h-none md:w-[min(360px,calc(100vw-2rem))]">
+                  <div className="flex items-center justify-between border-b border-[#e8eaf0] px-4 py-3 dark:border-white/10"><p className="text-sm font-extrabold text-[#252532] dark:text-white">Notifications</p>{(unreadCount + unreadEventCount) > 0 && <span className="text-[10px] font-extrabold uppercase tracking-[.12em] text-[#ec3b78]">{unreadCount + unreadEventCount} nouvelle{unreadCount + unreadEventCount > 1 ? 's' : ''}</span>}</div>
+                  {notifications.length === 0 ? <div className="px-4 py-8 text-center"><Bell size={22} className="mx-auto text-[#85899a] dark:text-white/40" /><p className="mt-3 text-sm font-bold text-[#4f5362] dark:text-white/75">Aucune notification</p><p className="mt-1 text-xs text-[#747888] dark:text-white/50">Tout est à jour.</p></div> : renderNotificationGroups()}
                 </div>
               )}
             </div>
@@ -420,7 +448,7 @@ export function Navbar() {
       </div>
 
       {open && !user && (
-        <div className="border-t border-black/5 bg-[#fbf8f2] px-5 pb-5 pt-3 md:hidden animate-in slide-in-from-top-2 duration-300">
+        <div className="border-t border-black/5 bg-[#f8f9fd] px-5 pb-5 pt-3 md:hidden animate-in slide-in-from-top-2 duration-300">
           <div className="flex flex-col gap-4 text-sm font-bold">
             {!isConnected && (
               <>
@@ -443,7 +471,7 @@ export function Navbar() {
                   onClick={() => setOpen(false)}
                   className="flex items-center gap-3 rounded-2xl border border-[#dfd2c6] bg-white p-3"
                 >
-                  <span className="relative h-11 w-11 shrink-0 overflow-hidden rounded-full bg-[#f3e9dc]">
+                  <span className="relative h-11 w-11 shrink-0 overflow-hidden rounded-full bg-[#f8f9fd]">
                     <img src={miniProfile?.photo_url || fallbackAvatar} alt="" className="h-full w-full object-cover" />
                     <span className={`absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-white ${miniProfile?.is_online ? 'bg-[#1a6b68]' : 'bg-[#b8aaa1]'}`} />
                   </span>

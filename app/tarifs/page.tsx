@@ -19,7 +19,7 @@ export default function TarifsPage() {
       price: '0',
       period: 'FCFA',
       icon: Heart,
-      bg: '#fbf8f2',
+      bg: '#f8f9fd',
       accent: '#1a6b68',
       cta: 'Commencer',
       href: '/inscription',
@@ -101,7 +101,7 @@ export default function TarifsPage() {
   ];
 
   return (
-    <main className="min-h-screen bg-[#fbf8f2] px-5 pb-24 pt-[100px] lg:px-8 lg:pt-[120px]">
+    <main className="min-h-screen bg-[#f8f9fd] px-5 pb-24 pt-[100px] lg:px-8 lg:pt-[120px]">
       <div className="mx-auto max-w-[1120px]">
         <div className="text-center">
           <p className="text-xs font-extrabold uppercase tracking-[.2em] text-[#ec3b78]">Choisissez votre formule</p>
@@ -128,7 +128,7 @@ export default function TarifsPage() {
           ))}
         </div>
 
-        <section className="mt-20 rounded-[28px] bg-[#f3e9dc] px-6 py-10 lg:px-10 lg:py-14">
+        <section className="mt-20 rounded-[28px] bg-[#f8f9fd] px-6 py-10 lg:px-10 lg:py-14">
           <div className="mx-auto grid max-w-[1080px] gap-12 lg:grid-cols-[.9fr_1.1fr] lg:items-start lg:gap-16">
             <div className="text-center lg:text-left">
               <p className="text-[11px] font-extrabold uppercase tracking-[.28em] text-[#c88a27]">Je ne souhaite pas m&apos;inscrire sur le site</p>
@@ -149,7 +149,7 @@ export default function TarifsPage() {
                 { title: 'Contact en privé', text: 'Nous vous recontactons par le moyen de votre choix : SMS, appel ou e-mail.' },
                 { title: 'Suivi et accompagnement', text: 'Nous vous accompagnons jusqu’au mariage.' },
               ].map((item, index) => (
-                <div key={item.title} className="rounded-[22px] bg-[#fbf8f2] p-5 shadow-[0_10px_24px_rgba(83,46,32,.05)] transition duration-300 hover:-translate-y-1 animate-in fade-in slide-in-from-bottom-4" style={{ animationDelay: `${index * 120}ms` }}>
+                <div key={item.title} className="rounded-[22px] bg-[#f8f9fd] p-5 shadow-[0_10px_24px_rgba(83,46,32,.05)] transition duration-300 hover:-translate-y-1 animate-in fade-in slide-in-from-bottom-4" style={{ animationDelay: `${index * 120}ms` }}>
                   <h3 className="font-display text-[20px] text-[#c88a27]">{item.title}</h3>
                   <p className="mt-2 text-sm leading-6 text-[#756960]">{item.text}</p>
                 </div>

@@ -56,14 +56,14 @@ export function AdminMessages({ messages, profiles, onDeleteMessage }: AdminMess
                 placeholder="Rechercher dans les messages..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full rounded-xl border border-[#dfd2c6] bg-[#fbf8f2] pl-10 pr-4 py-2.5 text-sm outline-none focus:border-[#ec3b78]"
+                className="w-full rounded-xl border border-[#dfd2c6] bg-[#f8f9fd] pl-10 pr-4 py-2.5 text-sm outline-none focus:border-[#ec3b78]"
               />
             </div>
           </div>
           <select
             value={filterConversation}
             onChange={(e) => setFilterConversation(e.target.value)}
-            className="rounded-xl border border-[#dfd2c6] bg-[#fbf8f2] px-4 py-2.5 text-sm outline-none focus:border-[#ec3b78]"
+            className="rounded-xl border border-[#dfd2c6] bg-[#f8f9fd] px-4 py-2.5 text-sm outline-none focus:border-[#ec3b78]"
           >
             <option value="">Toutes les conversations</option>
             {conversations.map((convId) => (
@@ -115,7 +115,7 @@ export function AdminMessages({ messages, profiles, onDeleteMessage }: AdminMess
             {filteredMessages.map((message) => {
               const sender = profiles[message.sender_id];
               return (
-                <div key={message.id} className="rounded-xl border border-[#f3e9dc] p-4 transition hover:bg-[#fbf8f2]">
+                <div key={message.id} className="rounded-xl border border-[#f3e9dc] p-4 transition hover:bg-[#f8f9fd]">
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
                       <div className="flex items-center gap-3 mb-2">

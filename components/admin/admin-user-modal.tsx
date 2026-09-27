@@ -48,7 +48,7 @@ export function AdminUserModal({ isOpen, onClose, onSubmit, editProfile }: Admin
       <div className="w-full max-w-2xl rounded-[28px] bg-white p-6 shadow-[0_20px_60px_rgba(0,0,0,.3)] max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-6">
           <h3 className="font-display text-2xl">{editProfile ? 'Modifier le profil' : 'Éditer le profil'}</h3>
-          <button onClick={onClose} className="rounded-full bg-[#f3e9dc] p-2 text-[#756960] transition hover:bg-[#e7cfc0]">
+          <button onClick={onClose} className="rounded-full bg-[#f8f9fd] p-2 text-[#756960] transition hover:bg-[#f8f9fd]">
             <X size={20} />
           </button>
         </div>
@@ -63,7 +63,7 @@ export function AdminUserModal({ isOpen, onClose, onSubmit, editProfile }: Admin
                 value={formData.display_name}
                 onChange={(e) => setFormData({ ...formData, display_name: e.target.value })}
                 placeholder="Nom complet"
-                className="w-full rounded-xl border border-[#dfd2c6] bg-[#fbf8f2] pl-10 pr-4 py-3 text-sm outline-none focus:border-[#ec3b78]"
+                className="w-full rounded-xl border border-[#dfd2c6] bg-[#f8f9fd] pl-10 pr-4 py-3 text-sm outline-none focus:border-[#ec3b78]"
               />
             </div>
           </div>
@@ -77,7 +77,7 @@ export function AdminUserModal({ isOpen, onClose, onSubmit, editProfile }: Admin
                 value={formData.profession}
                 onChange={(e) => setFormData({ ...formData, profession: e.target.value })}
                 placeholder="Profession"
-                className="w-full rounded-xl border border-[#dfd2c6] bg-[#fbf8f2] pl-10 pr-4 py-3 text-sm outline-none focus:border-[#ec3b78]"
+                className="w-full rounded-xl border border-[#dfd2c6] bg-[#f8f9fd] pl-10 pr-4 py-3 text-sm outline-none focus:border-[#ec3b78]"
               />
             </div>
           </div>
@@ -92,7 +92,7 @@ export function AdminUserModal({ isOpen, onClose, onSubmit, editProfile }: Admin
                   value={formData.city}
                   onChange={(e) => setFormData({ ...formData, city: e.target.value })}
                   placeholder="Ville"
-                  className="w-full rounded-xl border border-[#dfd2c6] bg-[#fbf8f2] pl-10 pr-4 py-3 text-sm outline-none focus:border-[#ec3b78]"
+                  className="w-full rounded-xl border border-[#dfd2c6] bg-[#f8f9fd] pl-10 pr-4 py-3 text-sm outline-none focus:border-[#ec3b78]"
                 />
               </div>
             </div>
@@ -106,7 +106,7 @@ export function AdminUserModal({ isOpen, onClose, onSubmit, editProfile }: Admin
                 placeholder="Âge"
                 min="18"
                 max="100"
-                className="w-full rounded-xl border border-[#dfd2c6] bg-[#fbf8f2] px-4 py-3 text-sm outline-none focus:border-[#ec3b78]"
+                className="w-full rounded-xl border border-[#dfd2c6] bg-[#f8f9fd] px-4 py-3 text-sm outline-none focus:border-[#ec3b78]"
               />
             </div>
           </div>
@@ -118,7 +118,7 @@ export function AdminUserModal({ isOpen, onClose, onSubmit, editProfile }: Admin
               onChange={(e) => setFormData({ ...formData, bio: e.target.value })}
               placeholder="Description personnelle"
               rows={3}
-              className="w-full rounded-xl border border-[#dfd2c6] bg-[#fbf8f2] px-4 py-3 text-sm outline-none focus:border-[#ec3b78]"
+              className="w-full rounded-xl border border-[#dfd2c6] bg-[#f8f9fd] px-4 py-3 text-sm outline-none focus:border-[#ec3b78]"
             />
           </div>
 
@@ -148,7 +148,7 @@ export function AdminUserModal({ isOpen, onClose, onSubmit, editProfile }: Admin
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 rounded-full bg-[#f3e9dc] px-6 py-3 text-sm font-extrabold text-[#756960] transition hover:bg-[#e7cfc0]"
+              className="flex-1 rounded-full bg-[#f8f9fd] px-6 py-3 text-sm font-extrabold text-[#756960] transition hover:bg-[#f8f9fd]"
             >
               Annuler
             </button>

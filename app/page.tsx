@@ -41,7 +41,7 @@ export default function Home() {
   return (
     <main className="min-h-screen">
       {/* HERO */}
-      <section className="relative min-h-[200px] bg-gradient-to-b from-[#f3e9dc] to-[#f5efe6] px-4 pb-2 pt-[72px] lg:min-h-[360px] lg:px-8 lg:pt-[85px]">
+      <section className="relative min-h-[200px] bg-gradient-to-b from-[#f8f9fd] to-[#f8f9fd] px-4 pb-2 pt-[72px] lg:min-h-[360px] lg:px-8 lg:pt-[85px]">
         <div className="relative mx-auto grid max-w-[1240px] items-center gap-6 lg:grid-cols-[1fr_0.8fr]">
           <div className="relative z-10 animate-[reveal_.8s_ease_both]">
             <div className={`mb-4 inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-[10px] font-extrabold uppercase tracking-[.18em] ${isDark ? 'border-white/30 bg-white/10 text-white' : 'border-[#d89b52]/40 bg-white/40 text-[#9a682f]'}`}>
@@ -79,7 +79,7 @@ export default function Home() {
       </section>
 
       {/* STATS */}
-      <section className="home-stats border-y border-[#e4d8cc] bg-[#fbf8f2] px-5 py-8 lg:px-8">
+      <section className="home-stats border-y border-[#e4d8cc] bg-[#f8f9fd] px-5 py-8 lg:px-8">
         <div className="mx-auto grid max-w-[1080px] grid-cols-2 gap-8 text-center sm:grid-cols-4">
           {[
             { v: '1 200+', l: 'Membres actifs', c: '#ec3b78' },
@@ -96,7 +96,7 @@ export default function Home() {
       </section>
 
       {/* CONCEPT */}
-      <section id="concept" className="bg-[#f3e9dc] px-5 py-24 lg:px-8 lg:py-32">
+      <section id="concept" className="bg-[#f8f9fd] px-5 py-24 lg:px-8 lg:py-32">
         <div className="mx-auto grid max-w-[1120px] items-center gap-16 lg:grid-cols-[.85fr_1fr] lg:gap-24">
           <div className="animate-in slide-in-from-left-4 duration-700">
             <p className="text-xs font-extrabold uppercase tracking-[.2em] text-[#ec3b78]">Une autre façon de se rencontrer</p>
@@ -106,7 +106,7 @@ export default function Home() {
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
             {[
-              { icon: ShieldCheck, bg: '#ec3b78', title: 'Profils vérifiés', text: 'ARAS met en place des mesures de vérification pour favoriser des échanges plus fiables et authentiques.', cardBg: '#fbf8f2' },
+              { icon: ShieldCheck, bg: '#ec3b78', title: 'Profils vérifiés', text: 'ARAS met en place des mesures de vérification pour favoriser des échanges plus fiables et authentiques.', cardBg: '#f8f9fd' },
               { icon: MessageCircle, bg: '#1a6b68', title: 'Confidentialité', text: 'Nous accordons une attention particulière à la confidentialité de vos échanges et de vos informations personnelles.', cardBg: '#e5f0ed' },
               { icon: MapPin, bg: '#d89b52', title: 'Ancrée localement', text: 'Villes, langues et codes sociaux du Sénégal, au cœur du fonctionnement de l&apos;app.', cardBg: '#fae4e2' },
               { icon: Heart, bg: '#b93a63', title: 'Ouverte à toutes et tous', text: 'Chrétiens, musulmans, ou sans confession particulière — ARAS accueille toutes les personnes en recherche de mariage.', cardBg: '#fff1df' },
@@ -124,7 +124,7 @@ export default function Home() {
       </section>
 
       {/* HOW IT WORKS */}
-      <section id="how-it-works" className="bg-[#f6ede3] px-5 py-20 lg:px-8 lg:py-24">
+      <section id="how-it-works" className="bg-[#f8f9fd] px-5 py-20 lg:px-8 lg:py-24">
         <div className="mx-auto grid max-w-[1240px] gap-12 lg:grid-cols-[.9fr_1.1fr] lg:items-start lg:gap-20">
           <div className="animate-in slide-in-from-left-4 duration-700">
             <p className="text-[11px] font-extrabold uppercase tracking-[.28em] text-[#ec3b78]">Comment ça marche</p>
@@ -144,7 +144,7 @@ export default function Home() {
 
           <div className="grid gap-4 sm:grid-cols-2">
             {[
-              { number: '01', icon: Users, title: 'Créez votre profil', text: 'Présentez-vous, vos valeurs, vos attentes et votre projet de vie.', bg: '#fbf8f2', span: false },
+              { number: '01', icon: Users, title: 'Créez votre profil', text: 'Présentez-vous, vos valeurs, vos attentes et votre projet de vie.', bg: '#f8f9fd', span: false },
               { number: '02', icon: Search, title: 'Dites ce que vous cherchez', text: 'Définissez vos préférences et les critères importants pour vous.', bg: '#fff7eb', span: false },
               { number: '03', icon: ShieldCheck, title: 'Découvrez des profils compatibles', text: 'Explorez des célibataires qui correspondent à vos affinités.', bg: '#eef6f3', span: false },
               { number: '04', icon: MessageCircle, title: 'Échangez', text: 'Prenez le temps de discuter et de découvrir l’autre avant la rencontre.', bg: '#fff4f6', span: false },
@@ -170,7 +170,7 @@ export default function Home() {
       </section>
 
       {events.length > 0 && (
-        <section className="bg-[#fbf8f2] px-5 py-20 lg:px-8 lg:py-24">
+        <section className="bg-[#f8f9fd] px-5 py-20 lg:px-8 lg:py-24">
           <div className="mx-auto max-w-[1120px]">
             <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
               <div>
@@ -194,7 +194,7 @@ export default function Home() {
 
       {/* FEATURED PROFILES */}
       {profiles.length > 0 && (
-        <section className="bg-[#fbf8f2] px-5 py-24 lg:px-8 lg:py-28">
+        <section className="bg-[#f8f9fd] px-5 py-24 lg:px-8 lg:py-28">
           <div className="mx-auto max-w-[1120px]">
             <div className="flex flex-col justify-between gap-6 sm:flex-row sm:items-end">
               <div className="animate-in slide-in-from-left-4 duration-700">
@@ -215,7 +215,7 @@ export default function Home() {
                     <p className="mt-1 text-xs font-bold text-[#756960]">{p.profession} · {p.city}</p>
                     <div className="mt-3 flex flex-wrap gap-1.5">
                       {p.interests.slice(0, 2).map((tag) => (
-                        <span key={tag} className="rounded-full bg-[#f3e9dc] px-2.5 py-1 text-[10px] font-bold text-[#9a682f]">{tag}</span>
+                        <span key={tag} className="rounded-full bg-[#f8f9fd] px-2.5 py-1 text-[10px] font-bold text-[#9a682f]">{tag}</span>
                       ))}
                     </div>
                   </div>
@@ -228,7 +228,7 @@ export default function Home() {
 
       {/* TESTIMONIALS */}
       {testimonials.length > 0 && (
-        <section className="bg-[#fbf8f2] px-5 py-24 lg:px-8 lg:py-28">
+        <section className="bg-[#f8f9fd] px-5 py-24 lg:px-8 lg:py-28">
           <div className="mx-auto max-w-[1120px]">
             <div className="text-center">
               <p className="text-xs font-extrabold uppercase tracking-[.2em] text-[#ec3b78]">Ils se sont rencontrés chez ARAS</p>
@@ -257,7 +257,7 @@ export default function Home() {
       )}
 
       {/* PRICING TEASER */}
-      <section className="home-pricing bg-[#f3e9dc] px-5 py-24 lg:px-8 lg:py-28">
+      <section className="home-pricing bg-[#f8f9fd] px-5 py-24 lg:px-8 lg:py-28">
         <div className="mx-auto max-w-[1120px]">
           <div className="text-center animate-in fade-in slide-in-from-bottom-4 duration-700">
             <p className="text-xs font-extrabold uppercase tracking-[.2em] text-[#ec3b78]">Choisissez votre formule</p>
@@ -266,7 +266,7 @@ export default function Home() {
           </div>
           <div className="mt-12 grid gap-6 md:grid-cols-3">
             {[
-              { name: 'Découverte', price: 'Gratuit', features: ['Création du profil', 'Voir les profils', '1 like par jour', 'Participation aux événements'], bg: '#fbf8f2', accent: '#1a6b68', cta: 'Commencer', href: '/inscription' },
+              { name: 'Découverte', price: 'Gratuit', features: ['Création du profil', 'Voir les profils', '1 like par jour', 'Participation aux événements'], bg: '#f8f9fd', accent: '#1a6b68', cta: 'Commencer', href: '/inscription' },
               { name: 'Premium', price: '5 000 FCFA', period: '/ mois', features: ['Likes illimités', 'Voir qui vous a liké', 'Messagerie illimitée', 'Filtres avancés', 'Priorité aux événements'], bg: '#ec3b78', accent: '#fff', cta: 'Passer Premium', href: '/tarifs', featured: true },
               { name: 'Élite', price: '15 000 FCFA', period: '/ mois', features: ['Tout Premium', 'Conciergerie personnelle', 'Accès événements privés', 'Profil mis en avant', 'Coaching rencontre'], bg: '#241c18', accent: '#f4c27a', cta: 'Rejoindre l\'Élite', href: '/tarifs' },
             ].map((plan, index) => (
@@ -287,7 +287,7 @@ export default function Home() {
       </section>
 
       {/* CTA */}
-      <section className="home-cta bg-[#fbf8f2] px-5 py-24 lg:px-8">
+      <section className="home-cta bg-[#f8f9fd] px-5 py-24 lg:px-8">
         <div className="mx-auto max-w-[1120px] rounded-[34px] bg-[#fae4e2] px-7 py-14 text-center sm:px-12 dark:bg-[#252525]">
           <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-[#ec3b78] text-white"><MessageCircle size={22} /></div>
           <h2 className="font-display mt-6 text-4xl tracking-[-.04em] sm:text-5xl">Prêt·e à écrire la suite ?</h2>

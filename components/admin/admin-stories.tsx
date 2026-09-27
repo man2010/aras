@@ -63,7 +63,7 @@ export function AdminStories({ stories, profiles, onDeleteStory }: AdminStoriesP
           <select
             value={filterType}
             onChange={(e) => setFilterType(e.target.value as 'all' | 'image' | 'video')}
-            className="rounded-xl border border-[#dfd2c6] bg-[#fbf8f2] px-4 py-2.5 text-sm outline-none focus:border-[#ec3b78]"
+            className="rounded-xl border border-[#dfd2c6] bg-[#f8f9fd] px-4 py-2.5 text-sm outline-none focus:border-[#ec3b78]"
           >
             <option value="all">Tous les types</option>
             <option value="image">Images</option>
@@ -72,7 +72,7 @@ export function AdminStories({ stories, profiles, onDeleteStory }: AdminStoriesP
           <select
             value={filterActive}
             onChange={(e) => setFilterActive(e.target.value as 'all' | 'active' | 'expired')}
-            className="rounded-xl border border-[#dfd2c6] bg-[#fbf8f2] px-4 py-2.5 text-sm outline-none focus:border-[#ec3b78]"
+            className="rounded-xl border border-[#dfd2c6] bg-[#f8f9fd] px-4 py-2.5 text-sm outline-none focus:border-[#ec3b78]"
           >
             <option value="all">Tous les statuts</option>
             <option value="active">Actives</option>
@@ -98,7 +98,7 @@ export function AdminStories({ stories, profiles, onDeleteStory }: AdminStoriesP
               </div>
               <div className="grid grid-cols-2 gap-4 sm:grid-cols-4 lg:grid-cols-6">
                 {(userStories as any[]).map((story) => (
-                  <div key={story.id} className="relative aspect-[9/16] overflow-hidden rounded-xl bg-[#f3e9dc]">
+                  <div key={story.id} className="relative aspect-[9/16] overflow-hidden rounded-xl bg-[#f8f9fd]">
                     {story.media_type === 'image' ? (
                       <img src={story.media_url} alt="Story" className="h-full w-full object-cover" />
                     ) : (

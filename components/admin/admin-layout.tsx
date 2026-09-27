@@ -23,7 +23,7 @@ export function AdminLayout({ children, tab, onTabChange }: AdminLayoutProps) {
   ];
 
   return (
-    <main className="min-h-screen bg-[#fbf8f2] px-5 pb-24 pt-[100px] lg:px-8 lg:pt-[120px]">
+    <main className="min-h-screen bg-[#f8f9fd] px-5 pb-24 pt-[100px] lg:px-8 lg:pt-[120px]">
       <div className="mx-auto max-w-[1600px]">
         <div className="mb-8">
           <p className="text-xs font-extrabold uppercase tracking-[.2em] text-[#ec3b78]">Administration</p>
@@ -36,7 +36,7 @@ export function AdminLayout({ children, tab, onTabChange }: AdminLayoutProps) {
             <button
               key={t.id}
               onClick={() => onTabChange(t.id)}
-              className={`flex items-center gap-2 whitespace-nowrap rounded-xl px-4 py-2.5 text-sm font-extrabold transition ${tab === t.id ? 'bg-[#ec3b78] text-white' : 'text-[#756960] hover:bg-[#f3e9dc]'}`}
+              className={`flex items-center gap-2 whitespace-nowrap rounded-xl px-4 py-2.5 text-sm font-extrabold transition ${tab === t.id ? 'bg-[#ec3b78] text-white' : 'text-[#756960] hover:bg-[#f8f9fd]'}`}
             >
               <t.icon size={16} /> {t.label}
             </button>

@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import {
-  Search,
+  House,
   User,
   MessageCircle,
   Heart,
@@ -26,7 +26,7 @@ export type EspaceTab =
   | 'settings-help';
 
 const mainItems: { id: EspaceTab; label: string; icon: typeof User }[] = [
-  { id: 'decouverte', label: 'Découverte', icon: Search },
+  { id: 'decouverte', label: 'Découverte', icon: House },
   { id: 'messages', label: 'Messages', icon: MessageCircle },
   { id: 'likes', label: 'Likes', icon: Heart },
   { id: 'matches', label: 'Matches', icon: Users },
@@ -70,7 +70,7 @@ export function AppSidebar({ active, onChange }: AppSidebarProps) {
                 className={`group relative flex w-full items-center gap-3 rounded-2xl px-3.5 py-3 text-sm font-bold transition-all duration-200 ${
                   isActive
                     ? 'bg-[#ec3b78] text-white shadow-[0_8px_20px_rgba(236,59,120,.22)]'
-                    : 'text-[#625852] hover:bg-[#f3e9dc] hover:translate-x-0.5 dark:text-white/65 dark:hover:bg-white/5'
+                    : 'text-[#625852] hover:bg-[#f8f9fd] hover:translate-x-0.5 dark:text-white/65 dark:hover:bg-white/5'
                 } ${collapsed ? 'justify-center' : ''}`}
               >
                 <item.icon size={19} className="shrink-0" fill={isActive && item.id === 'likes' ? 'currentColor' : 'none'} />

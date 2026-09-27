@@ -50,7 +50,7 @@ export function AdminAnalytics({ analytics }: AdminAnalyticsProps) {
           <select
             value={timeRange}
             onChange={(e) => setTimeRange(e.target.value as '7d' | '30d' | '90d')}
-            className="rounded-xl border border-[#dfd2c6] bg-[#fbf8f2] px-4 py-2.5 text-sm outline-none focus:border-[#ec3b78]"
+            className="rounded-xl border border-[#dfd2c6] bg-[#f8f9fd] px-4 py-2.5 text-sm outline-none focus:border-[#ec3b78]"
           >
             <option value="7d">7 jours</option>
             <option value="30d">30 jours</option>
@@ -140,7 +140,7 @@ export function AdminAnalytics({ analytics }: AdminAnalyticsProps) {
             {analytics.userDemographics.slice(0, 6).map((item, index) => (
               <div key={index} className="flex items-center gap-3">
                 <p className="w-24 text-sm text-[#756960]">{item.city}</p>
-                <div className="flex-1 h-4 rounded-full bg-[#f3e9dc]">
+                <div className="flex-1 h-4 rounded-full bg-[#f8f9fd]">
                   <div
                     className="h-full rounded-full bg-[#ec3b78] transition hover:bg-[#c92e63]"
                     style={{ width: `${(item.count / Math.max(...analytics.userDemographics.map(d => d.count))) * 100}%` }}

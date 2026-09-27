@@ -25,7 +25,8 @@ export function AuthPhoneInput({
         value={phone}
         onChange={(value) => setPhone(value)}
         placeholder={placeholder}
-        forceDialCode
+        disableDialCodeAndPrefix
+        showDisabledDialCodeAndPrefix
         inputProps={{ required, autoComplete: 'tel' }}
         countrySelectorStyleProps={{
           buttonClassName: 'auth-phone-input__country-button',

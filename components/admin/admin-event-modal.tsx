@@ -119,7 +119,7 @@ export function AdminEventModal({ isOpen, onClose, onSubmit, editEvent }: AdminE
       <div className="w-full max-w-2xl rounded-[28px] bg-white p-6 shadow-[0_20px_60px_rgba(0,0,0,.3)] max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-6">
           <h3 className="font-display text-2xl">{editEvent ? 'Modifier l&apos;événement' : 'Créer un événement'}</h3>
-          <button onClick={onClose} className="rounded-full bg-[#f3e9dc] p-2 text-[#756960] transition hover:bg-[#e7cfc0]">
+          <button onClick={onClose} className="rounded-full bg-[#f8f9fd] p-2 text-[#756960] transition hover:bg-[#f8f9fd]">
             <X size={20} />
           </button>
         </div>
@@ -133,7 +133,7 @@ export function AdminEventModal({ isOpen, onClose, onSubmit, editEvent }: AdminE
               onChange={(e) => setFormData({ ...formData, title: e.target.value })}
               required
               placeholder="Titre de l'événement"
-              className="w-full rounded-xl border border-[#dfd2c6] bg-[#fbf8f2] px-4 py-3 text-sm outline-none focus:border-[#ec3b78]"
+              className="w-full rounded-xl border border-[#dfd2c6] bg-[#f8f9fd] px-4 py-3 text-sm outline-none focus:border-[#ec3b78]"
             />
           </div>
 
@@ -144,7 +144,7 @@ export function AdminEventModal({ isOpen, onClose, onSubmit, editEvent }: AdminE
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
               placeholder="Description de l'événement"
               rows={3}
-              className="w-full rounded-xl border border-[#dfd2c6] bg-[#fbf8f2] px-4 py-3 text-sm outline-none focus:border-[#ec3b78]"
+              className="w-full rounded-xl border border-[#dfd2c6] bg-[#f8f9fd] px-4 py-3 text-sm outline-none focus:border-[#ec3b78]"
             />
           </div>
 
@@ -158,7 +158,7 @@ export function AdminEventModal({ isOpen, onClose, onSubmit, editEvent }: AdminE
                   value={formData.date}
                   onChange={(e) => setFormData({ ...formData, date: e.target.value })}
                   required
-                  className="w-full rounded-xl border border-[#dfd2c6] bg-[#fbf8f2] pl-10 pr-4 py-3 text-sm outline-none focus:border-[#ec3b78]"
+                  className="w-full rounded-xl border border-[#dfd2c6] bg-[#f8f9fd] pl-10 pr-4 py-3 text-sm outline-none focus:border-[#ec3b78]"
                 />
               </div>
             </div>
@@ -173,7 +173,7 @@ export function AdminEventModal({ isOpen, onClose, onSubmit, editEvent }: AdminE
                   onChange={(e) => setFormData({ ...formData, location: e.target.value })}
                   required
                   placeholder="Lieu de l'événement"
-                  className="w-full rounded-xl border border-[#dfd2c6] bg-[#fbf8f2] pl-10 pr-4 py-3 text-sm outline-none focus:border-[#ec3b78]"
+                  className="w-full rounded-xl border border-[#dfd2c6] bg-[#f8f9fd] pl-10 pr-4 py-3 text-sm outline-none focus:border-[#ec3b78]"
                 />
               </div>
             </div>
@@ -186,7 +186,7 @@ export function AdminEventModal({ isOpen, onClose, onSubmit, editEvent }: AdminE
               value={formData.city}
               onChange={(e) => setFormData({ ...formData, city: e.target.value })}
               placeholder="Ville"
-              className="w-full rounded-xl border border-[#dfd2c6] bg-[#fbf8f2] px-4 py-3 text-sm outline-none focus:border-[#ec3b78]"
+              className="w-full rounded-xl border border-[#dfd2c6] bg-[#f8f9fd] px-4 py-3 text-sm outline-none focus:border-[#ec3b78]"
             />
           </div>
 
@@ -200,7 +200,7 @@ export function AdminEventModal({ isOpen, onClose, onSubmit, editEvent }: AdminE
                   value={formData.price}
                   onChange={(e) => setFormData({ ...formData, price: e.target.value })}
                   placeholder="Laisser vide pour gratuit"
-                  className="w-full rounded-xl border border-[#dfd2c6] bg-[#fbf8f2] pl-10 pr-4 py-3 text-sm outline-none focus:border-[#ec3b78]"
+                  className="w-full rounded-xl border border-[#dfd2c6] bg-[#f8f9fd] pl-10 pr-4 py-3 text-sm outline-none focus:border-[#ec3b78]"
                 />
               </div>
             </div>
@@ -215,7 +215,7 @@ export function AdminEventModal({ isOpen, onClose, onSubmit, editEvent }: AdminE
                   onChange={(e) => setFormData({ ...formData, total_places: e.target.value })}
                   required
                   min="1"
-                  className="w-full rounded-xl border border-[#dfd2c6] bg-[#fbf8f2] pl-10 pr-4 py-3 text-sm outline-none focus:border-[#ec3b78]"
+                  className="w-full rounded-xl border border-[#dfd2c6] bg-[#f8f9fd] pl-10 pr-4 py-3 text-sm outline-none focus:border-[#ec3b78]"
                 />
               </div>
             </div>
@@ -235,7 +235,7 @@ export function AdminEventModal({ isOpen, onClose, onSubmit, editEvent }: AdminE
                 />
                 <label
                   htmlFor="event-image-upload"
-                  className="flex items-center justify-center gap-2 rounded-xl border-2 border-dashed border-[#dfd2c6] bg-[#fbf8f2] px-4 py-6 text-sm cursor-pointer hover:border-[#ec3b78] transition"
+                  className="flex items-center justify-center gap-2 rounded-xl border-2 border-dashed border-[#dfd2c6] bg-[#f8f9fd] px-4 py-6 text-sm cursor-pointer hover:border-[#ec3b78] transition"
                 >
                   <Upload size={18} className="text-[#9a8b82]" />
                   <span className="text-[#756960]">
@@ -265,7 +265,7 @@ export function AdminEventModal({ isOpen, onClose, onSubmit, editEvent }: AdminE
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 rounded-full bg-[#f3e9dc] px-6 py-3 text-sm font-extrabold text-[#756960] transition hover:bg-[#e7cfc0]"
+              className="flex-1 rounded-full bg-[#f8f9fd] px-6 py-3 text-sm font-extrabold text-[#756960] transition hover:bg-[#f8f9fd]"
             >
               Annuler
             </button>

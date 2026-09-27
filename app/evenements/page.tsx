@@ -29,7 +29,7 @@ export default function EvenementsPage() {
   const filtered = filterCat === 'all' ? events : events.filter((e) => e.category === filterCat);
 
   return (
-    <main className="min-h-screen bg-[#fbf8f2] px-5 pb-24 pt-[100px] lg:px-8 lg:pt-[120px]">
+    <main className="min-h-screen bg-[#f8f9fd] px-5 pb-24 pt-[100px] lg:px-8 lg:pt-[120px]">
       <div className="mx-auto max-w-[1120px]">
         <div className="text-center">
           <p className="text-xs font-extrabold uppercase tracking-[.2em] text-[#ec3b78]">Vivre la rencontre en vrai</p>
@@ -39,7 +39,7 @@ export default function EvenementsPage() {
 
         <div className="mt-10 flex flex-wrap justify-center gap-2">
           {categories.map((c) => (
-            <button key={c} onClick={() => setFilterCat(c)} className={`rounded-full px-5 py-2.5 text-xs font-extrabold transition ${filterCat === c ? 'bg-[#ec3b78] text-white' : 'bg-white text-[#756960] shadow-[0_4px_15px_rgba(83,46,32,.04)] hover:bg-[#f3e9dc]'}`}>
+            <button key={c} onClick={() => setFilterCat(c)} className={`rounded-full px-5 py-2.5 text-xs font-extrabold transition ${filterCat === c ? 'bg-[#ec3b78] text-white' : 'bg-white text-[#756960] shadow-[0_4px_15px_rgba(83,46,32,.04)] hover:bg-[#f8f9fd]'}`}>
               {c === 'all' ? 'Tous' : c}
             </button>
           ))}
@@ -60,7 +60,7 @@ export default function EvenementsPage() {
               <article key={item.id} className="group overflow-hidden rounded-[26px] bg-white shadow-[0_10px_35px_rgba(83,46,32,.06)] transition duration-300 hover:-translate-y-2 hover:shadow-[0_18px_45px_rgba(83,46,32,.13)]">
                 <div className="relative h-[240px] overflow-hidden">
                   <img src={item.image_url} alt={item.title} className="h-full w-full object-cover transition duration-700 group-hover:scale-105" />
-                  <span className="absolute left-4 top-4 rounded-full bg-[#fbf8f2]/90 px-3 py-1.5 text-[10px] font-extrabold uppercase tracking-wider text-[#1a6b68]">{item.category}</span>
+                  <span className="absolute left-4 top-4 rounded-full bg-[#f8f9fd]/90 px-3 py-1.5 text-[10px] font-extrabold uppercase tracking-wider text-[#1a6b68]">{item.category}</span>
                   {item.price_fcfa === 0 && <span className="absolute right-4 top-4 rounded-full bg-[#1a6b68] px-3 py-1.5 text-[10px] font-extrabold uppercase text-white">Gratuit</span>}
                 </div>
                 <div className="p-6">

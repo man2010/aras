@@ -67,14 +67,14 @@ export function AdminUsers({ profiles, currentPage, totalPages, onPageChange, on
                   placeholder="Rechercher par nom ou profession..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full rounded-xl border border-[#dfd2c6] bg-[#fbf8f2] pl-10 pr-4 py-2.5 text-sm outline-none focus:border-[#ec3b78]"
+                  className="w-full rounded-xl border border-[#dfd2c6] bg-[#f8f9fd] pl-10 pr-4 py-2.5 text-sm outline-none focus:border-[#ec3b78]"
                 />
               </div>
             </div>
             <select
               value={filterCity}
               onChange={(e) => setFilterCity(e.target.value)}
-              className="rounded-xl border border-[#dfd2c6] bg-[#fbf8f2] px-4 py-2.5 text-sm outline-none focus:border-[#ec3b78]"
+              className="rounded-xl border border-[#dfd2c6] bg-[#f8f9fd] px-4 py-2.5 text-sm outline-none focus:border-[#ec3b78]"
             >
               <option value="">Toutes les villes</option>
               {cities.map((city) => (
@@ -84,7 +84,7 @@ export function AdminUsers({ profiles, currentPage, totalPages, onPageChange, on
             <select
               value={filterVerified}
               onChange={(e) => setFilterVerified(e.target.value as 'all' | 'verified' | 'unverified')}
-              className="rounded-xl border border-[#dfd2c6] bg-[#fbf8f2] px-4 py-2.5 text-sm outline-none focus:border-[#ec3b78]"
+              className="rounded-xl border border-[#dfd2c6] bg-[#f8f9fd] px-4 py-2.5 text-sm outline-none focus:border-[#ec3b78]"
             >
               <option value="all">Tous les statuts</option>
               <option value="verified">Vérifiés</option>
@@ -118,7 +118,7 @@ export function AdminUsers({ profiles, currentPage, totalPages, onPageChange, on
               </thead>
               <tbody>
                 {filteredProfiles.map((p) => (
-                  <tr key={p.id} className="border-b border-[#f3e9dc] transition hover:bg-[#fbf8f2]">
+                  <tr key={p.id} className="border-b border-[#f3e9dc] transition hover:bg-[#f8f9fd]">
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-3">
                         <img src={p.photo_url} alt={p.display_name} className="h-12 w-12 rounded-full object-cover" />
@@ -189,7 +189,7 @@ export function AdminUsers({ profiles, currentPage, totalPages, onPageChange, on
                 <button
                   onClick={() => onPageChange(Math.max(1, currentPage - 1))}
                   disabled={currentPage === 1}
-                  className="rounded-full bg-[#f3e9dc] px-4 py-2 text-xs font-extrabold text-[#756960] transition hover:bg-[#e7cfc0] disabled:opacity-50"
+                  className="rounded-full bg-[#f8f9fd] px-4 py-2 text-xs font-extrabold text-[#756960] transition hover:bg-[#f8f9fd] disabled:opacity-50"
                 >
                   Précédent
                 </button>
@@ -214,16 +214,16 @@ export function AdminUsers({ profiles, currentPage, totalPages, onPageChange, on
                 <img src={selectedProfile.photo_url} alt="" className="h-16 w-16 rounded-2xl object-cover" />
                 <div><h2 className="font-display text-2xl">{selectedProfile.display_name}</h2><p className="text-sm text-[#756960]">{selectedProfile.age} ans · {selectedProfile.city}</p></div>
               </div>
-              <button onClick={() => setSelectedProfile(null)} aria-label="Fermer" className="rounded-full bg-[#f3e9dc] p-2"><X size={18} /></button>
+              <button onClick={() => setSelectedProfile(null)} aria-label="Fermer" className="rounded-full bg-[#f8f9fd] p-2"><X size={18} /></button>
             </div>
             <div className="mt-6 grid gap-3 sm:grid-cols-2">
-              <div className="rounded-2xl bg-[#fbf8f2] p-4"><p className="text-[11px] font-extrabold uppercase text-[#9a8b82]">Profession</p><p className="mt-1 text-sm font-semibold">{selectedProfile.profession || 'Non renseignée'}</p></div>
-              <div className="rounded-2xl bg-[#fbf8f2] p-4"><p className="text-[11px] font-extrabold uppercase text-[#9a8b82]">Zone</p><p className="mt-1 text-sm font-semibold">{selectedProfile.zone || selectedProfile.city || 'Non renseignée'}</p></div>
-              <div className="rounded-2xl bg-[#fbf8f2] p-4"><p className="text-[11px] font-extrabold uppercase text-[#9a8b82]">Genre</p><p className="mt-1 text-sm font-semibold">{selectedProfile.gender || 'Non renseigné'}</p></div>
-              <div className="rounded-2xl bg-[#fbf8f2] p-4"><p className="text-[11px] font-extrabold uppercase text-[#9a8b82]">Statut</p><p className="mt-1 text-sm font-semibold">{selectedProfile.is_active === false ? 'Compte bloqué' : 'Compte actif'} · {selectedProfile.is_verified ? 'Vérifié' : 'Non vérifié'}{selectedProfile.is_premium ? ' · Premium' : ''}</p></div>
+              <div className="rounded-2xl bg-[#f8f9fd] p-4"><p className="text-[11px] font-extrabold uppercase text-[#9a8b82]">Profession</p><p className="mt-1 text-sm font-semibold">{selectedProfile.profession || 'Non renseignée'}</p></div>
+              <div className="rounded-2xl bg-[#f8f9fd] p-4"><p className="text-[11px] font-extrabold uppercase text-[#9a8b82]">Zone</p><p className="mt-1 text-sm font-semibold">{selectedProfile.zone || selectedProfile.city || 'Non renseignée'}</p></div>
+              <div className="rounded-2xl bg-[#f8f9fd] p-4"><p className="text-[11px] font-extrabold uppercase text-[#9a8b82]">Genre</p><p className="mt-1 text-sm font-semibold">{selectedProfile.gender || 'Non renseigné'}</p></div>
+              <div className="rounded-2xl bg-[#f8f9fd] p-4"><p className="text-[11px] font-extrabold uppercase text-[#9a8b82]">Statut</p><p className="mt-1 text-sm font-semibold">{selectedProfile.is_active === false ? 'Compte bloqué' : 'Compte actif'} · {selectedProfile.is_verified ? 'Vérifié' : 'Non vérifié'}{selectedProfile.is_premium ? ' · Premium' : ''}</p></div>
             </div>
-            <div className="mt-3 rounded-2xl bg-[#fbf8f2] p-4"><p className="text-[11px] font-extrabold uppercase text-[#9a8b82]">À propos</p><p className="mt-1 whitespace-pre-wrap text-sm leading-6">{selectedProfile.bio || 'Aucune biographie renseignée.'}</p></div>
-            {selectedProfile.interests?.length > 0 && <div className="mt-3 rounded-2xl bg-[#fbf8f2] p-4"><p className="text-[11px] font-extrabold uppercase text-[#9a8b82]">Centres d’intérêt</p><p className="mt-1 text-sm">{selectedProfile.interests.join(' · ')}</p></div>}
+            <div className="mt-3 rounded-2xl bg-[#f8f9fd] p-4"><p className="text-[11px] font-extrabold uppercase text-[#9a8b82]">À propos</p><p className="mt-1 whitespace-pre-wrap text-sm leading-6">{selectedProfile.bio || 'Aucune biographie renseignée.'}</p></div>
+            {selectedProfile.interests?.length > 0 && <div className="mt-3 rounded-2xl bg-[#f8f9fd] p-4"><p className="text-[11px] font-extrabold uppercase text-[#9a8b82]">Centres d’intérêt</p><p className="mt-1 text-sm">{selectedProfile.interests.join(' · ')}</p></div>}
             {selectedProfile.avatar_urls?.length ? <div className="mt-4 grid grid-cols-3 gap-2">{selectedProfile.avatar_urls.filter(Boolean).map((url, i) => <img key={`${url}-${i}`} src={url!} alt={`Photo ${i + 1} de ${selectedProfile.display_name}`} className="aspect-square w-full rounded-xl object-cover" />)}</div> : null}
           </section>
         </div>
@@ -239,7 +239,7 @@ export function AdminUsers({ profiles, currentPage, totalPages, onPageChange, on
                 : `Le compte de ${pendingBlockAction.profile.display_name} pourra de nouveau se connecter à ARAS.`}
             </p>
             <div className="mt-7 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-              <button type="button" onClick={() => setPendingBlockAction(null)} className="rounded-full bg-[#f3e9dc] px-5 py-3 text-sm font-extrabold text-[#625852]">Annuler</button>
+              <button type="button" onClick={() => setPendingBlockAction(null)} className="rounded-full bg-[#f8f9fd] px-5 py-3 text-sm font-extrabold text-[#625852]">Annuler</button>
               <button type="button" onClick={() => { onToggleBlocked(pendingBlockAction.profile.id, pendingBlockAction.currentlyActive); setPendingBlockAction(null); }} className={`rounded-full px-5 py-3 text-sm font-extrabold text-white ${pendingBlockAction.currentlyActive ? 'bg-[#c92e63] hover:bg-[#a92350]' : 'bg-[#1a6b68] hover:bg-[#125552]'}`}>
                 {pendingBlockAction.currentlyActive ? 'Bloquer le compte' : 'Débloquer le compte'}
               </button>

@@ -4,7 +4,8 @@ import { FormEvent, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { ArrowRight, Chrome, Eye, EyeOff, LockKeyhole, Mail, Phone, X } from 'lucide-react';
+import { ArrowRight, Eye, EyeOff, LockKeyhole, Mail, Phone, X } from 'lucide-react';
+import { GoogleIcon } from '@/components/google-icon';
 import { AuthPhoneInput } from '@/components/auth-phone-input';
 import { normalizePhone, isValidPhone } from '@/lib/phone';
 import { ensureProfile } from '@/lib/create-profile';
@@ -109,16 +110,16 @@ export default function ConnexionPage() {
   };
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-gradient-to-b from-[#f3e9dc] to-[#fbf8f2] px-5 pt-[72px]">
+    <main className="flex min-h-screen items-center justify-center bg-gradient-to-b from-[#f8f9fd] to-[#f8f9fd] px-5 pt-[72px]">
       <div className="w-full max-w-[460px]">
-        <div className="rounded-[28px] bg-[#fbf8f2] p-8 shadow-[0_20px_60px_rgba(83,46,32,.08)] sm:p-10">
+        <div className="rounded-[28px] bg-[#f8f9fd] p-8 shadow-[0_20px_60px_rgba(83,46,32,.08)] sm:p-10">
           <Link href="/" className="flex justify-center" aria-label="ARAS">
             <Image src="/aras-logo.jpeg" alt="ARAS" width={180} height={72} className="h-14 w-auto object-contain sm:h-16" priority />
           </Link>
           <h1 className="mt-8 font-display text-4xl tracking-[-.04em]">Content de vous revoir</h1>
           <p className="mt-2 text-sm leading-6 text-[#756960]">Connectez-vous avec votre email ou votre téléphone et votre mot de passe.</p>
 
-          <div className="mt-6 grid grid-cols-2 gap-2 rounded-full bg-[#f3e9dc] p-1">
+          <div className="mt-6 grid grid-cols-2 gap-2 rounded-full bg-[#f8f9fd] p-1">
             <button
               type="button"
               onClick={() => setMethod('email')}
@@ -137,9 +138,9 @@ export default function ConnexionPage() {
 
           <div className="mt-6">
             <div className="mb-4 flex items-center gap-3 text-[11px] font-extrabold uppercase tracking-[0.2em] text-[#9a8b82]">
-              <span className="h-px flex-1 bg-[#e8d9cd]" />
+              <span className="h-px flex-1 bg-[#f8f9fd]" />
               ou
-              <span className="h-px flex-1 bg-[#e8d9cd]" />
+              <span className="h-px flex-1 bg-[#f8f9fd]" />
             </div>
             <button
               type="button"
@@ -147,7 +148,7 @@ export default function ConnexionPage() {
               disabled={loading}
               className="flex w-full items-center justify-center gap-2 rounded-full border border-[#dfd2c6] bg-white px-4 py-3 text-sm font-extrabold text-[#241c18] transition hover:border-[#ec3b78] hover:text-[#ec3b78] disabled:cursor-not-allowed disabled:opacity-60"
             >
-              <Chrome size={16} /> Continuer avec Google
+              <GoogleIcon size={16} /> Continuer avec Google
             </button>
           </div>
 

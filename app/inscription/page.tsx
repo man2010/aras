@@ -4,7 +4,8 @@ import { FormEvent, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { ArrowRight, Check, Chrome, Eye, EyeOff, LockKeyhole, Mail, Phone, RefreshCw, ShieldCheck, X } from 'lucide-react';
+import { ArrowRight, Check, Eye, EyeOff, LockKeyhole, Mail, Phone, RefreshCw, ShieldCheck, X } from 'lucide-react';
+import { GoogleIcon } from '@/components/google-icon';
 import { AuthPhoneInput } from '@/components/auth-phone-input';
 import { normalizePhone, isValidPhone } from '@/lib/phone';
 import { HumanVerification } from '@/components/human-verification';
@@ -97,6 +98,7 @@ export default function InscriptionPage() {
     e.preventDefault();
     setLoading(true);
     setMessage('');
+    setSuccess(false);
 
     const form = new FormData(e.currentTarget);
     const contact = String(form.get('contact') ?? '').trim();
@@ -149,7 +151,22 @@ export default function InscriptionPage() {
     });
 
     if (error) {
-      setMessage(error.message);
+      const duplicateContact = /already registered|already exists|phone.*taken|email.*taken/i.test(error.message);
+      setMessage(duplicateContact
+        ? method === 'email'
+          ? 'Un compte existe déjà avec cette adresse e-mail. Connectez-vous plutôt.'
+          : 'Un compte existe déjà avec ce numéro de téléphone. Connectez-vous plutôt.'
+        : error.message);
+      setLoading(false);
+      return;
+    }
+
+    // Supabase peut volontairement masquer un doublon et renvoyer un utilisateur
+    // sans identité. Ne pas le traiter comme une nouvelle inscription à vérifier.
+    if (data.user && data.user.identities?.length === 0) {
+      setMessage(method === 'email'
+        ? 'Un compte existe déjà avec cette adresse e-mail. Connectez-vous plutôt.'
+        : 'Un compte existe déjà avec ce numéro de téléphone. Connectez-vous plutôt.');
       setLoading(false);
       return;
     }
@@ -280,9 +297,9 @@ export default function InscriptionPage() {
   };
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-gradient-to-b from-[#f3e9dc] to-[#fbf8f2] px-5 pt-[72px]">
+    <main className="flex min-h-screen items-center justify-center bg-gradient-to-b from-[#f8f9fd] to-[#f8f9fd] px-5 pt-[72px]">
       <div className="w-full max-w-[520px]">
-        <div className="rounded-[28px] bg-[#fbf8f2] p-8 shadow-[0_20px_60px_rgba(83,46,32,.08)] sm:p-10">
+        <div className="rounded-[28px] bg-[#f8f9fd] p-8 shadow-[0_20px_60px_rgba(83,46,32,.08)] sm:p-10">
           <Link href="/" className="flex justify-center" aria-label="ARAS">
             <Image src="/aras-logo.jpeg" alt="ARAS" width={180} height={72} className="h-14 w-auto object-contain sm:h-16" priority />
           </Link>
@@ -292,7 +309,7 @@ export default function InscriptionPage() {
             Choisissez email ou téléphone, puis confirmez votre accès avant de rejoindre ARAS.
           </p>
 
-          <div className="mt-6 grid grid-cols-2 gap-2 rounded-full bg-[#f3e9dc] p-1">
+          <div className="mt-6 grid grid-cols-2 gap-2 rounded-full bg-[#f8f9fd] p-1">
             <button
               type="button"
               onClick={() => { setMethod('email'); setNeedsVerification(false); setVerificationCode(''); setPendingContact(''); setMessage(''); setCountdown(30); setCanResend(false); setTurnstileToken(''); setPendingHumanProof(''); }}
@@ -311,9 +328,9 @@ export default function InscriptionPage() {
 
           <div className="mt-6">
             <div className="mb-4 flex items-center gap-3 text-[11px] font-extrabold uppercase tracking-[0.2em] text-[#9a8b82]">
-              <span className="h-px flex-1 bg-[#e8d9cd]" />
+              <span className="h-px flex-1 bg-[#f8f9fd]" />
               ou
-              <span className="h-px flex-1 bg-[#e8d9cd]" />
+              <span className="h-px flex-1 bg-[#f8f9fd]" />
             </div>
             <button
               type="button"
@@ -321,7 +338,7 @@ export default function InscriptionPage() {
               disabled={loading}
               className="flex w-full items-center justify-center gap-2 rounded-full border border-[#dfd2c6] bg-white px-4 py-3 text-sm font-extrabold text-[#241c18] transition hover:border-[#ec3b78] hover:text-[#ec3b78] disabled:cursor-not-allowed disabled:opacity-60"
             >
-              <Chrome size={16} /> Continuer avec Google
+              <GoogleIcon size={16} /> Continuer avec Google
             </button>
           </div>
 
@@ -454,7 +471,7 @@ export default function InscriptionPage() {
                 <button
                   onClick={handleResendCode}
                   disabled={loading}
-                  className="flex items-center justify-center gap-2 w-full rounded-full border border-[#ec3b78] bg-white px-4 py-3 text-sm font-extrabold text-[#ec3b78] transition hover:bg-[#fbf8f2] disabled:opacity-50"
+                  className="flex items-center justify-center gap-2 w-full rounded-full border border-[#ec3b78] bg-white px-4 py-3 text-sm font-extrabold text-[#ec3b78] transition hover:bg-[#f8f9fd] disabled:opacity-50"
                 >
                   <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
                   {loading ? 'Envoi en cours...' : 'Renvoyer le code'}

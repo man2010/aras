@@ -29,15 +29,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [unreadCount, setUnreadCount] = useState(0);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session);
-      setLoading(false);
-    });
+    let disposed = false;
+    let authEventRevision = 0;
     const { data: listener } = supabase.auth.onAuthStateChange((_event, sess) => {
+      authEventRevision += 1;
       setSession(sess);
       setLoading(false);
     });
-    return () => listener.subscription.unsubscribe();
+
+    const initialRevision = authEventRevision;
+    void supabase.auth.getSession().then(
+      ({ data, error }) => {
+        if (disposed || authEventRevision !== initialRevision) return;
+        setSession(error ? null : data.session);
+        setLoading(false);
+      },
+      () => {
+        if (disposed || authEventRevision !== initialRevision) return;
+        setSession(null);
+        setLoading(false);
+      },
+    );
+
+    return () => {
+      disposed = true;
+      listener.subscription.unsubscribe();
+    };
   }, []);
 
   useEffect(() => {
@@ -119,11 +136,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [session]);
 
   const signOut = async () => {
-    if (session?.user) {
-      await supabase.from('profiles').update({ is_online: false, last_seen_at: new Date().toISOString() }).eq('id', session.user.id);
+    const userId = session?.user.id;
+    setSession(null);
+    setUnreadCount(0);
+    if (userId) {
+      void supabase.from('profiles').update({ is_online: false, last_seen_at: new Date().toISOString() }).eq('id', userId);
     }
     await supabase.auth.signOut();
-    setSession(null);
   };
 
   return (

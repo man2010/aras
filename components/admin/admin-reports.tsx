@@ -32,7 +32,7 @@ export function AdminReports({ reports, profiles, onResolveReport, onDismissRepo
           <select
             value={filterStatus}
             onChange={(e) => setFilterStatus(e.target.value as 'all' | 'pending' | 'resolved')}
-            className="rounded-xl border border-[#dfd2c6] bg-[#fbf8f2] px-4 py-2.5 text-sm outline-none focus:border-[#ec3b78]"
+            className="rounded-xl border border-[#dfd2c6] bg-[#f8f9fd] px-4 py-2.5 text-sm outline-none focus:border-[#ec3b78]"
           >
             <option value="all">Tous les statuts</option>
             <option value="pending">En attente</option>
@@ -41,7 +41,7 @@ export function AdminReports({ reports, profiles, onResolveReport, onDismissRepo
           <select
             value={filterType}
             onChange={(e) => setFilterType(e.target.value)}
-            className="rounded-xl border border-[#dfd2c6] bg-[#fbf8f2] px-4 py-2.5 text-sm outline-none focus:border-[#ec3b78]"
+            className="rounded-xl border border-[#dfd2c6] bg-[#f8f9fd] px-4 py-2.5 text-sm outline-none focus:border-[#ec3b78]"
           >
             <option value="all">Tous les types</option>
             {reportTypes.map((type) => (
