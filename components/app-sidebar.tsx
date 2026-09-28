@@ -26,11 +26,14 @@ export type EspaceTab =
 
 const mainItems: { id: EspaceTab; label: string; icon: typeof User }[] = [
   { id: 'decouverte', label: 'Découverte', icon: House },
-  { id: 'messages', label: 'Messages', icon: MessageCircle },
+  { id: 'events', label: 'Événements', icon: CalendarDays },
   { id: 'likes', label: 'Likes', icon: Heart },
   { id: 'profile', label: 'Profil', icon: User },
-  { id: 'events', label: 'Événements', icon: CalendarDays },
+  { id: 'messages', label: 'Messages', icon: MessageCircle },
 ];
+
+// Même ordre sur mobile et grand écran, avec Likes au centre.
+const mobileItems = mainItems;
 
 interface AppSidebarProps {
   active: EspaceTab;
@@ -84,19 +87,28 @@ export function AppSidebar({ active, onChange }: AppSidebarProps) {
       {/* MOBILE : icônes en bas de l'écran */}
       <div className="lg:hidden">
         <nav className="fixed inset-x-0 bottom-0 z-40 flex items-center justify-around gap-0.5 overflow-x-auto border-t border-[#eadfd5] bg-white/95 px-1 py-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] backdrop-blur-xl dark:border-white/10 dark:bg-[#15151a]/95">
-          {mainItems.map((item) => {
+          {mobileItems.map((item) => {
             const isActive = active === item.id;
+            const isLikes = item.id === 'likes';
             return (
               <button
                 key={item.id}
                 type="button"
                 onClick={() => onChange(item.id)}
                 aria-label={item.label}
-                className={`relative flex shrink-0 flex-col items-center gap-1 rounded-xl px-2.5 py-1.5 transition ${
-                  isActive ? 'text-[#ec3b78]' : 'text-[#9a8b82] dark:text-white/45'
+                aria-current={isActive ? 'page' : undefined}
+                className={`relative flex shrink-0 flex-col items-center justify-center transition ${
+                  isLikes
+                    ? 'h-[60px] w-[60px] -translate-y-2 rounded-full bg-[#d92f6b] text-white shadow-[0_8px_24px_rgba(217,47,107,.32)]'
+                    : `h-12 min-w-[58px] rounded-xl px-2 ${isActive ? 'text-[#ec3b78]' : 'text-[#9a8b82] dark:text-white/45'}`
                 }`}
               >
-                <item.icon size={20} fill={isActive && item.id === 'likes' ? 'currentColor' : 'none'} />
+                <item.icon
+                  size={isLikes ? 29 : 25}
+                  strokeWidth={isLikes ? 2.5 : 2.2}
+                  fill={isLikes ? 'currentColor' : 'none'}
+                />
+                {!isLikes && <span className="sr-only">{item.label}</span>}
               </button>
             );
           })}

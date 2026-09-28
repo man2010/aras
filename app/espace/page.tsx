@@ -3,7 +3,7 @@
 import { Dispatch, FormEvent, SetStateAction, useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { User, MessageCircle, Heart, CalendarDays, ArrowRight, ArrowLeft, ArrowDownLeft, ArrowUpRight, ArrowLeftRight, ShieldCheck, Send, Plus, Check, Upload, X, CheckCheck, Search, MapPin, Users, Eye, EyeOff, ChevronRight, Flag, RotateCcw, AlertTriangle, Music2, Plane, Utensils, Dumbbell, BookOpen, Clapperboard, PartyPopper, Palette, Camera, Shirt, Laptop, Trees, Flower2, Gamepad2, PawPrint, Briefcase, Ruler, Languages, Cigarette, ClipboardList, Settings, SlidersHorizontal, LockKeyhole, CircleHelp, LogOut, EllipsisVertical, Ban } from 'lucide-react';
+import { User, MessageCircle, Heart, CalendarDays, ArrowRight, ArrowLeft, ArrowDownLeft, ArrowUpRight, ArrowLeftRight, ShieldCheck, Send, Plus, Check, X, CheckCheck, Search, MapPin, Users, Eye, EyeOff, ChevronRight, Flag, RotateCcw, AlertTriangle, Music2, Plane, Utensils, Dumbbell, BookOpen, Clapperboard, PartyPopper, Palette, Camera, Shirt, Laptop, Trees, Flower2, Gamepad2, PawPrint, Briefcase, Ruler, Languages, Cigarette, ClipboardList, Settings, SlidersHorizontal, LockKeyhole, CircleHelp, LogOut, EllipsisVertical, Ban } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
 import type { Profile, Conversation, Message, Story } from '@/lib/types';
@@ -270,9 +270,11 @@ export default function EspacePage() {
   const [discoveryProfiles, setDiscoveryProfiles] = useState<Profile[]>([]);
   const [discoveryLoading, setDiscoveryLoading] = useState(true);
   const [discoveryLikedIds, setDiscoveryLikedIds] = useState<Set<string>>(new Set());
-  const [discoverySearch, setDiscoverySearch] = useState('');
-  const [discoveryCityFilter, setDiscoveryCityFilter] = useState('all');
+  const [discoveryCityFilter, setDiscoveryCityFilter] = useState('');
   const [showDiscoveryFilters, setShowDiscoveryFilters] = useState(false);
+  const [searchFiltersReturnTo, setSearchFiltersReturnTo] = useState<'discovery' | 'profile' | 'settings'>('discovery');
+  const [ownProfilePreviewOpen, setOwnProfilePreviewOpen] = useState(false);
+  const [ownProfileDetailExpanded, setOwnProfileDetailExpanded] = useState(false);
   const FILTER_AGE_MIN = 18;
   const [filterAgeMin, setFilterAgeMin] = useState(FILTER_AGE_MIN);
   const [filterAgeMax, setFilterAgeMax] = useState(100);
@@ -316,6 +318,7 @@ export default function EspacePage() {
   const [galleryUploadIndex, setGalleryUploadIndex] = useState<number | null>(null);
   const [galleryUploadingIndex, setGalleryUploadingIndex] = useState<number | null>(null);
   const galleryFileInputRef = useRef<HTMLInputElement | null>(null);
+  const profilePhotoInputRef = useRef<HTMLInputElement | null>(null);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeConv, setActiveConv] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -466,6 +469,15 @@ export default function EspacePage() {
   const [blockedProfilesLoading, setBlockedProfilesLoading] = useState(false);
   const [chatActionsOpen, setChatActionsOpen] = useState(false);
 
+  const closeDiscoveryFilters = useCallback(() => {
+    setShowDiscoveryFilters(false);
+    if (searchFiltersReturnTo === 'profile') setTab('profile');
+    if (searchFiltersReturnTo === 'settings') {
+      setTab('profile');
+      setProfileSettingsOpen(true);
+    }
+  }, [searchFiltersReturnTo]);
+
   const loadBlockedProfiles = useCallback(async () => {
     if (!user) return;
     setBlockedProfilesLoading(true);
@@ -529,7 +541,10 @@ export default function EspacePage() {
 
   useEffect(() => {
     const openFilters = () => {
-      if (tab === 'decouverte') setShowDiscoveryFilters(true);
+      if (tab === 'decouverte') {
+        setSearchFiltersReturnTo('discovery');
+        setShowDiscoveryFilters(true);
+      }
     };
     window.addEventListener('aras:open-discovery-filters', openFilters);
     return () => window.removeEventListener('aras:open-discovery-filters', openFilters);
@@ -539,13 +554,13 @@ export default function EspacePage() {
     setMobileDiscoveryIndex(0);
     setMobileDiscoveryHistory([]);
     setDiscoveryPage(1);
-  }, [discoverySearch, discoveryCityFilter, filterAgeMin, filterAgeMax, filterDistance, filterHeightMin, filterHeightMax, filterProfession, filterReligion, filterPreference, filterSituation, filterInterests]);
+  }, [discoveryCityFilter, filterAgeMin, filterAgeMax, filterDistance, filterHeightMin, filterHeightMax, filterProfession, filterReligion, filterPreference, filterSituation, filterInterests]);
 
   useEffect(() => {
     if (!showDiscoveryFilters) return;
     const previousOverflow = document.body.style.overflow;
     const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setShowDiscoveryFilters(false);
+      if (event.key === 'Escape') closeDiscoveryFilters();
     };
     document.body.style.overflow = 'hidden';
     window.addEventListener('keydown', closeOnEscape);
@@ -553,7 +568,7 @@ export default function EspacePage() {
       document.body.style.overflow = previousOverflow;
       window.removeEventListener('keydown', closeOnEscape);
     };
-  }, [showDiscoveryFilters]);
+  }, [showDiscoveryFilters, closeDiscoveryFilters]);
 
   useEffect(() => {
     // Handle URL parameters for tab and conversation
@@ -586,7 +601,8 @@ export default function EspacePage() {
         setProfile(p);
         setSubscriptionPlan(p.is_premium ? 'premium' : 'discovery');
         setProfileForm({ display_name: p.display_name, age: String(p.age), city: p.city, bio: p.bio, profession: p.profession, photo_url: p.photo_url, interests: p.interests ?? [], languages: p.languages ?? [], religion: p.religion ?? '', caste: p.caste ?? '', marital_status: p.marital_status ?? '', smoking_habit: p.smoking_habit ?? '' });
-        setGalleryPhotos(Array.from({ length: 6 }, (_, index) => p.avatar_urls?.[index] ?? (index === 0 ? p.photo_url : null)));
+        const optionalPhotos = (p.avatar_urls ?? []).filter((photo) => Boolean(photo) && photo !== p.photo_url);
+        setGalleryPhotos(Array.from({ length: 6 }, (_, index) => optionalPhotos[index] ?? null));
         const { data: subscription } = await supabase.from('user_subscriptions').select('plan_code').eq('user_id', user.id).eq('status', 'active').or(`ends_at.is.null,ends_at.gt.${new Date().toISOString()}`).order('created_at', { ascending: false }).limit(1).maybeSingle();
         if (subscription?.plan_code === 'premium' || subscription?.plan_code === 'elite') setSubscriptionPlan(subscription.plan_code);
         const raw = existing as Record<string, unknown>;
@@ -725,10 +741,9 @@ export default function EspacePage() {
     if (!user) return;
     setProfileSaved(false);
 
-    const gallery = Array.from(new Set(galleryPhotos.filter((photo): photo is string => Boolean(photo))));
-    const avatarUrls = gallery.length > 0
-      ? gallery
-      : (profileForm.photo_url ? [profileForm.photo_url] : profile?.avatar_urls?.length ? profile.avatar_urls : ['https://images.pexels.com/photos/733872/pexels-photo-733872.jpeg?auto=compress&cs=tinysrgb&w=600']);
+    const primaryPhoto = profileForm.photo_url || profile?.photo_url || 'https://images.pexels.com/photos/733872/pexels-photo-733872.jpeg?auto=compress&cs=tinysrgb&w=600';
+    const gallery = Array.from(new Set(galleryPhotos.filter((photo): photo is string => Boolean(photo) && photo !== primaryPhoto)));
+    const avatarUrls = [primaryPhoto, ...gallery];
 
     const payload = {
       ...(!profile ? { full_name: profileForm.display_name } : {}),
@@ -1178,12 +1193,14 @@ export default function EspacePage() {
       const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(filePath);
 
       if (slotIndex === null) {
+        const updatedAvatarUrls = [publicUrl, ...galleryPhotos.filter((photo): photo is string => Boolean(photo) && photo !== publicUrl)];
+        if (profile) {
+          const { error: profileUpdateError } = await supabase.from('profiles').update({ avatar_urls: updatedAvatarUrls }).eq('id', profile.id);
+          if (profileUpdateError) throw profileUpdateError;
+          setProfile((current) => current ? { ...current, photo_url: publicUrl, avatar_urls: updatedAvatarUrls } : current);
+        }
         setProfileForm((current) => ({ ...current, photo_url: publicUrl }));
-        setGalleryPhotos((current) => {
-          const next = [...current];
-          next[0] = publicUrl;
-          return next;
-        });
+        setImagePreview(null);
       } else {
         setGalleryPhotos((current) => {
           const next = [...current];
@@ -1193,6 +1210,7 @@ export default function EspacePage() {
       }
     } catch (error) {
       console.error('Upload error:', error);
+      if (slotIndex === null) setImagePreview(null);
       showInfoModal('Upload impossible', slotIndex === null ? 'Erreur lors de l\'upload de l\'image.' : 'Erreur lors de l\'upload de cette photo.', 'OK');
     } finally {
       setUploadingImage(false);
@@ -1201,6 +1219,7 @@ export default function EspacePage() {
       if (galleryFileInputRef.current) {
         galleryFileInputRef.current.value = '';
       }
+      if (profilePhotoInputRef.current) profilePhotoInputRef.current.value = '';
     }
   };
 
@@ -1242,22 +1261,10 @@ export default function EspacePage() {
     setTab('messages');
   };
 
-  const discoveryCities = ['all', ...Array.from(new Set(discoveryProfiles.map((profileItem) => profileItem.city).filter(Boolean)))];
   const filteredDiscoveryProfiles = discoveryProfiles.filter((profileItem) => {
     if (discoveryLikedIds.has(profileItem.id)) return false;
-    const term = discoverySearch.trim().toLowerCase();
-    const phrase = [
-      profileItem.display_name,
-      profileItem.city,
-      profileItem.profession,
-      profileItem.bio,
-      ...(profileItem.interests ?? []),
-    ]
-      .join(' ')
-      .toLowerCase();
-
-    const matchesSearch = !term || phrase.includes(term);
-    const matchesCity = discoveryCityFilter === 'all' || profileItem.city === discoveryCityFilter;
+    const cityTerm = discoveryCityFilter.trim().toLocaleLowerCase('fr');
+    const matchesCity = !cityTerm || profileItem.city.toLocaleLowerCase('fr').includes(cityTerm);
     const matchesAge = profileItem.age >= filterAgeMin && profileItem.age <= filterAgeMax;
     const matchesProfession = !filterProfession.trim() || profileItem.profession.toLocaleLowerCase('fr').includes(filterProfession.trim().toLocaleLowerCase('fr'));
     const matchesHeight = profileItem.height == null || (profileItem.height >= filterHeightMin && profileItem.height <= filterHeightMax);
@@ -1275,7 +1282,7 @@ export default function EspacePage() {
       matchesDistance = 6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)) <= filterDistance;
     }
 
-    return matchesSearch && matchesCity && matchesAge && matchesProfession && matchesHeight && matchesReligion && matchesPreference && matchesSituation && matchesInterests && matchesDistance;
+    return matchesCity && matchesAge && matchesProfession && matchesHeight && matchesReligion && matchesPreference && matchesSituation && matchesInterests && matchesDistance;
   });
   const mobileDiscoveryProfile = filteredDiscoveryProfiles[mobileDiscoveryIndex];
   const mobileDiscoveryPhotos = mobileDiscoveryProfile
@@ -1306,6 +1313,7 @@ export default function EspacePage() {
   const selectedProfilePhotos = selectedProfileDetail
     ? Array.from(new Set([...(selectedProfileDetail.avatar_urls ?? []), selectedProfileDetail.photo_url].filter((photo): photo is string => Boolean(photo))))
     : [];
+  const ownProfilePhoto = imagePreview || profile?.avatar_urls?.[0] || profile?.photo_url || profileForm.photo_url || 'https://images.pexels.com/photos/733872/pexels-photo-733872.jpeg?auto=compress&cs=tinysrgb&w=600';
 
   useEffect(() => {
     if (!selectedProfileDetail || selectedProfilePhotos.length < 2) return;
@@ -1376,12 +1384,12 @@ export default function EspacePage() {
             <div className="space-y-6">
               <div className="contents">
                 {showDiscoveryFilters && (
-                  <div className="fixed inset-0 z-[80] flex items-stretch justify-center bg-[#f8f9fd] text-[#241c18] dark:bg-[#111111] dark:text-white sm:items-center sm:bg-black/65 sm:p-5 sm:backdrop-blur-sm" onClick={() => setShowDiscoveryFilters(false)}>
+                  <div className="fixed inset-0 z-[80] flex items-stretch justify-center bg-[#f8f9fd] text-[#241c18] dark:bg-[#111111] dark:text-white sm:items-center sm:bg-black/65 sm:p-5 sm:backdrop-blur-sm" onClick={closeDiscoveryFilters}>
                     <section role="dialog" aria-modal="true" aria-labelledby="discovery-filter-title" onClick={(event) => event.stopPropagation()} className="flex h-dvh min-h-0 w-full max-w-3xl flex-col overflow-hidden bg-[#f8f9fd] dark:bg-[#111111] sm:max-h-[min(94dvh,900px)] sm:rounded-[30px] sm:border sm:border-[#e5e6ec] sm:shadow-[0_24px_90px_rgba(0,0,0,.35)] dark:sm:border-white/10">
                       <header className="z-10 flex shrink-0 items-center gap-4 border-b border-[#ececf1] bg-[#f8f9fd] px-5 pb-4 pt-[max(1rem,env(safe-area-inset-top))] dark:border-white/10 dark:bg-[#171717] sm:px-7">
-                        <button type="button" aria-label="Fermer les filtres" onClick={() => setShowDiscoveryFilters(false)} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[#373844] dark:text-white"><ArrowLeft size={23} /></button>
+                        <button type="button" aria-label="Retour" onClick={closeDiscoveryFilters} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[#373844] dark:text-white"><ArrowLeft size={23} /></button>
                         <h2 id="discovery-filter-title" className="flex-1 text-center font-display text-xl font-bold sm:text-2xl">Filtres de recherche</h2>
-                        <button type="button" onClick={() => { setDiscoverySearch(''); setDiscoveryCityFilter('all'); setFilterAgeMin(FILTER_AGE_MIN); setFilterAgeMax(100); setFilterDistance(100000); setFilterHeightMin(FILTER_HEIGHT_MIN); setFilterHeightMax(220); setFilterProfession(''); setFilterReligion(''); setFilterPreference(''); setFilterSituation(''); setFilterInterests(''); setMobileDiscoveryIndex(0); setMobileDiscoveryHistory([]); }} className="shrink-0 text-xs font-semibold text-[#6e6f79] dark:text-white/70 sm:text-sm">Réinitialiser</button>
+                        <button type="button" onClick={() => { setDiscoveryCityFilter(''); setFilterAgeMin(FILTER_AGE_MIN); setFilterAgeMax(100); setFilterDistance(100000); setFilterHeightMin(FILTER_HEIGHT_MIN); setFilterHeightMax(220); setFilterProfession(''); setFilterReligion(''); setFilterPreference(''); setFilterSituation(''); setFilterInterests(''); setMobileDiscoveryIndex(0); setMobileDiscoveryHistory([]); }} className="shrink-0 text-xs font-semibold text-[#6e6f79] dark:text-white/70 sm:text-sm">Réinitialiser</button>
                       </header>
 
                       <div className="min-h-0 flex-1 space-y-7 overflow-y-auto overscroll-contain px-5 pb-6 pt-7 sm:px-8 sm:pt-8">
@@ -1390,15 +1398,14 @@ export default function EspacePage() {
                         <section><h3 className="mb-4 text-sm font-bold">Taille</h3><div className={filterCardClass}><div className="mb-6 grid grid-cols-3 items-center text-xs text-[#858691] dark:text-white/55"><span>{FILTER_HEIGHT_MIN} cm</span><strong className="text-center text-sm text-[#ec1689]">{filterHeightMin} – {filterHeightMax} cm</strong><span className="text-right">220 cm</span></div><Slider dir="ltr" aria-label="Tranche de taille" min={FILTER_HEIGHT_MIN} max={220} step={1} value={[filterHeightMin, filterHeightMax]} onValueChange={([minimum, maximum]) => { setFilterHeightMin(minimum); setFilterHeightMax(maximum); }} className="px-2 [&>span[data-orientation=horizontal]]:bg-[#e6e7ed] dark:[&>span[data-orientation=horizontal]]:bg-white/10 [&>span[data-orientation=horizontal]>span]:bg-[#ec1689] [&_[role=slider]]:h-5 [&_[role=slider]]:w-5 [&_[role=slider]]:border-[#ec1689] [&_[role=slider]]:bg-[#ec1689] [&_[role=slider]]:shadow-[0_2px_8px_rgba(236,22,137,.35)]" /></div></section>
 
                         <section><h3 className="mb-4 text-sm font-bold">Profession</h3><div className={`${filterCardClass} flex items-center gap-4`}><Briefcase size={22} className="shrink-0 text-[#ec1689]" /><input value={filterProfession} onChange={(event) => setFilterProfession(event.target.value)} placeholder="Ton métier (ex. Designer, Étudiant…)" className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-[#92939d] dark:placeholder:text-white/45" /></div></section>
-                        <section><h3 className="mb-4 text-sm font-bold">Ville</h3><div className={`${filterCardClass} flex items-center gap-4`}><MapPin size={22} className="shrink-0 text-[#858691]" /><select aria-label="Ville" value={discoveryCityFilter} onChange={(event) => setDiscoveryCityFilter(event.target.value)} className="min-w-0 flex-1 appearance-none bg-transparent text-sm outline-none"><option value="all" className="text-black">Toutes les villes</option>{discoveryCities.filter((city) => city !== 'all').map((city) => <option key={city} value={city} className="text-black">{city}</option>)}</select></div></section>
+                        <section><h3 className="mb-4 text-sm font-bold">Ville</h3><div className={`${filterCardClass} flex items-center gap-4`}><MapPin size={22} className="shrink-0 text-[#858691]" /><input aria-label="Ville" value={discoveryCityFilter} onChange={(event) => setDiscoveryCityFilter(event.target.value)} placeholder="Rechercher une ville…" className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-[#92939d] dark:placeholder:text-white/45" /></div></section>
                         <section><h3 className="mb-4 text-sm font-bold">Religion</h3><div className={`${filterCardClass} flex flex-wrap gap-2.5`}>{PROFILE_RELIGION_OPTIONS.map((option) => <button key={option} type="button" aria-pressed={filterReligion === option} onClick={() => setFilterReligion((current) => current === option ? '' : option)} className={filterChipClass(filterReligion === option)}>{option}</button>)}</div></section>
                         <section><h3 className="mb-4 text-sm font-bold">Préférences</h3><div className={`${filterCardClass} flex flex-wrap gap-2.5`}>{PROFILE_PREFERENCE_OPTIONS.map((option) => <button key={option} type="button" aria-pressed={filterPreference === option} onClick={() => setFilterPreference((current) => current === option ? '' : option)} className={filterChipClass(filterPreference === option)}>{option}</button>)}</div></section>
                         <section><h3 className="mb-4 text-sm font-bold">Situation</h3><div className={`${filterCardClass} flex flex-wrap gap-2.5`}>{PROFILE_MARITAL_OPTIONS.map(({ label, value }) => <button key={value} type="button" aria-pressed={filterSituation === value} onClick={() => setFilterSituation((current) => current === value ? '' : value)} className={filterChipClass(filterSituation === value)}>{label}</button>)}</div></section>
                         <section><h3 className="mb-4 text-sm font-bold">Centres d’intérêt</h3><div className={`${filterCardClass} flex flex-wrap gap-2.5`}>{PROFILE_INTEREST_OPTIONS.map(({ label, Icon }) => { const selected = filterInterests.split(',').map((interest) => interest.trim()).includes(label); return <button key={label} type="button" aria-pressed={selected} onClick={() => setFilterInterests((current) => { const interests = current.split(',').map((interest) => interest.trim()).filter(Boolean); return interests.includes(label) ? interests.filter((interest) => interest !== label).join(', ') : [...interests, label].join(', '); })} className={filterChipClass(selected)}><Icon size={16} className="text-[#ec1689]" />{label}</button>; })}</div></section>
-                        <section><h3 className="mb-4 text-sm font-bold">Recherche libre</h3><div className={`${filterCardClass} flex items-center gap-4`}><Search size={21} className="shrink-0 text-[#858691]" /><input value={discoverySearch} onChange={(event) => { setDiscoverySearch(event.target.value); setMobileDiscoveryIndex(0); setMobileDiscoveryHistory([]); }} placeholder="Nom, ville ou intérêt…" className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-[#92939d] dark:placeholder:text-white/45" /></div></section>
                       </div>
 
-                      <footer className="shrink-0 border-t border-[#ececf1] bg-[#f8f9fd]/95 px-5 pb-[max(1rem,env(safe-area-inset-bottom))] pt-4 backdrop-blur dark:border-white/10 dark:bg-[#171717]/95 sm:px-8"><button type="button" onClick={() => setShowDiscoveryFilters(false)} className="min-h-[58px] w-full rounded-full bg-[#ec1689] text-base font-extrabold text-white shadow-[0_12px_30px_rgba(236,22,137,.2)] transition hover:bg-[#d9147e]">Appliquer les filtres</button></footer>
+                      <footer className="shrink-0 border-t border-[#ececf1] bg-[#f8f9fd]/95 px-5 pb-[max(1rem,env(safe-area-inset-bottom))] pt-4 backdrop-blur dark:border-white/10 dark:bg-[#171717]/95 sm:px-8"><button type="button" onClick={closeDiscoveryFilters} className="min-h-[58px] w-full rounded-full bg-[#ec1689] text-base font-extrabold text-white shadow-[0_12px_30px_rgba(236,22,137,.2)] transition hover:bg-[#d82e69]">Appliquer les filtres</button></footer>
                     </section>
                   </div>
                 )}
@@ -1464,7 +1471,7 @@ export default function EspacePage() {
                         {mobileDiscoveryProfile.bio && <section className="mt-3"><h4 className="text-[10px] font-extrabold uppercase tracking-[.16em] text-white/50">À propos</h4><p className={`mt-1 max-w-prose text-sm leading-6 text-white/80 ${expandedDiscoveryProfile ? '' : 'line-clamp-2'}`}>{mobileDiscoveryProfile.bio}</p></section>}
                         {expandedDiscoveryProfile && <div className="mt-4 space-y-4">
                           <section><h4 className="text-[10px] font-extrabold uppercase tracking-[.16em] text-white/50">Informations</h4><div className="mt-2 grid grid-cols-2 gap-2 text-xs">
-                            {[['Ville', mobileDiscoveryProfile.city], ['Quartier', mobileDiscoveryProfile.zone], ['Profession', mobileDiscoveryProfile.profession], ['Taille', mobileDiscoveryProfile.height ? `${mobileDiscoveryProfile.height} cm` : ''], ['Religion', mobileDiscoveryProfile.religion], ['Situation', mobileDiscoveryProfile.marital_status], ['Langues', mobileDiscoveryProfile.languages?.join(', ')], ['Tabac', mobileDiscoveryProfile.smoking_habit]].filter(([, value]) => Boolean(value)).map(([label, value]) => <div key={label} className="min-w-0 rounded-xl border border-white/10 bg-white/5 p-2.5"><p className="text-[10px] font-semibold text-white/50">{label}</p><p className="mt-1 break-words font-bold text-white/90">{value}</p></div>)}
+                            {[['Ville', mobileDiscoveryProfile.city], ['Profession', mobileDiscoveryProfile.profession], ['Taille', mobileDiscoveryProfile.height ? `${mobileDiscoveryProfile.height} cm` : ''], ['Religion', mobileDiscoveryProfile.religion], ['Situation', mobileDiscoveryProfile.marital_status], ['Langues', mobileDiscoveryProfile.languages?.join(', ')], ['Tabac', mobileDiscoveryProfile.smoking_habit]].filter(([, value]) => Boolean(value)).map(([label, value]) => <div key={label} className="min-w-0 rounded-xl border border-white/10 bg-white/5 p-2.5"><p className="text-[10px] font-semibold text-white/50">{label}</p><p className="mt-1 break-words font-bold text-white/90">{value}</p></div>)}
                           </div></section>
                           <section><h4 className="text-[10px] font-extrabold uppercase tracking-[.16em] text-white/50">Centres d&apos;intérêt</h4>{mobileDiscoveryProfile.interests?.length ? <div className="mt-2 flex flex-wrap gap-2">{mobileDiscoveryProfile.interests.map((interest) => <span key={interest} className="rounded-full border border-white/15 bg-white/5 px-3 py-1.5 text-xs font-bold">{interest}</span>)}</div> : <p className="mt-2 text-xs text-white/60">Aucun centre d&apos;intérêt renseigné.</p>}</section>
                         </div>}
@@ -1475,7 +1482,7 @@ export default function EspacePage() {
                         <div className="mt-5 flex items-center justify-center gap-5">
                           <button type="button" onClick={advanceMobileDiscovery} aria-label="Passer ce profil" className="flex h-14 w-14 items-center justify-center rounded-full bg-black/45 text-white ring-1 ring-white/15 backdrop-blur transition active:scale-95"><X size={25} /></button>
                           <button type="button" onClick={() => handleDiscoveryMessage(mobileDiscoveryProfile)} aria-label="Envoyer un message" className="flex h-16 w-16 items-center justify-center rounded-full bg-[#292746] text-white shadow-lg transition active:scale-95"><MessageCircle size={27} /></button>
-                          <button type="button" onClick={() => { if (!discoveryLikedIds.has(mobileDiscoveryProfile.id)) void toggleDiscoveryLike(mobileDiscoveryProfile.id); }} aria-label={discoveryLikedIds.has(mobileDiscoveryProfile.id) ? 'Profil aimé' : 'Aimer ce profil'} className={`flex h-14 w-14 items-center justify-center rounded-full text-white shadow-[0_10px_28px_rgba(236,22,137,.32)] transition active:scale-95 ${discoveryLikedIds.has(mobileDiscoveryProfile.id) ? 'bg-[#a20d5d]' : 'bg-[#ec1689]'}`}><Heart size={25} fill="currentColor" /></button>
+                          <button type="button" onClick={() => { if (!discoveryLikedIds.has(mobileDiscoveryProfile.id)) void toggleDiscoveryLike(mobileDiscoveryProfile.id); }} aria-label={discoveryLikedIds.has(mobileDiscoveryProfile.id) ? 'Profil aimé' : 'Aimer ce profil'} className={`flex h-14 w-14 items-center justify-center rounded-full text-white shadow-[0_10px_28px_rgba(236,59,120,.32)] transition active:scale-95 ${discoveryLikedIds.has(mobileDiscoveryProfile.id) ? 'bg-[#a20d5d]' : 'bg-[#ec1689]'}`}><Heart size={25} fill="currentColor" /></button>
                         </div>
                         <p className="mt-3 text-center text-xs font-semibold text-white/60">Glissez vers la gauche pour passer, vers la droite pour revenir.</p>
                       </div>
@@ -1487,8 +1494,7 @@ export default function EspacePage() {
                             <div className="min-w-0">
                               <p className="text-[10px] font-extrabold uppercase tracking-[.22em] text-[#ec1689] dark:text-[#ff4b9b]">Profil à découvrir</p>
                               <h2 className="mt-1 truncate font-display text-3xl font-bold sm:text-4xl">{mobileDiscoveryProfile.display_name}{mobileDiscoveryProfile.age ? `, ${mobileDiscoveryProfile.age}` : ''}</h2>
-                              <p className="mt-1 flex items-center gap-1.5 text-sm text-[#686b79] dark:text-white/65"><MapPin size={14} className="shrink-0 text-[#ec1689]" />{[mobileDiscoveryProfile.city, mobileDiscoveryDistance !== null ? `${mobileDiscoveryDistance} km` : null].filter(Boolean).join(' · ') || 'Localisation non renseignée'}</p>
-                              {mobileDiscoveryProfile.zone && <p className="ml-5 mt-0.5 text-xs text-[#85899a] dark:text-white/45">{mobileDiscoveryProfile.zone}</p>}
+                              <p className="mt-1 flex items-center gap-1.5 text-sm text-[#686b79] dark:text-white/65"><MapPin size={14} className="shrink-0 text-[#ec1689]" />{mobileDiscoveryProfile.city || 'Localisation non renseignée'}</p>
                               <div className="mt-2 flex flex-wrap gap-2">
                                 {mobileDiscoveryProfile.is_verified && <span className="rounded-full bg-sky-100 px-2.5 py-1 text-[10px] font-bold text-sky-700 dark:bg-sky-500/20 dark:text-sky-200">✓ Vérifié</span>}
                                 {mobileDiscoveryProfile.is_online && <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-[10px] font-bold text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-200">● En ligne</span>}
@@ -1542,7 +1548,7 @@ export default function EspacePage() {
                             <div className="mx-auto flex max-w-sm items-center justify-center gap-5">
                               <button type="button" onClick={advanceMobileDiscovery} aria-label="Passer ce profil" className="flex h-12 w-12 items-center justify-center rounded-full bg-[#eceef4] text-[#414452] ring-1 ring-[#dfe1e8] transition active:scale-95 dark:bg-white/10 dark:text-white dark:ring-white/10"><X size={21} /></button>
                               <button type="button" onClick={() => handleDiscoveryMessage(mobileDiscoveryProfile)} aria-label="Envoyer un message" className="flex h-14 w-14 items-center justify-center rounded-full bg-[#292746] text-white shadow-lg transition active:scale-95"><MessageCircle size={23} /></button>
-                              <button type="button" onClick={() => { if (!discoveryLikedIds.has(mobileDiscoveryProfile.id)) void toggleDiscoveryLike(mobileDiscoveryProfile.id); }} aria-label={discoveryLikedIds.has(mobileDiscoveryProfile.id) ? 'Profil aimé' : 'Aimer ce profil'} className={`flex h-12 w-12 items-center justify-center rounded-full text-white shadow-[0_10px_28px_rgba(236,22,137,.32)] transition active:scale-95 ${discoveryLikedIds.has(mobileDiscoveryProfile.id) ? 'bg-[#a20d5d]' : 'bg-[#ec1689]'}`}><Heart size={21} fill="currentColor" /></button>
+                              <button type="button" onClick={() => { if (!discoveryLikedIds.has(mobileDiscoveryProfile.id)) void toggleDiscoveryLike(mobileDiscoveryProfile.id); }} aria-label={discoveryLikedIds.has(mobileDiscoveryProfile.id) ? 'Profil aimé' : 'Aimer ce profil'} className={`flex h-12 w-12 items-center justify-center rounded-full text-white shadow-[0_10px_28px_rgba(236,59,120,.32)] transition active:scale-95 ${discoveryLikedIds.has(mobileDiscoveryProfile.id) ? 'bg-[#a20d5d]' : 'bg-[#ec1689]'}`}><Heart size={21} fill="currentColor" /></button>
                             </div>
                           </footer>
                         </section>
@@ -1654,26 +1660,26 @@ export default function EspacePage() {
                 <header className="flex items-center justify-between"><h1 className="font-display text-3xl font-bold text-[#241c18] dark:text-white sm:text-4xl">Mon Profil</h1><button type="button" onClick={() => setProfileSettingsOpen(true)} aria-label="Ouvrir les paramètres" className="flex h-12 w-12 items-center justify-center rounded-full bg-white text-[#262733] shadow-sm transition hover:text-[#ec3b78] dark:bg-[#242424] dark:text-white"><Settings size={23} /></button></header>
                 <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
                   <article className="rounded-[30px] bg-white p-6 text-center shadow-[0_12px_38px_rgba(20,20,30,.06)] dark:bg-[#1d1d1d] sm:p-8">
-                    <div className="relative mx-auto h-40 w-40 overflow-hidden rounded-full border-[5px] border-white bg-[#eceef4] shadow-[0_0_0_2px_rgba(236,22,137,.18)] dark:border-[#303036] dark:bg-[#292932] sm:h-48 sm:w-48">
-                      <img src={imagePreview || profileForm.photo_url || 'https://images.pexels.com/photos/733872/pexels-photo-733872.jpeg?auto=compress&cs=tinysrgb&w=400'} alt={`Photo de ${profileForm.display_name || 'votre profil'}`} className="h-full w-full object-cover" />
-                      <button type="button" onClick={() => setProfileEditOpen(true)} aria-label="Modifier ma photo de profil" className="absolute bottom-1 right-1 flex h-12 w-12 items-center justify-center rounded-full bg-[#ec1689] text-white shadow-lg"><Camera size={21} /></button>
-                    </div>
+                    <input ref={profilePhotoInputRef} type="file" accept="image/png,image/jpeg,image/jpg" className="sr-only" tabIndex={-1} onChange={(event) => { const file = event.target.files?.[0]; if (file) void handleProfileImageSelection(file, null); }} />
+                    <button type="button" disabled={uploadingImage} onClick={() => profilePhotoInputRef.current?.click()} aria-label="Changer ma photo de profil" className="group relative mx-auto block h-40 w-40 overflow-hidden rounded-full border-[5px] border-white bg-[#eceef4] shadow-[0_0_0_2px_rgba(236,22,137,.18)] dark:border-[#303036] dark:bg-[#292932] sm:h-48 sm:w-48 disabled:cursor-wait">
+                      <img src={imagePreview || profileForm.photo_url || 'https://images.pexels.com/photos/733872/pexels-photo-733872.jpeg?auto=compress&cs=tinysrgb&w=400'} alt={`Photo de ${profileForm.display_name || 'votre profil'}`} className="h-full w-full object-cover transition group-hover:scale-105" />
+                      <span className="absolute inset-0 flex items-center justify-center bg-black/0 text-white transition group-hover:bg-black/35"><span className="absolute bottom-1 right-1 flex h-12 w-12 items-center justify-center rounded-full bg-[#ec1689] text-white shadow-lg"><Camera size={21} /></span></span>
+                      {uploadingImage && <span className="absolute inset-0 flex items-center justify-center bg-black/45"><span className="h-8 w-8 animate-spin rounded-full border-2 border-white border-t-transparent" /></span>}
+                    </button>
                     <div className="mt-5 flex items-center justify-center gap-2"><h2 className="font-display text-3xl font-bold text-[#272630] dark:text-white">{profileForm.display_name || 'Votre nom'}{profileForm.age ? `, ${profileForm.age}` : ''}</h2>{(!profileForm.bio || !profileForm.profession || !profileForm.interests.length) && <AlertTriangle size={20} className="text-amber-500" aria-label="Profil à compléter" />}</div>
                     <p className="mt-2 text-base text-[#777985] dark:text-white/60">{profileForm.city || 'Ville non renseignée'}</p>
                     {profile?.is_verified && <span className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-sky-100 px-3 py-1.5 text-xs font-bold text-sky-700 dark:bg-sky-500/15 dark:text-sky-200"><ShieldCheck size={14} /> Profil vérifié</span>}
                     {(!profileForm.bio || !profileForm.profession || !profileForm.interests.length) && <button type="button" onClick={() => setProfileEditOpen(true)} className="mt-6 flex w-full items-center gap-4 rounded-[24px] bg-[#f4f4f6] p-5 text-left text-sm font-bold text-[#555763] dark:bg-[#292929] dark:text-white/75"><span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#ec1689]/10 text-[#ec1689]">✦</span>Complétez votre profil pour avoir plus de chance</button>}
                     <div className="mt-7 grid gap-3 sm:grid-cols-2">
-                      <button type="button" onClick={() => setProfileEditOpen(true)} className="flex h-[68px] items-center justify-center gap-3 rounded-[22px] border border-white/10 bg-gradient-to-br from-[#37345d] to-[#292746] px-4 text-sm font-extrabold text-white shadow-[0_10px_24px_rgba(41,39,70,.22)] transition hover:-translate-y-0.5 hover:shadow-[0_14px_28px_rgba(41,39,70,.3)] active:translate-y-0 dark:from-[#39365f] dark:to-[#292746]"><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/10 ring-1 ring-white/10"><SlidersHorizontal size={19} /></span><span>Modifier</span></button>
-                      <button type="button" disabled={!profile} onClick={() => { if (profile) { setProfileDetailPhotoIndex(0); setSelectedProfileDetail(profile); } }} className="flex h-[68px] items-center justify-center gap-3 rounded-[22px] border border-white/10 bg-gradient-to-br from-[#37345d] to-[#292746] px-4 text-sm font-extrabold text-white shadow-[0_10px_24px_rgba(41,39,70,.22)] transition hover:-translate-y-0.5 hover:shadow-[0_14px_28px_rgba(41,39,70,.3)] active:translate-y-0 disabled:cursor-not-allowed disabled:opacity-50 dark:from-[#39365f] dark:to-[#292746]"><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/10 ring-1 ring-white/10"><User size={19} /></span><span>Voir mon profil</span></button>
+                      <button type="button" onClick={() => setProfileEditOpen(true)} className="flex h-[68px] items-center justify-center gap-3 rounded-[22px] border border-white/10 bg-[#ec3b78] dark:bg-[#ec3b78] px-4 text-sm font-extrabold text-white shadow-[0_10px_24px_rgba(236,59,120,.24)] transition hover:-translate-y-0.5 hover:bg-[#d82e69] hover:shadow-[0_14px_28px_rgba(236,59,120,.34)] active:translate-y-0 "><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/10 ring-1 ring-white/10"><SlidersHorizontal size={19} /></span><span>Modifier</span></button>
+                      <button type="button" disabled={!profile} onClick={() => { if (profile) { setOwnProfileDetailExpanded(false); setOwnProfilePreviewOpen(true); } }} className="flex h-[68px] items-center justify-center gap-3 rounded-[22px] border border-white/10 bg-[#ec3b78] dark:bg-[#ec3b78] px-4 text-sm font-extrabold text-white shadow-[0_10px_24px_rgba(236,59,120,.24)] transition hover:-translate-y-0.5 hover:bg-[#d82e69] hover:shadow-[0_14px_28px_rgba(236,59,120,.34)] active:translate-y-0 disabled:cursor-not-allowed disabled:opacity-50 "><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/10 ring-1 ring-white/10"><User size={19} /></span><span>Voir mon profil</span></button>
                     </div>
-                    <button type="button" onClick={() => { setTab('decouverte'); setShowDiscoveryFilters(true); }} className="mt-3 flex h-[72px] w-full items-center gap-4 rounded-[22px] border border-white/10 bg-gradient-to-r from-[#37345d] to-[#292746] px-5 text-left text-white shadow-[0_10px_24px_rgba(41,39,70,.18)] transition hover:-translate-y-0.5 hover:shadow-[0_14px_28px_rgba(41,39,70,.28)] active:translate-y-0 dark:from-[#39365f] dark:to-[#292746]"><span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white/10 ring-1 ring-white/10"><SlidersHorizontal size={20} /></span><span className="min-w-0 flex-1"><strong className="block text-sm font-extrabold">Préférences de recherche</strong><span className="mt-0.5 block text-xs font-medium text-white/65">Âge, distance et critères</span></span><ChevronRight size={19} className="shrink-0 text-white/65" /></button>
+                    <button type="button" onClick={() => { setSearchFiltersReturnTo('profile'); setTab('decouverte'); setShowDiscoveryFilters(true); }} className="mt-3 flex h-[72px] w-full items-center gap-4 rounded-[22px] border border-white/10 bg-[#ec3b78] dark:bg-[#ec3b78] px-5 text-left text-white shadow-[0_10px_24px_rgba(236,59,120,.22)] transition hover:-translate-y-0.5 hover:bg-[#d82e69] hover:shadow-[0_14px_28px_rgba(236,59,120,.32)] active:translate-y-0 "><span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white/10 ring-1 ring-white/10"><SlidersHorizontal size={20} /></span><span className="min-w-0 flex-1"><strong className="block text-sm font-extrabold">Préférences de recherche</strong><span className="mt-0.5 block text-xs font-medium text-white/65">Âge, distance et critères</span></span><ChevronRight size={19} className="shrink-0 text-white/65" /></button>
                   </article>
 
                   <aside className="space-y-4">
                     <button type="button" onClick={() => { setProfileSection('visitors'); void loadProfileVisitors(); }} className="flex min-h-48 w-full flex-col items-center justify-center rounded-[30px] bg-white p-6 text-center shadow-[0_12px_38px_rgba(20,20,30,.06)] transition hover:-translate-y-0.5 dark:bg-[#1d1d1d]"><span className="flex h-14 w-14 items-center justify-center rounded-full bg-[#ec1689]/10 text-[#ec1689]"><Eye size={26} /></span><strong className="mt-4 text-3xl font-extrabold text-[#292746] dark:text-white">{profileVisitors.length}</strong><span className="mt-1 text-sm text-[#777985] dark:text-white/60">Vues profil</span></button>
-                    <button type="button" onClick={() => setProfileSettingsOpen(true)} className="flex min-h-24 w-full items-center justify-between rounded-[24px] bg-white px-5 text-left shadow-sm dark:bg-[#1d1d1d]"><span className="flex items-center gap-3"><span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#ec1689]/10 text-[#ec1689]"><Settings size={20} /></span><span className="font-bold text-[#292832] dark:text-white">Paramètres du compte</span></span><ChevronRight size={19} className="text-[#8d8e98]" /></button>
                     {isAdminAccount && <Link href="/admin" className="flex min-h-14 items-center justify-center rounded-[20px] border border-[#dfdfe5] text-sm font-bold text-[#565762] dark:border-white/10 dark:text-white/70">Administration</Link>}
-                    <button type="button" onClick={async () => { await signOut(); router.push('/'); }} className="flex h-[64px] w-full items-center gap-3 rounded-[22px] border border-[#f1d4de] bg-[#fff6f8] px-5 text-left text-sm font-extrabold text-[#bd4167] transition hover:border-[#e9b4c5] hover:bg-[#ffedf2] dark:border-[#56303d] dark:bg-[#281c21] dark:text-[#ff9ab9] dark:hover:bg-[#342129]"><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#ec1689]/10"><LogOut size={18} /></span>Déconnexion</button>
                   </aside>
                 </div>
               </section>}
@@ -1682,7 +1688,7 @@ export default function EspacePage() {
                 <header className="flex items-center gap-4"><button type="button" onClick={() => setProfileSettingsOpen(false)} aria-label="Retour à mon profil" className="flex h-10 w-10 items-center justify-center rounded-full bg-white text-[#282832] shadow-sm dark:bg-[#202027] dark:text-white"><ArrowLeft size={21} /></button><h1 className="font-display text-2xl font-bold text-[#241c18] dark:text-white">Paramètres</h1></header>
                 <button type="button" onClick={() => { setProfileSettingsOpen(false); setProfileEditOpen(true); }} className="flex w-full items-center gap-4 rounded-[26px] bg-white p-5 text-left shadow-sm dark:bg-[#202027]"><img src={profileForm.photo_url || 'https://images.pexels.com/photos/733872/pexels-photo-733872.jpeg?auto=compress&cs=tinysrgb&w=200'} alt="" className="h-16 w-16 rounded-full object-cover"/><span className="min-w-0 flex-1"><strong className="block truncate text-lg text-[#292832] dark:text-white">{profileForm.display_name}{profileForm.age ? `, ${profileForm.age}` : ''}</strong><span className="text-sm text-[#858691] dark:text-white/55">Modifier mon profil</span></span><ChevronRight size={20} /></button>
                 <section><h2 className="mb-3 px-1 text-sm font-bold text-[#92939d]">Préférences</h2><div className="grid gap-3 md:grid-cols-2">
-                  <button type="button" onClick={() => { setProfileSettingsOpen(false); setTab('decouverte'); setShowDiscoveryFilters(true); }} className="flex min-h-[96px] w-full items-center gap-4 rounded-[24px] border border-[#e7e8ee] bg-white p-5 text-left shadow-[0_8px_24px_rgba(25,26,40,.05)] transition hover:-translate-y-0.5 hover:border-sky-200 hover:shadow-[0_14px_32px_rgba(25,26,40,.09)] dark:border-white/[0.07] dark:bg-[#202027] dark:hover:border-sky-400/30"><span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[18px] bg-sky-100 text-sky-600 dark:bg-sky-500/15 dark:text-sky-300"><MapPin size={21} /></span><span className="min-w-0 flex-1"><strong className="block text-sm font-extrabold text-[#292832] dark:text-white">Préférences de recherche</strong><span className="mt-1 block text-xs leading-5 text-[#858691] dark:text-white/50">Âge, distance et profils recherchés</span></span><ChevronRight size={19} className="shrink-0 text-[#9b9ca6]" /></button>
+                  <button type="button" onClick={() => { setSearchFiltersReturnTo('settings'); setProfileSettingsOpen(false); setTab('decouverte'); setShowDiscoveryFilters(true); }} className="flex min-h-[96px] w-full items-center gap-4 rounded-[24px] border border-[#e7e8ee] bg-white p-5 text-left shadow-[0_8px_24px_rgba(25,26,40,.05)] transition hover:-translate-y-0.5 hover:border-sky-200 hover:shadow-[0_14px_32px_rgba(25,26,40,.09)] dark:border-white/[0.07] dark:bg-[#202027] dark:hover:border-sky-400/30"><span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[18px] bg-sky-100 text-sky-600 dark:bg-sky-500/15 dark:text-sky-300"><MapPin size={21} /></span><span className="min-w-0 flex-1"><strong className="block text-sm font-extrabold text-[#292832] dark:text-white">Préférences de recherche</strong><span className="mt-1 block text-xs leading-5 text-[#858691] dark:text-white/50">Âge, distance et profils recherchés</span></span><ChevronRight size={19} className="shrink-0 text-[#9b9ca6]" /></button>
                   <button type="button" onClick={() => setProfileSection('privacy')} className="flex min-h-[96px] w-full items-center gap-4 rounded-[24px] border border-[#e7e8ee] bg-white p-5 text-left shadow-[0_8px_24px_rgba(25,26,40,.05)] transition hover:-translate-y-0.5 hover:border-emerald-200 hover:shadow-[0_14px_32px_rgba(25,26,40,.09)] dark:border-white/[0.07] dark:bg-[#202027] dark:hover:border-emerald-400/30"><span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[18px] bg-emerald-100 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-300"><Eye size={21} /></span><span className="min-w-0 flex-1"><strong className="block text-sm font-extrabold text-[#292832] dark:text-white">Confidentialité & notifications</strong><span className="mt-1 block text-xs leading-5 text-[#858691] dark:text-white/50">Contrôlez votre visibilité et vos alertes</span></span><ChevronRight size={19} className="shrink-0 text-[#9b9ca6]" /></button>
                   <button type="button" onClick={() => setProfileSection('security')} className="flex min-h-[96px] w-full items-center gap-4 rounded-[24px] border border-[#e7e8ee] bg-white p-5 text-left shadow-[0_8px_24px_rgba(25,26,40,.05)] transition hover:-translate-y-0.5 hover:border-amber-200 hover:shadow-[0_14px_32px_rgba(25,26,40,.09)] dark:border-white/[0.07] dark:bg-[#202027] dark:hover:border-amber-400/30"><span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[18px] bg-amber-100 text-amber-600 dark:bg-amber-500/15 dark:text-amber-300"><LockKeyhole size={21} /></span><span className="min-w-0 flex-1"><strong className="block text-sm font-extrabold text-[#292832] dark:text-white">Sécurité du compte</strong><span className="mt-1 block text-xs leading-5 text-[#858691] dark:text-white/50">Mot de passe et accès à votre compte</span></span><ChevronRight size={19} className="shrink-0 text-[#9b9ca6]" /></button>
                   <button type="button" onClick={() => setProfileSection('blocks')} className="flex min-h-[96px] w-full items-center gap-4 rounded-[24px] border border-[#e7e8ee] bg-white p-5 text-left shadow-[0_8px_24px_rgba(25,26,40,.05)] transition hover:-translate-y-0.5 hover:border-sky-200 hover:shadow-[0_14px_32px_rgba(25,26,40,.09)] dark:border-white/[0.07] dark:bg-[#202027] dark:hover:border-sky-400/30"><span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[18px] bg-sky-100 text-sky-600 dark:bg-sky-500/15 dark:text-sky-300"><Ban size={21} /></span><span className="min-w-0 flex-1"><strong className="block text-sm font-extrabold text-[#292832] dark:text-white">Blocages & signalements</strong><span className="mt-1 block text-xs leading-5 text-[#858691] dark:text-white/50">Gérez les profils bloqués et signalez une personne depuis sa conversation</span></span><ChevronRight size={19} className="shrink-0 text-[#9b9ca6]" /></button>
@@ -1704,44 +1710,18 @@ export default function EspacePage() {
               {profileSection === 'security' && <SettingsPanels tab="settings-security" profile={profile} privacySettings={privacySettings} setPrivacySettings={setPrivacySettings} savePrivacy={savePrivacy} privacySaved={privacySaved} securityForm={securityForm} setSecurityForm={setSecurityForm} changePassword={changePassword} securityMessage={securityMessage} securityLoading={securityLoading} showNewPw={showNewPw} setShowNewPw={setShowNewPw} onGoToProfileTab={() => setProfileSection('profile')} onChangeTab={() => {}} subscriptionPlan={subscriptionPlan} showTabs={false} />}
               {profileSection === 'subscription' && <SettingsPanels tab="settings-subscription" profile={profile} privacySettings={privacySettings} setPrivacySettings={setPrivacySettings} savePrivacy={savePrivacy} privacySaved={privacySaved} securityForm={securityForm} setSecurityForm={setSecurityForm} changePassword={changePassword} securityMessage={securityMessage} securityLoading={securityLoading} showNewPw={showNewPw} setShowNewPw={setShowNewPw} onGoToProfileTab={() => setProfileSection('profile')} onChangeTab={() => {}} subscriptionPlan={subscriptionPlan} showTabs={false} />}
               {profileSection === 'help' && <SettingsPanels tab="settings-help" profile={profile} privacySettings={privacySettings} setPrivacySettings={setPrivacySettings} savePrivacy={savePrivacy} privacySaved={privacySaved} securityForm={securityForm} setSecurityForm={setSecurityForm} changePassword={changePassword} securityMessage={securityMessage} securityLoading={securityLoading} showNewPw={showNewPw} setShowNewPw={setShowNewPw} onGoToProfileTab={() => setProfileSection('profile')} onChangeTab={() => {}} subscriptionPlan={subscriptionPlan} showTabs={false} />}
-              {profileSection === 'profile' && profileEditOpen && <div className="grid gap-6 lg:grid-cols-[300px_1fr]">
-              <div className="lg:col-span-2 flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-white p-4 shadow dark:bg-[#1c1b21]"><div className="flex items-center gap-3"><button type="button" onClick={() => setProfileEditOpen(false)} aria-label="Retour à mon profil" className="flex h-10 w-10 items-center justify-center rounded-full bg-[#f4f4f6] text-[#343540] dark:bg-white/10 dark:text-white"><ArrowLeft size={19} /></button><div><p className="font-bold">Modifier mon profil</p><p className="text-xs text-[#756960] dark:text-white/55">Mettez à jour les informations de votre profil.</p></div></div><div className="flex items-center gap-2">{isAdminAccount && <Link href="/admin" className="rounded-full border border-[#dfd2c6] px-4 py-2.5 text-xs font-extrabold text-[#756960] dark:border-white/15 dark:text-white/75">Administration</Link>}<button type="button" onClick={async () => { await signOut(); router.push('/'); }} className="rounded-full border border-[#dfd2c6] px-4 py-2.5 text-xs font-extrabold text-[#756960] dark:border-white/15 dark:text-white/75">Déconnexion</button></div></div>
-              <div className="rounded-[26px] bg-white p-6 text-center shadow-[0_8px_30px_rgba(83,46,32,.05)]">
-                <div className="relative mx-auto h-32 w-32 overflow-hidden rounded-full border-4 border-[#f3e9dc]">
-                  <img src={imagePreview || profileForm.photo_url || 'https://images.pexels.com/photos/733872/pexels-photo-733872.jpeg?auto=compress&cs=tinysrgb&w=300'} alt="Photo" className="h-full w-full object-cover" />
-                  <label className="absolute inset-0 flex cursor-pointer items-center justify-center bg-black/40 opacity-0 transition hover:opacity-100">
-                    <Upload size={20} className="text-white" />
-                    <input
-                      type="file"
-                      accept="image/png,image/jpeg,image/jpg"
-                      className="hidden"
-                      onChange={(e) => handleProfileImageSelection(e.target.files?.[0], null)}
-                    />
-                  </label>
-                  {uploadingImage && (
-                    <div className="absolute inset-0 flex items-center justify-center bg-black/50">
-                      <div className="h-6 w-6 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
-                    </div>
-                  )}
-                </div>
-                <p className="mt-4 font-display text-2xl">{profileForm.display_name || 'Votre nom'}</p>
-                <p className="mt-1 text-sm text-[#756960]">{profileForm.profession || 'Votre profession'}</p>
-                <p className="mt-1 text-sm text-[#756960]">{profileForm.city}</p>
-                {profile?.is_verified && <span className="mt-3 inline-flex items-center gap-1 rounded-full bg-[#e5f0ed] px-3 py-1.5 text-[10px] font-extrabold uppercase text-[#1a6b68]"><ShieldCheck size={12} /> Vérifié</span>}
-                {!profile?.is_verified && <p className="mt-3 text-xs text-[#9a8b82]">Profil non vérifié</p>}
-              </div>
+              {profileSection === 'profile' && profileEditOpen && <div className="grid gap-6">
+              <div className="lg:col-span-2 flex items-center gap-3 rounded-2xl bg-white p-4 shadow dark:bg-[#1c1b21]"><button type="button" onClick={() => setProfileEditOpen(false)} aria-label="Retour au profil" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#f4f4f6] text-[#343540] dark:bg-white/10 dark:text-white"><ArrowLeft size={19} /></button><p className="font-bold text-[#292832] dark:text-white">Modifier mon profil</p></div>
               <form onSubmit={saveProfile} className="rounded-[26px] bg-white p-6 shadow-[0_8px_30px_rgba(83,46,32,.05)] lg:p-8">
                 <div className="mt-0 rounded-[22px] border border-[#dfd2c6] bg-[#f8f9fd] p-4 transition dark:border-[#3a3a3a] dark:bg-[#1d1f24]">
                   <div className="flex items-center justify-between gap-3">
                     <div>
-                      <p className="text-[10px] font-extrabold uppercase tracking-[0.18em] text-[#625852] dark:text-[#d8d5d2]">Mes Gallery</p>
-                      <h3 className="mt-1 font-display text-xl text-[#241c18] dark:text-white">Photos optionnelles</h3>
+                      <h3 className="font-display text-xl text-[#241c18] dark:text-white">Photos</h3>
                     </div>
                     <span className="rounded-full bg-[#fce6ee] px-3 py-1 text-[10px] font-extrabold uppercase tracking-[0.14em] text-[#ec3b78] dark:bg-[#3a1e2a] dark:text-[#f9bfd2]">
                       {galleryPhotos.filter(Boolean).length}/6
                     </span>
                   </div>
-                  <p className="mt-2 text-xs text-[#9a8b82] dark:text-[#c9c3bf]">Ajoutez jusqu’à 6 photos supplémentaires pour enrichir votre profil. C’est 100% optionnel.</p>
 
                   <input
                     ref={galleryFileInputRef}
@@ -1756,32 +1736,22 @@ export default function EspacePage() {
                   />
                   <div className="mt-4 grid gap-3 grid-cols-3">
                     {Array.from({ length: 6 }, (_, index) => (
-                      <button
+                      <div
                         key={`gallery-slot-${index}`}
-                        type="button"
-                        disabled={galleryUploadingIndex !== null}
-                        aria-label={galleryPhotos[index] ? `Remplacer la photo ${index + 1}` : `Ajouter une photo ${index + 1}`}
-                        onClick={() => {
-                          setGalleryUploadIndex(index);
-                          galleryFileInputRef.current?.click();
-                        }}
-                        className="group relative flex aspect-[4/5] w-full items-center justify-center overflow-hidden rounded-[20px] border border-dashed border-[#d9c9ba] bg-white transition hover:border-[#ec3b78] disabled:cursor-wait disabled:opacity-70 dark:border-[#4a4a4a] dark:bg-[#27272a] dark:hover:border-[#ff7ab3]"
+                        className="group relative flex aspect-[4/5] w-full items-center justify-center overflow-hidden rounded-[20px] border border-dashed border-[#d9c9ba] bg-white transition hover:border-[#ec3b78] dark:border-[#4a4a4a] dark:bg-[#27272a] dark:hover:border-[#ff7ab3]"
                       >
                         {galleryPhotos[index] ? (
                           <>
-                            <img src={galleryPhotos[index]!} alt={`Photo ${index + 1}`} className="h-full w-full object-cover" />
-                            <div className="absolute inset-0 bg-black/20 opacity-0 transition group-hover:opacity-100" />
-                            <div className="absolute bottom-2 left-2 right-2 rounded-full bg-black/55 px-2 py-1 text-[9px] font-extrabold uppercase tracking-[0.16em] text-white opacity-100 transition sm:opacity-0 sm:group-hover:opacity-100">
-                              Remplacer
-                            </div>
+                            <button type="button" disabled={galleryUploadingIndex !== null} aria-label={`Remplacer la photo ${index + 1}`} onClick={() => { setGalleryUploadIndex(index); galleryFileInputRef.current?.click(); }} className="absolute inset-0 h-full w-full disabled:cursor-wait"><img src={galleryPhotos[index]!} alt={`Photo optionnelle ${index + 1}`} className="h-full w-full object-cover" /><span className="absolute inset-x-2 bottom-2 rounded-full bg-black/55 px-2 py-1 text-[9px] font-extrabold uppercase tracking-[0.16em] text-white opacity-100 transition sm:opacity-0 sm:group-hover:opacity-100">Remplacer</span></button>
+                            <button type="button" disabled={galleryUploadingIndex !== null} aria-label={`Supprimer la photo ${index + 1}`} onClick={() => setGalleryPhotos((current) => current.map((photo, photoIndex) => photoIndex === index ? null : photo))} className="absolute right-2 top-2 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-black/70 text-white shadow-lg ring-1 ring-white/50 transition hover:scale-105 hover:bg-[#ec1689] disabled:opacity-50"><X size={17} /></button>
                           </>
                         ) : (
-                          <div className="flex flex-col items-center justify-center gap-2 text-[#9a8b82] dark:text-[#c9c3bf]">
+                          <button type="button" disabled={galleryUploadingIndex !== null} aria-label={`Ajouter la photo ${index + 1}`} onClick={() => { setGalleryUploadIndex(index); galleryFileInputRef.current?.click(); }} className="flex h-full w-full flex-col items-center justify-center gap-2 text-[#9a8b82] disabled:cursor-wait disabled:opacity-70 dark:text-[#c9c3bf]">
                             <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#fce6ee] text-[#ec3b78] dark:bg-[#3a1e2a] dark:text-[#f9bfd2]">
                               <Plus size={20} />
                             </div>
                             <span className="text-[10px] font-extrabold uppercase tracking-[0.18em]">Ajouter</span>
-                          </div>
+                          </button>
                         )}
 
                         {galleryUploadingIndex === index && (
@@ -1789,17 +1759,17 @@ export default function EspacePage() {
                             <div className="h-6 w-6 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
                           </div>
                         )}
-                      </button>
+                      </div>
                     ))}
                   </div>
                 </div>
 
                 <h2 className="font-display text-2xl">Mes informations</h2>
-                <p className="mt-1 text-sm text-[#756960]">Renseignez votre profil pour augmenter vos chances de match.</p>
                 <div className="mt-6 grid gap-4 sm:grid-cols-2">
                   <label className="block text-xs font-extrabold text-[#625852]">Nom affiché<input value={profileForm.display_name} readOnly aria-readonly="true" className="mt-2 w-full cursor-not-allowed rounded-xl border border-[#dfd2c6] bg-[#f8f9fd] px-4 py-3 text-sm text-[#756960] outline-none dark:bg-white/5 dark:text-white/70" /><span className="mt-1 block text-[10px] font-medium text-[#9a8b82]">Le nom affiché ne peut pas être modifié ici.</span></label>
                   <label className="block text-xs font-extrabold text-[#625852]">Âge<input value={profileForm.age} readOnly aria-readonly="true" className="mt-2 w-full cursor-not-allowed rounded-xl border border-[#dfd2c6] bg-[#f8f9fd] px-4 py-3 text-sm text-[#756960] outline-none dark:bg-white/5" /><span className="mt-1 block text-[10px] font-medium text-[#9a8b82]">L’âge est calculé à partir de votre date de naissance.</span></label>
-                  <label className="block text-xs font-extrabold text-[#625852]">Ville<input value={profileForm.city} readOnly aria-readonly="true" className="mt-2 w-full cursor-not-allowed rounded-xl border border-[#dfd2c6] bg-[#f8f9fd] px-4 py-3 text-sm text-[#756960] outline-none dark:bg-white/5 dark:text-white/70" /><span className="mt-1 block text-[10px] font-medium text-[#9a8b82]">La ville ne peut pas être modifiée ici.</span></label>
+                  <label className="block text-xs font-extrabold text-[#625852]">Ville<input value={profileForm.city} onChange={(event) => setProfileForm((current) => ({ ...current, city: event.target.value }))} className="mt-2 w-full rounded-xl border border-[#dfd2c6] bg-[#f8f9fd] px-4 py-3 text-sm outline-none focus:border-[#ec3b78] dark:bg-white/5 dark:text-white" /></label>
+                  <label className="block text-xs font-extrabold text-[#625852]">Genre<input value={profile?.gender || 'Non renseigné'} readOnly aria-readonly="true" className="mt-2 w-full cursor-not-allowed rounded-xl border border-[#dfd2c6] bg-[#f8f9fd] px-4 py-3 text-sm text-[#756960] outline-none dark:bg-white/5 dark:text-white/70" /></label>
                   <label className="block text-xs font-extrabold text-[#625852]">Profession<input value={profileForm.profession} onChange={(e) => setProfileForm({ ...profileForm, profession: e.target.value })} className="mt-2 w-full rounded-xl border border-[#dfd2c6] bg-[#f8f9fd] px-4 py-3 text-sm outline-none focus:border-[#ec3b78]" /></label>
 
                   {renderProfileOptionGroup('Tes passions', profileForm.interests.length === 0, PROFILE_INTEREST_OPTIONS.map(({ label, Icon }) => ({ label, value: label, Icon })), profileForm.interests, (value) => setProfileForm((current) => ({ ...current, interests: current.interests.includes(value) ? current.interests.filter((item) => item !== value) : [...current.interests, value] })), true)}
@@ -2211,11 +2181,51 @@ export default function EspacePage() {
           </form>
         </div>
       )}
+      {ownProfilePreviewOpen && profile && (
+        <div className="fixed inset-0 z-[125] flex items-center justify-center bg-black/65 p-3 backdrop-blur-sm sm:p-6" role="dialog" aria-modal="true" aria-label="Mon profil">
+          <section className="relative isolate flex h-[min(86dvh,860px)] w-full max-w-[680px] flex-col overflow-y-auto rounded-[32px] bg-[#202027] text-white shadow-[0_28px_90px_rgba(0,0,0,.42)] sm:rounded-[40px]">
+            {!ownProfileDetailExpanded ? <>
+              <img src={ownProfilePhoto} alt="" onError={(event) => { event.currentTarget.src = 'https://images.pexels.com/photos/733872/pexels-photo-733872.jpeg?auto=compress&cs=tinysrgb&w=600'; }} className="absolute inset-0 h-full w-full object-cover" />
+              <div className="absolute inset-0 bg-gradient-to-b from-black/25 via-transparent to-black/85" />
+              <button type="button" onClick={() => setOwnProfilePreviewOpen(false)} aria-label="Fermer mon profil" className="absolute right-4 top-4 z-10 flex h-11 w-11 items-center justify-center rounded-full border border-white/30 bg-black/30 text-white backdrop-blur"><X size={21} /></button>
+              <div className="relative mt-auto p-6 sm:p-9">
+                <p className="text-xs font-extrabold uppercase tracking-[.18em] text-[#ff86bc]">Mon profil</p>
+                <h2 className="mt-2 font-display text-4xl font-bold sm:text-5xl">{profileForm.display_name}{profileForm.age && <>, {profileForm.age}</>}</h2>
+                {profileForm.profession && <p className="mt-2 flex items-center gap-2 text-lg text-white/85"><Briefcase size={18} />{profileForm.profession}</p>}
+                <p className="mt-1 flex items-center gap-2 text-base text-white/75"><MapPin size={17} />{profileForm.city || 'Ville non renseignée'}</p>
+                {!!profileForm.interests.length && <div className="mt-5 flex flex-wrap gap-2">{profileForm.interests.slice(0, 3).map((interest) => <span key={interest} className="rounded-full border border-white/40 bg-black/30 px-4 py-2 text-sm font-bold backdrop-blur">★ {interest}</span>)}</div>}
+                <button type="button" onClick={() => setOwnProfileDetailExpanded(true)} className="mt-7 inline-flex min-h-14 items-center gap-3 rounded-full bg-[#ec1689] px-7 text-base font-extrabold text-white shadow-[0_12px_35px_rgba(236,22,137,.38)] transition hover:bg-[#d82e69]">Voir plus <ChevronRight size={20} className="rotate-90" /></button>
+              </div>
+            </> : <>
+              <div className="sticky top-0 z-10 flex shrink-0 items-center justify-between bg-[#f8f9fd]/95 px-5 pb-3 pt-[max(1rem,env(safe-area-inset-top))] text-[#24212b] backdrop-blur dark:bg-[#101014]/95 dark:text-white sm:px-8">
+                <h2 className="font-display text-xl font-bold">Mon profil</h2>
+                <button type="button" onClick={() => setOwnProfileDetailExpanded(false)} aria-label="Voir la photo de couverture" className="rounded-full px-3 py-2 text-sm font-bold text-[#ec1689]">Photo <ChevronRight size={16} className="inline rotate-180" /></button>
+                <button type="button" onClick={() => setOwnProfilePreviewOpen(false)} aria-label="Fermer mon profil" className="flex h-10 w-10 items-center justify-center rounded-full bg-black/5 dark:bg-white/10"><X size={20} /></button>
+              </div>
+              <div className="flex-1 space-y-6 bg-[#f8f9fd] px-5 pb-8 pt-6 text-[#24212b] dark:bg-[#101014] dark:text-white sm:px-8">
+                <div className="text-center">
+                  <div className="relative mx-auto h-36 w-36 overflow-hidden rounded-full border-4 border-white bg-[#e4e6ed] shadow-[0_0_0_3px_rgba(236,22,137,.25)] dark:border-[#303036] sm:h-44 sm:w-44">
+                    <img src={ownProfilePhoto} alt={profileForm.display_name} onError={(event) => { event.currentTarget.src = 'https://images.pexels.com/photos/733872/pexels-photo-733872.jpeg?auto=compress&cs=tinysrgb&w=600'; }} className="h-full w-full object-cover" />
+                  </div>
+                  <h3 className="mt-4 font-display text-3xl font-bold">{profileForm.display_name}{profileForm.age && <>, {profileForm.age}</>}</h3>
+                  <p className="mt-1 flex items-center justify-center gap-1.5 text-sm text-[#686b79] dark:text-white/65"><MapPin size={15} className="text-[#ec1689]" />{profileForm.city || 'Ville non renseignée'}</p>
+                  {profile?.is_verified && <span className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-sky-100 px-3 py-1 text-xs font-bold text-sky-700 dark:bg-sky-500/15 dark:text-sky-200"><ShieldCheck size={14} />Profil vérifié</span>}
+                </div>
+                <section><h3 className="font-extrabold">À propos</h3><p className="mt-2 whitespace-pre-line text-sm leading-6 text-[#626779] dark:text-white/75">{profileForm.bio || 'Vous n’avez pas encore ajouté de description.'}</p></section>
+                <section><h3 className="font-extrabold">Centres d’intérêt</h3>{profileForm.interests.length ? <div className="mt-3 flex flex-wrap gap-2">{profileForm.interests.map((interest) => <span key={interest} className="rounded-full border border-[#dfe1e8] bg-[#f0f1f5] px-3.5 py-2 text-xs font-semibold text-[#3e414d] dark:border-white/15 dark:bg-white/[0.08] dark:text-white/85">{interest}</span>)}</div> : <p className="mt-2 text-sm text-[#747888] dark:text-white/55">Aucun centre d’intérêt renseigné.</p>}</section>
+                <section><h3 className="font-extrabold">Informations</h3><div className="mt-2 divide-y divide-[#e5e6ec] dark:divide-white/10">{[
+                  ['Profession', profileForm.profession], ['Religion', profileForm.religion], ['Préférences', profileForm.caste], ['Situation', profileForm.marital_status], ['Langues', profileForm.languages.join(', ')], ['Tabac', profileForm.smoking_habit],
+                ].filter(([, value]) => Boolean(value)).map(([label, value]) => <div key={label} className="flex min-w-0 items-center gap-3 py-3"><span className="min-w-0 flex-1 text-sm text-[#666a78] dark:text-white/65">{label}</span><span className="max-w-[60%] break-words text-right text-sm font-bold">{value}</span></div>)}</div></section>
+              </div>
+            </>}
+          </section>
+        </div>
+      )}
       {selectedProfileDetail && (
         <div className="fixed inset-0 z-[120] overflow-y-auto overscroll-contain bg-[#f8f9fd] text-[#24212b] dark:bg-[#101014] dark:text-white" role="dialog" aria-modal="true" aria-label={`Profil de ${selectedProfileDetail.display_name}`}>
           <section className="mx-auto flex min-h-dvh w-full max-w-[820px] flex-col">
             <header className="flex items-start justify-between gap-4 px-5 pb-4 pt-[max(1.25rem,env(safe-area-inset-top))] sm:px-8">
-              <div className="min-w-0"><p className="text-[10px] font-extrabold uppercase tracking-[.22em] text-[#ec1689] dark:text-[#ff4b9b]">Profil</p><h2 className="mt-1 truncate font-display text-3xl font-bold sm:text-4xl">{selectedProfileDetail.display_name}{selectedProfileDetail.age ? `, ${selectedProfileDetail.age}` : ''}</h2><p className="mt-1 flex items-center gap-1.5 text-sm text-[#686b79] dark:text-white/65"><MapPin size={14} className="shrink-0 text-[#ec1689]" />{selectedProfileDetail.city || 'Localisation non renseignée'}</p>{selectedProfileDetail.zone && <p className="ml-5 mt-0.5 text-xs text-[#85899a] dark:text-white/45">{selectedProfileDetail.zone}</p>}<div className="mt-2 flex flex-wrap gap-2">{selectedProfileDetail.is_verified && <span className="rounded-full bg-sky-100 px-2.5 py-1 text-[10px] font-bold text-sky-700 dark:bg-sky-500/20 dark:text-sky-200">✓ Vérifié</span>}{selectedProfileDetail.is_online && <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-[10px] font-bold text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-200">● En ligne</span>}{selectedProfileDetail.is_premium && <span className="rounded-full bg-[#fce6ef] px-2.5 py-1 text-[10px] font-bold text-[#c21c6b] dark:bg-[#ec1689]/20 dark:text-[#ff8fc0]">Premium</span>}</div></div>
+              <div className="min-w-0"><p className="text-[10px] font-extrabold uppercase tracking-[.22em] text-[#ec1689] dark:text-[#ff4b9b]">Profil</p><h2 className="mt-1 truncate font-display text-3xl font-bold sm:text-4xl">{selectedProfileDetail.display_name}{selectedProfileDetail.age ? `, ${selectedProfileDetail.age}` : ''}</h2><p className="mt-1 flex items-center gap-1.5 text-sm text-[#686b79] dark:text-white/65"><MapPin size={14} className="shrink-0 text-[#ec1689]" />{selectedProfileDetail.city || 'Localisation non renseignée'}</p><div className="mt-2 flex flex-wrap gap-2">{selectedProfileDetail.is_verified && <span className="rounded-full bg-sky-100 px-2.5 py-1 text-[10px] font-bold text-sky-700 dark:bg-sky-500/20 dark:text-sky-200">✓ Vérifié</span>}{selectedProfileDetail.is_online && <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-[10px] font-bold text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-200">● En ligne</span>}{selectedProfileDetail.is_premium && <span className="rounded-full bg-[#fce6ef] px-2.5 py-1 text-[10px] font-bold text-[#c21c6b] dark:bg-[#ec1689]/20 dark:text-[#ff8fc0]">Premium</span>}</div></div>
               <button type="button" onClick={() => setSelectedProfileDetail(null)} aria-label="Fermer le profil" className="mt-1 flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#eceef4] text-[#515565] ring-1 ring-[#e1e3eb] transition hover:bg-[#e3e5ed] dark:bg-white/10 dark:text-white dark:ring-white/10 dark:hover:bg-white/15"><X size={21} /></button>
             </header>
             <div className="relative mx-4 h-[min(52dvh,540px)] min-h-[320px] overflow-hidden rounded-[28px] bg-[#e4e6ed] shadow-[0_24px_70px_rgba(35,38,55,.18)] dark:bg-[#24242c] sm:mx-8 sm:rounded-[34px]">
