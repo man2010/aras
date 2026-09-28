@@ -3,7 +3,7 @@
 import { Dispatch, FormEvent, SetStateAction, useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { User, MessageCircle, Heart, CalendarDays, ArrowRight, ArrowLeft, ArrowDownLeft, ArrowUpRight, ArrowLeftRight, ShieldCheck, Send, Plus, Check, Upload, X, CheckCheck, Search, MapPin, Users, Eye, EyeOff, ChevronRight, Flag, RotateCcw, AlertTriangle, Music2, Plane, Utensils, Dumbbell, BookOpen, Clapperboard, PartyPopper, Palette, Camera, Shirt, Laptop, Trees, Flower2, Gamepad2, PawPrint, Briefcase, Ruler, Languages, Cigarette, ClipboardList } from 'lucide-react';
+import { User, MessageCircle, Heart, CalendarDays, ArrowRight, ArrowLeft, ArrowDownLeft, ArrowUpRight, ArrowLeftRight, ShieldCheck, Send, Plus, Check, Upload, X, CheckCheck, Search, MapPin, Users, Eye, EyeOff, ChevronRight, Flag, RotateCcw, AlertTriangle, Music2, Plane, Utensils, Dumbbell, BookOpen, Clapperboard, PartyPopper, Palette, Camera, Shirt, Laptop, Trees, Flower2, Gamepad2, PawPrint, Briefcase, Ruler, Languages, Cigarette, ClipboardList, Settings, SlidersHorizontal, LockKeyhole, CircleHelp, LogOut, EllipsisVertical, Ban } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
 import type { Profile, Conversation, Message, Story } from '@/lib/types';
@@ -352,8 +352,9 @@ export default function EspacePage() {
   const [profileVisitors, setProfileVisitors] = useState<Profile[]>([]);
   const [visitorsLoading, setVisitorsLoading] = useState(false);
   const [visitorsPage, setVisitorsPage] = useState(1);
-  const [profileSection, setProfileSection] = useState<'profile' | 'visitors' | 'privacy' | 'security' | 'subscription' | 'help'>('profile');
-  const [profilePreviewOpen, setProfilePreviewOpen] = useState(false);
+  const [profileSection, setProfileSection] = useState<'profile' | 'visitors' | 'privacy' | 'security' | 'subscription' | 'blocks' | 'help'>('profile');
+  const [profileEditOpen, setProfileEditOpen] = useState(false);
+  const [profileSettingsOpen, setProfileSettingsOpen] = useState(false);
   const [isAdminAccount, setIsAdminAccount] = useState(false);
   const [discoveryVisitProfileId, setDiscoveryVisitProfileId] = useState<string | null>(null);
   const likeRefreshVersion = useRef(0);
@@ -461,6 +462,38 @@ export default function EspacePage() {
   const [securityLoading, setSecurityLoading] = useState(false);
   const [showNewPw, setShowNewPw] = useState(false);
   const [subscriptionPlan, setSubscriptionPlan] = useState<'discovery' | 'premium' | 'elite'>('discovery');
+  const [blockedProfiles, setBlockedProfiles] = useState<Profile[]>([]);
+  const [blockedProfilesLoading, setBlockedProfilesLoading] = useState(false);
+  const [chatActionsOpen, setChatActionsOpen] = useState(false);
+
+  const loadBlockedProfiles = useCallback(async () => {
+    if (!user) return;
+    setBlockedProfilesLoading(true);
+    const { data: blockRows, error: blockError } = await supabase.from('blocks').select('blocked_id').eq('blocker_id', user.id);
+    if (blockError) {
+      setBlockedProfilesLoading(false);
+      return;
+    }
+    const blockedIds = Array.from(new Set((blockRows ?? []).map((row: { blocked_id: string }) => row.blocked_id)));
+    if (!blockedIds.length) {
+      setBlockedProfiles([]);
+      setBlockedProfilesLoading(false);
+      return;
+    }
+    const { data: profileRows } = await supabase.from('profiles').select(PROFILE_CARD_SELECT).in('id', blockedIds);
+    setBlockedProfiles((profileRows ?? []).map((row) => toProfile(row as ProfileRow)));
+    setBlockedProfilesLoading(false);
+  }, [user]);
+
+  useEffect(() => {
+    if (!user || tab !== 'profile' || profileSection !== 'blocks') return;
+    void loadBlockedProfiles();
+  }, [user, tab, profileSection, loadBlockedProfiles]);
+
+  useEffect(() => {
+    if (!user || tab !== 'profile' || profileSection !== 'profile' || profileEditOpen) return;
+    void loadProfileVisitors();
+  }, [user, tab, profileSection, profileEditOpen, loadProfileVisitors]);
 
   useEffect(() => {
     if (!authLoading && !user) router.push('/connexion');
@@ -484,7 +517,12 @@ export default function EspacePage() {
   }, [tab]);
 
   useEffect(() => {
-    const showProfileTab = () => setTab('profile');
+    const showProfileTab = () => {
+      setProfileSection('profile');
+      setProfileSettingsOpen(false);
+      setProfileEditOpen(false);
+      setTab('profile');
+    };
     window.addEventListener('aras:show-profile-tab', showProfileTab);
     return () => window.removeEventListener('aras:show-profile-tab', showProfileTab);
   }, []);
@@ -1075,6 +1113,31 @@ export default function EspacePage() {
     setInfoModal({ title: 'Signalement transmis', message: 'Merci. Notre équipe de modération va examiner ce signalement.', confirmLabel: 'OK' });
   };
 
+  const blockConversationProfile = async () => {
+    if (!user || !activeConversationProfile) return;
+    const blockedProfile = activeConversationProfile;
+    const { error } = await supabase.from('blocks').insert({ blocker_id: user.id, blocked_id: blockedProfile.id });
+    setChatActionsOpen(false);
+    if (error && error.code !== '23505') {
+      showInfoModal('Blocage impossible', 'Cette personne n’a pas pu être bloquée. Réessaie dans quelques instants.');
+      return;
+    }
+    setBlockedProfiles((current) => current.some((item) => item.id === blockedProfile.id) ? current : [...current, blockedProfile]);
+    setActiveConv(null);
+    setMessages([]);
+    showInfoModal('Profil bloqué', `${blockedProfile.display_name} a été ajouté à vos profils bloqués. Vous pouvez annuler ce blocage depuis Paramètres > Blocages & signalements.`);
+  };
+
+  const unblockProfile = async (blockedProfile: Profile) => {
+    if (!user) return;
+    const { error } = await supabase.from('blocks').delete().eq('blocker_id', user.id).eq('blocked_id', blockedProfile.id);
+    if (error) {
+      showInfoModal('Déblocage impossible', 'Cette personne n’a pas pu être débloquée. Réessaie dans quelques instants.');
+      return;
+    }
+    setBlockedProfiles((current) => current.filter((item) => item.id !== blockedProfile.id));
+  };
+
   const showInfoModal = (title: string, message: string, confirmLabel = 'OK') => {
     setInfoModal({ title, message, confirmLabel });
   };
@@ -1285,6 +1348,7 @@ export default function EspacePage() {
   const filteredConversations = conversations.filter((c) => {
     if (!user) return false;
     const otherId = c.user_a === user.id ? c.user_b : c.user_a;
+    if (blockedProfiles.some((item) => item.id === otherId)) return false;
     const name = conversationProfiles[otherId]?.display_name || '';
     return name.toLowerCase().includes(messageSearch.trim().toLowerCase());
   });
@@ -1296,7 +1360,14 @@ export default function EspacePage() {
       <div className="flex min-h-[calc(100vh-60px)] w-full items-stretch">
         <AppSidebar
           active={tab}
-          onChange={setTab}
+          onChange={(nextTab) => {
+            if (nextTab === 'profile') {
+              setProfileSection('profile');
+              setProfileSettingsOpen(false);
+              setProfileEditOpen(false);
+            }
+            setTab(nextTab);
+          }}
         />
 
         <div className="min-w-0 flex-1 bg-[radial-gradient(ellipse_at_top_right,_rgba(236,59,120,0.08),_transparent_40%)] px-3 pb-28 pt-5 sm:px-6 sm:pt-8 lg:px-10 lg:pt-10 lg:pb-12">
@@ -1576,22 +1647,65 @@ export default function EspacePage() {
 
           {/* PROFILE TAB */}
           {tab === 'profile' && (
-            <div className="space-y-5">
-              <div className="flex gap-2 overflow-x-auto rounded-2xl bg-white p-2 shadow dark:bg-[#1c1b21]">
-                {([{ id: 'profile', label: 'Mon profil' }, { id: 'visitors', label: `Visiteurs (${profileVisitors.length})` }, { id: 'privacy', label: 'Confidentialité' }, { id: 'security', label: 'Sécurité' }, { id: 'subscription', label: 'Abonnement' }, { id: 'help', label: 'Aide' }] as const).map((item) => <button key={item.id} type="button" onClick={() => { setProfileSection(item.id); if (item.id === 'visitors') void loadProfileVisitors(); }} className={`shrink-0 rounded-xl px-4 py-2.5 text-xs font-extrabold ${profileSection === item.id ? 'bg-[#ec3b78] text-white' : 'text-[#756960] dark:text-white/60'}`}>{item.label}</button>)}
-              </div>
+            <div className="mx-auto max-w-6xl space-y-6">
+              {profileSection !== 'profile' && <header className="flex items-center gap-4"><button type="button" onClick={() => { setProfileSection('profile'); setProfileEditOpen(false); }} aria-label="Retour au profil" className="flex h-10 w-10 items-center justify-center rounded-full bg-white text-[#282832] shadow-sm dark:bg-[#202027] dark:text-white"><ArrowLeft size={21} /></button><h1 className="font-display text-2xl font-bold text-[#241c18] dark:text-white">{profileSection === 'visitors' ? 'Visiteurs' : profileSection === 'privacy' ? 'Confidentialité' : profileSection === 'security' ? 'Sécurité du compte' : profileSection === 'subscription' ? 'Abonnement' : profileSection === 'blocks' ? 'Blocages & signalements' : 'Centre d’aide'}</h1></header>}
+
+              {profileSection === 'profile' && !profileEditOpen && !profileSettingsOpen && <section className="space-y-6">
+                <header className="flex items-center justify-between"><h1 className="font-display text-3xl font-bold text-[#241c18] dark:text-white sm:text-4xl">Mon Profil</h1><button type="button" onClick={() => setProfileSettingsOpen(true)} aria-label="Ouvrir les paramètres" className="flex h-12 w-12 items-center justify-center rounded-full bg-white text-[#262733] shadow-sm transition hover:text-[#ec3b78] dark:bg-[#242424] dark:text-white"><Settings size={23} /></button></header>
+                <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
+                  <article className="rounded-[30px] bg-white p-6 text-center shadow-[0_12px_38px_rgba(20,20,30,.06)] dark:bg-[#1d1d1d] sm:p-8">
+                    <div className="relative mx-auto h-40 w-40 overflow-hidden rounded-full border-[5px] border-white bg-[#eceef4] shadow-[0_0_0_2px_rgba(236,22,137,.18)] dark:border-[#303036] dark:bg-[#292932] sm:h-48 sm:w-48">
+                      <img src={imagePreview || profileForm.photo_url || 'https://images.pexels.com/photos/733872/pexels-photo-733872.jpeg?auto=compress&cs=tinysrgb&w=400'} alt={`Photo de ${profileForm.display_name || 'votre profil'}`} className="h-full w-full object-cover" />
+                      <button type="button" onClick={() => setProfileEditOpen(true)} aria-label="Modifier ma photo de profil" className="absolute bottom-1 right-1 flex h-12 w-12 items-center justify-center rounded-full bg-[#ec1689] text-white shadow-lg"><Camera size={21} /></button>
+                    </div>
+                    <div className="mt-5 flex items-center justify-center gap-2"><h2 className="font-display text-3xl font-bold text-[#272630] dark:text-white">{profileForm.display_name || 'Votre nom'}{profileForm.age ? `, ${profileForm.age}` : ''}</h2>{(!profileForm.bio || !profileForm.profession || !profileForm.interests.length) && <AlertTriangle size={20} className="text-amber-500" aria-label="Profil à compléter" />}</div>
+                    <p className="mt-2 text-base text-[#777985] dark:text-white/60">{profileForm.city || 'Ville non renseignée'}</p>
+                    {profile?.is_verified && <span className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-sky-100 px-3 py-1.5 text-xs font-bold text-sky-700 dark:bg-sky-500/15 dark:text-sky-200"><ShieldCheck size={14} /> Profil vérifié</span>}
+                    {(!profileForm.bio || !profileForm.profession || !profileForm.interests.length) && <button type="button" onClick={() => setProfileEditOpen(true)} className="mt-6 flex w-full items-center gap-4 rounded-[24px] bg-[#f4f4f6] p-5 text-left text-sm font-bold text-[#555763] dark:bg-[#292929] dark:text-white/75"><span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#ec1689]/10 text-[#ec1689]">✦</span>Complétez votre profil pour avoir plus de chance</button>}
+                    <div className="mt-7 grid gap-3 sm:grid-cols-2">
+                      <button type="button" onClick={() => setProfileEditOpen(true)} className="flex h-[68px] items-center justify-center gap-3 rounded-[22px] border border-white/10 bg-gradient-to-br from-[#37345d] to-[#292746] px-4 text-sm font-extrabold text-white shadow-[0_10px_24px_rgba(41,39,70,.22)] transition hover:-translate-y-0.5 hover:shadow-[0_14px_28px_rgba(41,39,70,.3)] active:translate-y-0 dark:from-[#39365f] dark:to-[#292746]"><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/10 ring-1 ring-white/10"><SlidersHorizontal size={19} /></span><span>Modifier</span></button>
+                      <button type="button" disabled={!profile} onClick={() => { if (profile) { setProfileDetailPhotoIndex(0); setSelectedProfileDetail(profile); } }} className="flex h-[68px] items-center justify-center gap-3 rounded-[22px] border border-white/10 bg-gradient-to-br from-[#37345d] to-[#292746] px-4 text-sm font-extrabold text-white shadow-[0_10px_24px_rgba(41,39,70,.22)] transition hover:-translate-y-0.5 hover:shadow-[0_14px_28px_rgba(41,39,70,.3)] active:translate-y-0 disabled:cursor-not-allowed disabled:opacity-50 dark:from-[#39365f] dark:to-[#292746]"><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/10 ring-1 ring-white/10"><User size={19} /></span><span>Voir mon profil</span></button>
+                    </div>
+                    <button type="button" onClick={() => { setTab('decouverte'); setShowDiscoveryFilters(true); }} className="mt-3 flex h-[72px] w-full items-center gap-4 rounded-[22px] border border-white/10 bg-gradient-to-r from-[#37345d] to-[#292746] px-5 text-left text-white shadow-[0_10px_24px_rgba(41,39,70,.18)] transition hover:-translate-y-0.5 hover:shadow-[0_14px_28px_rgba(41,39,70,.28)] active:translate-y-0 dark:from-[#39365f] dark:to-[#292746]"><span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white/10 ring-1 ring-white/10"><SlidersHorizontal size={20} /></span><span className="min-w-0 flex-1"><strong className="block text-sm font-extrabold">Préférences de recherche</strong><span className="mt-0.5 block text-xs font-medium text-white/65">Âge, distance et critères</span></span><ChevronRight size={19} className="shrink-0 text-white/65" /></button>
+                  </article>
+
+                  <aside className="space-y-4">
+                    <button type="button" onClick={() => { setProfileSection('visitors'); void loadProfileVisitors(); }} className="flex min-h-48 w-full flex-col items-center justify-center rounded-[30px] bg-white p-6 text-center shadow-[0_12px_38px_rgba(20,20,30,.06)] transition hover:-translate-y-0.5 dark:bg-[#1d1d1d]"><span className="flex h-14 w-14 items-center justify-center rounded-full bg-[#ec1689]/10 text-[#ec1689]"><Eye size={26} /></span><strong className="mt-4 text-3xl font-extrabold text-[#292746] dark:text-white">{profileVisitors.length}</strong><span className="mt-1 text-sm text-[#777985] dark:text-white/60">Vues profil</span></button>
+                    <button type="button" onClick={() => setProfileSettingsOpen(true)} className="flex min-h-24 w-full items-center justify-between rounded-[24px] bg-white px-5 text-left shadow-sm dark:bg-[#1d1d1d]"><span className="flex items-center gap-3"><span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#ec1689]/10 text-[#ec1689]"><Settings size={20} /></span><span className="font-bold text-[#292832] dark:text-white">Paramètres du compte</span></span><ChevronRight size={19} className="text-[#8d8e98]" /></button>
+                    {isAdminAccount && <Link href="/admin" className="flex min-h-14 items-center justify-center rounded-[20px] border border-[#dfdfe5] text-sm font-bold text-[#565762] dark:border-white/10 dark:text-white/70">Administration</Link>}
+                    <button type="button" onClick={async () => { await signOut(); router.push('/'); }} className="flex h-[64px] w-full items-center gap-3 rounded-[22px] border border-[#f1d4de] bg-[#fff6f8] px-5 text-left text-sm font-extrabold text-[#bd4167] transition hover:border-[#e9b4c5] hover:bg-[#ffedf2] dark:border-[#56303d] dark:bg-[#281c21] dark:text-[#ff9ab9] dark:hover:bg-[#342129]"><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#ec1689]/10"><LogOut size={18} /></span>Déconnexion</button>
+                  </aside>
+                </div>
+              </section>}
+
+              {profileSection === 'profile' && profileSettingsOpen && !profileEditOpen && <section className="mx-auto w-full max-w-4xl space-y-6">
+                <header className="flex items-center gap-4"><button type="button" onClick={() => setProfileSettingsOpen(false)} aria-label="Retour à mon profil" className="flex h-10 w-10 items-center justify-center rounded-full bg-white text-[#282832] shadow-sm dark:bg-[#202027] dark:text-white"><ArrowLeft size={21} /></button><h1 className="font-display text-2xl font-bold text-[#241c18] dark:text-white">Paramètres</h1></header>
+                <button type="button" onClick={() => { setProfileSettingsOpen(false); setProfileEditOpen(true); }} className="flex w-full items-center gap-4 rounded-[26px] bg-white p-5 text-left shadow-sm dark:bg-[#202027]"><img src={profileForm.photo_url || 'https://images.pexels.com/photos/733872/pexels-photo-733872.jpeg?auto=compress&cs=tinysrgb&w=200'} alt="" className="h-16 w-16 rounded-full object-cover"/><span className="min-w-0 flex-1"><strong className="block truncate text-lg text-[#292832] dark:text-white">{profileForm.display_name}{profileForm.age ? `, ${profileForm.age}` : ''}</strong><span className="text-sm text-[#858691] dark:text-white/55">Modifier mon profil</span></span><ChevronRight size={20} /></button>
+                <section><h2 className="mb-3 px-1 text-sm font-bold text-[#92939d]">Préférences</h2><div className="grid gap-3 md:grid-cols-2">
+                  <button type="button" onClick={() => { setProfileSettingsOpen(false); setTab('decouverte'); setShowDiscoveryFilters(true); }} className="flex min-h-[96px] w-full items-center gap-4 rounded-[24px] border border-[#e7e8ee] bg-white p-5 text-left shadow-[0_8px_24px_rgba(25,26,40,.05)] transition hover:-translate-y-0.5 hover:border-sky-200 hover:shadow-[0_14px_32px_rgba(25,26,40,.09)] dark:border-white/[0.07] dark:bg-[#202027] dark:hover:border-sky-400/30"><span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[18px] bg-sky-100 text-sky-600 dark:bg-sky-500/15 dark:text-sky-300"><MapPin size={21} /></span><span className="min-w-0 flex-1"><strong className="block text-sm font-extrabold text-[#292832] dark:text-white">Préférences de recherche</strong><span className="mt-1 block text-xs leading-5 text-[#858691] dark:text-white/50">Âge, distance et profils recherchés</span></span><ChevronRight size={19} className="shrink-0 text-[#9b9ca6]" /></button>
+                  <button type="button" onClick={() => setProfileSection('privacy')} className="flex min-h-[96px] w-full items-center gap-4 rounded-[24px] border border-[#e7e8ee] bg-white p-5 text-left shadow-[0_8px_24px_rgba(25,26,40,.05)] transition hover:-translate-y-0.5 hover:border-emerald-200 hover:shadow-[0_14px_32px_rgba(25,26,40,.09)] dark:border-white/[0.07] dark:bg-[#202027] dark:hover:border-emerald-400/30"><span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[18px] bg-emerald-100 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-300"><Eye size={21} /></span><span className="min-w-0 flex-1"><strong className="block text-sm font-extrabold text-[#292832] dark:text-white">Confidentialité & notifications</strong><span className="mt-1 block text-xs leading-5 text-[#858691] dark:text-white/50">Contrôlez votre visibilité et vos alertes</span></span><ChevronRight size={19} className="shrink-0 text-[#9b9ca6]" /></button>
+                  <button type="button" onClick={() => setProfileSection('security')} className="flex min-h-[96px] w-full items-center gap-4 rounded-[24px] border border-[#e7e8ee] bg-white p-5 text-left shadow-[0_8px_24px_rgba(25,26,40,.05)] transition hover:-translate-y-0.5 hover:border-amber-200 hover:shadow-[0_14px_32px_rgba(25,26,40,.09)] dark:border-white/[0.07] dark:bg-[#202027] dark:hover:border-amber-400/30"><span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[18px] bg-amber-100 text-amber-600 dark:bg-amber-500/15 dark:text-amber-300"><LockKeyhole size={21} /></span><span className="min-w-0 flex-1"><strong className="block text-sm font-extrabold text-[#292832] dark:text-white">Sécurité du compte</strong><span className="mt-1 block text-xs leading-5 text-[#858691] dark:text-white/50">Mot de passe et accès à votre compte</span></span><ChevronRight size={19} className="shrink-0 text-[#9b9ca6]" /></button>
+                  <button type="button" onClick={() => setProfileSection('blocks')} className="flex min-h-[96px] w-full items-center gap-4 rounded-[24px] border border-[#e7e8ee] bg-white p-5 text-left shadow-[0_8px_24px_rgba(25,26,40,.05)] transition hover:-translate-y-0.5 hover:border-sky-200 hover:shadow-[0_14px_32px_rgba(25,26,40,.09)] dark:border-white/[0.07] dark:bg-[#202027] dark:hover:border-sky-400/30"><span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[18px] bg-sky-100 text-sky-600 dark:bg-sky-500/15 dark:text-sky-300"><Ban size={21} /></span><span className="min-w-0 flex-1"><strong className="block text-sm font-extrabold text-[#292832] dark:text-white">Blocages & signalements</strong><span className="mt-1 block text-xs leading-5 text-[#858691] dark:text-white/50">Gérez les profils bloqués et signalez une personne depuis sa conversation</span></span><ChevronRight size={19} className="shrink-0 text-[#9b9ca6]" /></button>
+                </div></section>
+                <section><h2 className="mb-3 px-1 text-sm font-bold text-[#92939d]">Aide & informations</h2><button type="button" onClick={() => setProfileSection('help')} className="flex min-h-[96px] w-full items-center gap-4 rounded-[24px] border border-[#e7e8ee] bg-white p-5 text-left shadow-[0_8px_24px_rgba(25,26,40,.05)] transition hover:-translate-y-0.5 hover:shadow-[0_14px_32px_rgba(25,26,40,.09)] dark:border-white/[0.07] dark:bg-[#202027]"><span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[18px] bg-[#f1f1f3] text-[#555763] dark:bg-white/10 dark:text-white"><CircleHelp size={21} /></span><span className="min-w-0 flex-1"><strong className="block text-sm font-extrabold text-[#292832] dark:text-white">Centre d’aide</strong><span className="mt-1 block text-xs leading-5 text-[#858691] dark:text-white/50">Retrouvez les réponses à vos questions</span></span><ChevronRight size={19} className="shrink-0 text-[#9b9ca6]" /></button></section>
+                <button type="button" onClick={async () => { await signOut(); router.push('/'); }} className="flex h-[68px] w-full items-center gap-4 rounded-[24px] border border-[#f1d4de] bg-[#fff6f8] px-5 text-left text-sm font-extrabold text-[#bd4167] transition hover:border-[#e9b4c5] hover:bg-[#ffedf2] dark:border-[#56303d] dark:bg-[#281c21] dark:text-[#ff9ab9] dark:hover:bg-[#342129]"><span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[17px] bg-[#ec1689]/10"><LogOut size={18} /></span>Se déconnecter</button>
+              </section>}
               {profileSection === 'visitors' && <section className="rounded-[26px] bg-white p-5 shadow dark:bg-[#1c1b21]">
                 <div className="mb-4 flex items-center justify-between"><h2 className="font-display text-2xl">Personnes qui ont visité votre profil</h2><button type="button" onClick={() => void loadProfileVisitors()} className="text-xs font-bold text-[#ec3b78]">Actualiser</button></div>
                 {visitorsLoading ? <p className="text-sm text-[#756960]">Chargement des visiteurs…</p> : profileVisitors.length === 0 ? <p className="rounded-2xl bg-[#f8f9fd] p-6 text-center text-sm text-[#756960] dark:bg-white/5">Aucune visite pour le moment.</p> : <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{profileVisitors.slice((visitorsPage - 1) * 12, visitorsPage * 12).map((visitor) => <article key={visitor.id} className="flex items-center gap-3 rounded-2xl border border-[#eadfd5] p-3 dark:border-white/10"><img src={visitor.photo_url} alt="" className="h-14 w-14 rounded-xl object-cover"/><div className="min-w-0"><p className="truncate font-bold">{visitor.display_name}{visitor.age ? `, ${visitor.age}` : ''}</p><p className="truncate text-xs text-[#756960]">{visitor.city}</p></div></article>)}</div>}
                 {profileSection === 'visitors' && profileVisitors.length > 12 && <div className="mt-4 flex items-center justify-between"><p className="text-xs text-[#756960]">Page {visitorsPage} / {Math.ceil(profileVisitors.length / 12)}</p><div className="flex gap-2"><button type="button" disabled={visitorsPage === 1} onClick={() => setVisitorsPage((page) => Math.max(1, page - 1))} className="rounded-full border px-4 py-2 text-xs font-bold disabled:opacity-40">Précédent</button><button type="button" disabled={visitorsPage >= Math.ceil(profileVisitors.length / 12)} onClick={() => setVisitorsPage((page) => Math.min(Math.ceil(profileVisitors.length / 12), page + 1))} className="rounded-full border px-4 py-2 text-xs font-bold disabled:opacity-40">Suivant</button></div></div>}
               </section>}
+              {profileSection === 'blocks' && <section className="rounded-[26px] border border-[#e7e8ee] bg-white p-5 shadow-sm dark:border-white/10 dark:bg-[#1c1b21] sm:p-7">
+                <div className="mb-5"><h2 className="font-display text-2xl font-bold text-[#292832] dark:text-white">Profils bloqués</h2><p className="mt-1 text-sm text-[#777985] dark:text-white/55">Les profils bloqués ne peuvent plus vous contacter et sont masqués de vos conversations.</p></div>
+                {blockedProfilesLoading ? <p className="rounded-2xl bg-[#f8f9fd] p-5 text-center text-sm text-[#756960] dark:bg-white/5 dark:text-white/60">Chargement…</p> : blockedProfiles.length === 0 ? <div className="rounded-2xl bg-[#f8f9fd] p-6 text-center text-sm text-[#756960] dark:bg-white/5 dark:text-white/60">Aucun profil bloqué.</div> : <div className="space-y-3">{blockedProfiles.map((blockedProfile) => <article key={blockedProfile.id} className="flex items-center gap-3 rounded-2xl border border-[#e7e8ee] p-3 dark:border-white/10"><img src={blockedProfile.photo_url} alt="" className="h-12 w-12 shrink-0 rounded-full object-cover"/><div className="min-w-0 flex-1"><p className="truncate text-sm font-bold text-[#292832] dark:text-white">{blockedProfile.display_name}{blockedProfile.age ? `, ${blockedProfile.age}` : ''}</p><p className="truncate text-xs text-[#777985] dark:text-white/50">{blockedProfile.city || 'Ville non renseignée'}</p></div><button type="button" onClick={() => void unblockProfile(blockedProfile)} className="shrink-0 rounded-full border border-[#e7e8ee] px-4 py-2 text-xs font-bold text-[#555763] transition hover:border-[#ec3b78] hover:text-[#ec3b78] dark:border-white/15 dark:text-white/75">Débloquer</button></article>)}</div>}
+                <div className="mt-5 flex items-start gap-3 rounded-2xl bg-[#f8f9fd] p-4 text-sm text-[#777985] dark:bg-white/5 dark:text-white/55"><Flag size={17} className="mt-0.5 shrink-0 text-[#ec3b78]"/><p>Pour signaler une personne, ouvrez sa conversation, puis le menu ⋮ en haut à droite.</p></div>
+              </section>}
               {profileSection === 'privacy' && <SettingsPanels tab="settings-privacy" profile={profile} privacySettings={privacySettings} setPrivacySettings={setPrivacySettings} savePrivacy={savePrivacy} privacySaved={privacySaved} securityForm={securityForm} setSecurityForm={setSecurityForm} changePassword={changePassword} securityMessage={securityMessage} securityLoading={securityLoading} showNewPw={showNewPw} setShowNewPw={setShowNewPw} onGoToProfileTab={() => setProfileSection('profile')} onChangeTab={() => {}} subscriptionPlan={subscriptionPlan} showTabs={false} />}
               {profileSection === 'security' && <SettingsPanels tab="settings-security" profile={profile} privacySettings={privacySettings} setPrivacySettings={setPrivacySettings} savePrivacy={savePrivacy} privacySaved={privacySaved} securityForm={securityForm} setSecurityForm={setSecurityForm} changePassword={changePassword} securityMessage={securityMessage} securityLoading={securityLoading} showNewPw={showNewPw} setShowNewPw={setShowNewPw} onGoToProfileTab={() => setProfileSection('profile')} onChangeTab={() => {}} subscriptionPlan={subscriptionPlan} showTabs={false} />}
               {profileSection === 'subscription' && <SettingsPanels tab="settings-subscription" profile={profile} privacySettings={privacySettings} setPrivacySettings={setPrivacySettings} savePrivacy={savePrivacy} privacySaved={privacySaved} securityForm={securityForm} setSecurityForm={setSecurityForm} changePassword={changePassword} securityMessage={securityMessage} securityLoading={securityLoading} showNewPw={showNewPw} setShowNewPw={setShowNewPw} onGoToProfileTab={() => setProfileSection('profile')} onChangeTab={() => {}} subscriptionPlan={subscriptionPlan} showTabs={false} />}
               {profileSection === 'help' && <SettingsPanels tab="settings-help" profile={profile} privacySettings={privacySettings} setPrivacySettings={setPrivacySettings} savePrivacy={savePrivacy} privacySaved={privacySaved} securityForm={securityForm} setSecurityForm={setSecurityForm} changePassword={changePassword} securityMessage={securityMessage} securityLoading={securityLoading} showNewPw={showNewPw} setShowNewPw={setShowNewPw} onGoToProfileTab={() => setProfileSection('profile')} onChangeTab={() => {}} subscriptionPlan={subscriptionPlan} showTabs={false} />}
-              {profileSection === 'profile' && <div className="grid gap-6 lg:grid-cols-[300px_1fr]">
-              <div className="lg:col-span-2 flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-white p-4 shadow dark:bg-[#1c1b21]"><div><p className="font-bold">Votre profil public</p><p className="text-xs text-[#756960]">Consultez les informations visibles par les autres membres.</p></div><div className="flex items-center gap-2"><button type="button" onClick={() => setProfilePreviewOpen((open) => !open)} className="rounded-full bg-[#292746] px-5 py-2.5 text-xs font-extrabold text-white">{profilePreviewOpen ? 'Masquer l’aperçu' : 'Voir mon profil'}</button>{isAdminAccount && <Link href="/admin" className="rounded-full border border-[#dfd2c6] px-4 py-2.5 text-xs font-extrabold text-[#756960] dark:border-white/15 dark:text-white/75">Administration</Link>}<button type="button" onClick={async () => { await signOut(); router.push('/'); }} className="rounded-full border border-[#dfd2c6] px-4 py-2.5 text-xs font-extrabold text-[#756960] dark:border-white/15 dark:text-white/75">Déconnexion</button></div></div>
-              {profilePreviewOpen && <section className="lg:col-span-2 overflow-hidden rounded-[26px] bg-white shadow dark:bg-[#1c1b21]"><img src={profile?.photo_url || profileForm.photo_url} alt="Votre photo de profil" className="h-64 w-full object-cover sm:h-80"/><div className="p-6"><h2 className="font-display text-3xl">{profileForm.display_name}, {profileForm.age}</h2><p className="mt-1 text-sm text-[#756960]">{profileForm.city} · {profileForm.profession}</p><p className="mt-4 whitespace-pre-line text-sm leading-6 text-[#756960]">{profileForm.bio || 'Aucune description ajoutée.'}</p><div className="mt-4 flex flex-wrap gap-2">{profileForm.interests.map((interest) => <span key={interest} className="rounded-full bg-[#f8f9fd] px-3 py-1.5 text-xs font-bold">{interest}</span>)}</div></div></section>}
+              {profileSection === 'profile' && profileEditOpen && <div className="grid gap-6 lg:grid-cols-[300px_1fr]">
+              <div className="lg:col-span-2 flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-white p-4 shadow dark:bg-[#1c1b21]"><div className="flex items-center gap-3"><button type="button" onClick={() => setProfileEditOpen(false)} aria-label="Retour à mon profil" className="flex h-10 w-10 items-center justify-center rounded-full bg-[#f4f4f6] text-[#343540] dark:bg-white/10 dark:text-white"><ArrowLeft size={19} /></button><div><p className="font-bold">Modifier mon profil</p><p className="text-xs text-[#756960] dark:text-white/55">Mettez à jour les informations de votre profil.</p></div></div><div className="flex items-center gap-2">{isAdminAccount && <Link href="/admin" className="rounded-full border border-[#dfd2c6] px-4 py-2.5 text-xs font-extrabold text-[#756960] dark:border-white/15 dark:text-white/75">Administration</Link>}<button type="button" onClick={async () => { await signOut(); router.push('/'); }} className="rounded-full border border-[#dfd2c6] px-4 py-2.5 text-xs font-extrabold text-[#756960] dark:border-white/15 dark:text-white/75">Déconnexion</button></div></div>
               <div className="rounded-[26px] bg-white p-6 text-center shadow-[0_8px_30px_rgba(83,46,32,.05)]">
                 <div className="relative mx-auto h-32 w-32 overflow-hidden rounded-full border-4 border-[#f3e9dc]">
                   <img src={imagePreview || profileForm.photo_url || 'https://images.pexels.com/photos/733872/pexels-photo-733872.jpeg?auto=compress&cs=tinysrgb&w=300'} alt="Photo" className="h-full w-full object-cover" />
@@ -1711,8 +1825,8 @@ export default function EspacePage() {
           {/* MESSAGES TAB */}
           {tab === 'messages' && (
             <div>
-              <div className="grid gap-6 lg:grid-cols-[340px_1fr]">
-              <div className={`${activeConv ? 'hidden lg:block' : 'block'} rounded-[26px] border border-[#dfd2c6] bg-white p-4 shadow-[0_8px_30px_rgba(83,46,32,.05)]`}>
+              <div className="grid min-w-0 gap-4 lg:grid-cols-[340px_minmax(0,1fr)] lg:gap-6">
+              <div className={`${activeConv ? 'hidden lg:block' : 'block'} max-h-[calc(100dvh-180px)] min-w-0 overflow-y-auto rounded-[26px] border border-[#dfd2c6] bg-white p-3 shadow-[0_8px_30px_rgba(83,46,32,.05)] sm:p-4 lg:max-h-none`}>
                 <p className="px-2 pb-3 font-display text-xl">Conversations</p>
                 {conversations.length > 0 && (
                   <div className="relative mb-3 px-2">
@@ -1780,10 +1894,10 @@ export default function EspacePage() {
                   </div>
                 )}
               </div>
-              <div className={`${activeConv ? 'flex' : 'hidden lg:flex'} h-[calc(100vh-150px)] min-h-[460px] flex-col rounded-[26px] bg-white p-4 shadow-[0_8px_30px_rgba(83,46,32,.05)]`}>
+              <div className={`${activeConv ? 'flex' : 'hidden lg:flex'} h-[calc(100dvh-180px)] min-h-0 w-full min-w-0 flex-col overflow-hidden rounded-[26px] bg-white p-3 shadow-[0_8px_30px_rgba(83,46,32,.05)] sm:p-4 lg:h-[calc(100vh-150px)] lg:min-h-[460px]`}>
                 {activeConv ? (
                   <>
-                    <div className="mb-3 flex items-center gap-3 border-b border-[#eadfd5] pb-3">
+                    <div className="relative mb-3 flex min-w-0 items-center gap-2 border-b border-[#eadfd5] pb-3 sm:gap-3">
                       <button
                         type="button"
                         onClick={() => setActiveConv(null)}
@@ -1808,12 +1922,16 @@ export default function EspacePage() {
                           {activeConversationProfile?.is_online ? 'En ligne' : 'Hors ligne'}
                         </p>
                       </div>
+                      <div className="relative ml-auto shrink-0">
+                        <button type="button" aria-label="Actions de la conversation" aria-haspopup="menu" aria-expanded={chatActionsOpen} onClick={() => setChatActionsOpen((open) => !open)} className="flex h-10 w-10 items-center justify-center rounded-full text-[#625852] transition hover:bg-[#f8f9fd] hover:text-[#ec3b78] dark:text-white/75 dark:hover:bg-white/10 dark:hover:text-[#ff80b2]"><EllipsisVertical size={21} /></button>
+                        {chatActionsOpen && <><button type="button" aria-label="Fermer le menu d’actions" className="fixed inset-0 z-20 cursor-default" onClick={() => setChatActionsOpen(false)} /><div role="menu" className="absolute right-0 top-12 z-30 w-56 overflow-hidden rounded-2xl border border-[#e7e8ee] bg-white p-1.5 shadow-[0_16px_45px_rgba(20,20,30,.18)] dark:border-white/10 dark:bg-[#24242b]"><button type="button" role="menuitem" onClick={() => { setChatActionsOpen(false); if (activeConversationProfile) { setReportReason('comportement'); setReportDescription(''); setReportingProfile(activeConversationProfile); } }} className="flex min-h-12 w-full items-center gap-3 rounded-xl px-3 text-left text-sm font-semibold text-[#454650] transition hover:bg-[#f8f9fd] hover:text-[#ec3b78] dark:text-white/80 dark:hover:bg-white/5"><Flag size={17} />Signaler la personne</button><button type="button" role="menuitem" onClick={() => void blockConversationProfile()} className="flex min-h-12 w-full items-center gap-3 rounded-xl px-3 text-left text-sm font-semibold text-[#b4234a] transition hover:bg-[#fff3f5] dark:text-rose-300 dark:hover:bg-rose-500/10"><Ban size={17} />Bloquer</button></div></>}
+                      </div>
                     </div>
-                    <div className="flex-1 space-y-3 overflow-y-auto rounded-xl bg-[#f8f9fd] p-4">
+                    <div className="min-h-0 min-w-0 flex-1 space-y-3 overflow-x-hidden overflow-y-auto rounded-xl bg-[#f8f9fd] p-3 sm:p-4">
                       {messages.map((m) => (
                         <div key={m.id} className={`flex ${m.sender_id === user.id ? 'justify-end' : 'justify-start'}`}>
-                          <div className={`max-w-[75%] rounded-2xl px-4 py-2.5 text-sm ${m.sender_id === user.id ? 'bg-[#ec3b78] text-white' : 'bg-white text-[#241c18] shadow-sm'}`}>
-                            <p>{m.content}</p>
+                          <div className={`min-w-0 max-w-[85%] break-words [overflow-wrap:anywhere] rounded-2xl px-3 py-2.5 text-sm sm:max-w-[75%] sm:px-4 ${m.sender_id === user.id ? 'bg-[#ec3b78] text-white' : 'bg-white text-[#241c18] shadow-sm'}`}>
+                            <p className="whitespace-pre-wrap">{m.content}</p>
                             {m.sender_id === user.id && (
                               <div className="mt-1 flex items-center justify-end gap-1">
                                 <span className="text-[10px] opacity-70">
@@ -1831,8 +1949,8 @@ export default function EspacePage() {
                       ))}
                       {messages.length === 0 && <p className="py-8 text-center text-sm text-[#9a8b82]">Démarrez la conversation.</p>}
                     </div>
-                    <form onSubmit={sendMessage} className="mt-3 flex gap-2">
-                      <input value={newMessage} onChange={(e) => setNewMessage(e.target.value)} placeholder="Votre message..." className="flex-1 rounded-full border border-[#dfd2c6] bg-[#f8f9fd] px-4 py-3 text-sm outline-none focus:border-[#ec3b78]" />
+                    <form onSubmit={sendMessage} className="mt-3 flex min-w-0 shrink-0 gap-2">
+                      <input value={newMessage} onChange={(e) => setNewMessage(e.target.value)} placeholder="Votre message..." className="min-w-0 flex-1 rounded-full border border-[#dfd2c6] bg-[#f8f9fd] px-3 py-3 text-sm outline-none focus:border-[#ec3b78] sm:px-4" />
                       <button type="submit" className="flex h-12 w-12 items-center justify-center rounded-full bg-[#ec3b78] text-white transition hover:bg-[#c92e63]"><Send size={18} /></button>
                     </form>
                   </>
