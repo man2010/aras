@@ -6,7 +6,6 @@ import {
   User,
   MessageCircle,
   Heart,
-  Users,
   CalendarDays,
   ChevronLeft,
   ChevronRight,
@@ -29,7 +28,7 @@ const mainItems: { id: EspaceTab; label: string; icon: typeof User }[] = [
   { id: 'decouverte', label: 'Découverte', icon: House },
   { id: 'messages', label: 'Messages', icon: MessageCircle },
   { id: 'likes', label: 'Likes', icon: Heart },
-  { id: 'matches', label: 'Matches', icon: Users },
+  { id: 'profile', label: 'Profil', icon: User },
   { id: 'events', label: 'Événements', icon: CalendarDays },
 ];
 
