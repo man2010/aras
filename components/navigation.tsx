@@ -21,14 +21,14 @@ type NotificationPreview = {
 };
 
 type MiniProfile = {
+  userId: string;
   display_name: string;
   photo_url: string;
   is_online: boolean;
   city: string;
 };
 
-const fallbackAvatar =
-  'https://images.pexels.com/photos/733872/pexels-photo-733872.jpeg?auto=compress&cs=tinysrgb&w=300';
+const fallbackAvatar = '/images/default-avatar.svg';
 
 export function Navbar() {
   const [open, setOpen] = useState(false);
@@ -86,6 +86,7 @@ export function Navbar() {
     }
 
     let cancelled = false;
+    setMiniProfile(null);
     const loadMiniProfile = async () => {
       const { data } = await supabase
         .from('profiles')
@@ -94,8 +95,9 @@ export function Navbar() {
         .maybeSingle();
       if (!cancelled && data) {
         setMiniProfile({
+          userId: user.id,
           display_name: data.full_name || 'Mon profil',
-          photo_url: data.avatar_urls?.[0] || fallbackAvatar,
+          photo_url: data.avatar_urls?.find((url: string) => !url.includes('images.pexels.com/photos/733872/')) || fallbackAvatar,
           is_online: Boolean(data.is_online),
           city: data.city || '',
         });
@@ -278,6 +280,8 @@ export function Navbar() {
     router.push('/');
   };
 
+  const currentMiniProfile = miniProfile?.userId === user?.id ? miniProfile : null;
+
   const notificationGroups = [
     { type: 'like' as const, label: 'Likes reçus', Icon: Heart },
     { type: 'message' as const, label: 'Messages', Icon: MessageCircle },
@@ -323,8 +327,8 @@ export function Navbar() {
             className="flex min-w-0 items-center gap-2"
             aria-label="Mon profil"
           >
-            <span className="relative h-9 w-9 shrink-0 overflow-hidden rounded-full border-2 border-[#ec3b78] bg-white sm:h-10 sm:w-10"><img src={miniProfile?.photo_url || fallbackAvatar} alt="" className="h-full w-full object-cover" /></span>
-            <span className="hidden max-w-32 truncate text-sm font-extrabold text-[#241c18] sm:block">{miniProfile?.display_name || 'Mon profil'}</span>
+            <span className="relative h-9 w-9 shrink-0 overflow-hidden rounded-full border-2 border-[#ec3b78] bg-white sm:h-10 sm:w-10"><img src={currentMiniProfile?.photo_url || fallbackAvatar} alt="" className="h-full w-full object-cover" /></span>
+            <span className="hidden max-w-32 truncate text-sm font-extrabold text-[#241c18] sm:block">{currentMiniProfile?.display_name || 'Mon profil'}</span>
           </Link>
         ) : (
           <Link href="/" className="flex items-center" aria-label="ARAS">
@@ -459,13 +463,13 @@ export function Navbar() {
                   className="flex items-center gap-3 rounded-2xl border border-[#dfd2c6] bg-white p-3"
                 >
                   <span className="relative h-11 w-11 shrink-0 overflow-hidden rounded-full bg-[#f8f9fd]">
-                    <img src={miniProfile?.photo_url || fallbackAvatar} alt="" className="h-full w-full object-cover" />
-                    <span className={`absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-white ${miniProfile?.is_online ? 'bg-[#1a6b68]' : 'bg-[#b8aaa1]'}`} />
+                    <img src={currentMiniProfile?.photo_url || fallbackAvatar} alt="" className="h-full w-full object-cover" />
+                    <span className={`absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-white ${currentMiniProfile?.is_online ? 'bg-[#1a6b68]' : 'bg-[#b8aaa1]'}`} />
                   </span>
                   <span className="min-w-0">
-                    <span className="block truncate text-sm font-extrabold text-[#241c18]">{miniProfile?.display_name ?? 'Mon profil'}</span>
-                    <span className={`block text-xs font-bold ${miniProfile?.is_online ? 'text-[#1a6b68]' : 'text-[#9a8b82]'}`}>
-                      {miniProfile?.is_online ? 'En ligne' : 'Hors ligne'}
+                    <span className="block truncate text-sm font-extrabold text-[#241c18]">{currentMiniProfile?.display_name ?? 'Mon profil'}</span>
+                    <span className={`block text-xs font-bold ${currentMiniProfile?.is_online ? 'text-[#1a6b68]' : 'text-[#9a8b82]'}`}>
+                      {currentMiniProfile?.is_online ? 'En ligne' : 'Hors ligne'}
                     </span>
                   </span>
                 </Link>

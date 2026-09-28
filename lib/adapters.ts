@@ -80,7 +80,8 @@ export type StoryRow = {
   is_active: boolean;
 };
 
-const fallbackPhoto = 'https://images.pexels.com/photos/733872/pexels-photo-733872.jpeg?auto=compress&cs=tinysrgb&w=600';
+const fallbackPhoto = '/images/default-avatar.svg';
+const seededDemoPhoto = 'images.pexels.com/photos/733872/pexels-photo-733872.jpeg';
 
 function ageFromBirthdate(birthdate: string | null) {
   if (!birthdate) return 25;
@@ -100,6 +101,9 @@ function isRecentlyOnline(isOnline: boolean | null, lastSeenAt: string | null) {
 }
 
 export function toProfile(row: ProfileRow): Profile {
+  // Les anciens comptes pouvaient recevoir une photo de démonstration partagée.
+  // Ne jamais la présenter comme une photo personnelle ni la laisser dans la galerie.
+  const photos = (row.avatar_urls || []).filter((url): url is string => Boolean(url) && !url.includes(seededDemoPhoto));
   return {
     id: row.id,
     user_id: row.id,
@@ -107,7 +111,7 @@ export function toProfile(row: ProfileRow): Profile {
     age: ageFromBirthdate(row.birthdate),
     city: row.city || 'Ville non renseignée',
     bio: row.bio || '',
-    photo_url: row.avatar_urls?.[0] || fallbackPhoto,
+    photo_url: photos[0] || fallbackPhoto,
     interests: row.interests || [],
     profession: row.profession || '',
     is_verified: Boolean(row.is_verified),
@@ -117,7 +121,7 @@ export function toProfile(row: ProfileRow): Profile {
     gender: row.gender,
     birthdate: row.birthdate,
     zone: row.zone,
-    avatar_urls: row.avatar_urls || [],
+    avatar_urls: photos,
     is_online: isRecentlyOnline(row.is_online, row.last_seen_at),
     is_premium: Boolean(row.is_premium),
     last_seen_at: row.last_seen_at,

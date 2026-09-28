@@ -71,7 +71,7 @@ export function SarahAssistant() {
     <>
       <button
         onClick={() => setOpen(true)}
-        className="fixed bottom-[50px] right-4 z-[60] flex items-center gap-3 rounded-full bg-[#ec3b78] px-5 py-3 text-sm font-extrabold text-white shadow-2xl shadow-black/20 md:bottom-5 md:right-5"
+        className="fixed bottom-[78px] right-4 z-[60] flex items-center gap-3 rounded-full bg-[#ec3b78] px-5 py-3 text-sm font-extrabold text-white shadow-2xl shadow-black/20 md:bottom-5 md:right-5"
       >
         <span className="relative h-5 w-5 overflow-hidden rounded-full bg-white/20">
           <Image src="/aras-logo.jpeg" alt="ARAS" fill className="object-cover" />

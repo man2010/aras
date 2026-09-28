@@ -588,10 +588,23 @@ export default function EspacePage() {
   }, [searchParams]);
 
   useEffect(() => {
-    if (!user) return;
+    let cancelled = false;
+    if (!user) {
+      setProfile(null);
+      setProfileForm({ display_name: '', age: '', city: '', bio: '', profession: '', photo_url: '', interests: [], languages: [], religion: '', caste: '', marital_status: '', smoking_habit: '' });
+      setGalleryPhotos(Array(6).fill(null));
+      setDiscoveryProfiles([]);
+      setConversations([]);
+      setConversationProfiles({});
+      return () => { cancelled = true; };
+    }
+    setProfile(null);
+    setProfileForm({ display_name: '', age: '', city: '', bio: '', profession: '', photo_url: '', interests: [], languages: [], religion: '', caste: '', marital_status: '', smoking_habit: '' });
+    setGalleryPhotos(Array(6).fill(null));
     (async () => {
       setDiscoveryLoading(true);
       const { data: existing } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle();
+      if (cancelled) return;
       if (existing) {
         const p = toProfile(existing as ProfileRow);
         if (!p.onboarding_completed || p.profile_status !== 'completed') {
@@ -604,6 +617,7 @@ export default function EspacePage() {
         const optionalPhotos = (p.avatar_urls ?? []).filter((photo) => Boolean(photo) && photo !== p.photo_url);
         setGalleryPhotos(Array.from({ length: 6 }, (_, index) => optionalPhotos[index] ?? null));
         const { data: subscription } = await supabase.from('user_subscriptions').select('plan_code').eq('user_id', user.id).eq('status', 'active').or(`ends_at.is.null,ends_at.gt.${new Date().toISOString()}`).order('created_at', { ascending: false }).limit(1).maybeSingle();
+        if (cancelled) return;
         if (subscription?.plan_code === 'premium' || subscription?.plan_code === 'elite') setSubscriptionPlan(subscription.plan_code);
         const raw = existing as Record<string, unknown>;
         setPrivacySettings({
@@ -622,6 +636,7 @@ export default function EspacePage() {
         .select(PROFILE_CARD_SELECT)
         .eq('is_active', true)
         .order('created_at', { ascending: false });
+      if (cancelled) return;
 
       if (discoveryData) {
         const allProfiles = (discoveryData as ProfileRow[]).map(toProfile);
@@ -642,14 +657,17 @@ export default function EspacePage() {
         setDiscoveryProfiles([]);
       }
       await refreshLikeState();
+      if (cancelled) return;
       setDiscoveryLoading(false);
 
       const { data: convs } = await supabase.from('matches').select('*').or(`user_1_id.eq.${user.id},user_2_id.eq.${user.id}`).order('updated_at', { ascending: false });
+      if (cancelled) return;
       if (convs) {
         const mappedConversations = uniqueConversations(convs as MatchRow[], user.id);
         setConversations(mappedConversations);
         const partnerIds = mappedConversations.map((c) => c.user_a === user.id ? c.user_b : c.user_a);
         const { data: partnerProfiles } = await supabase.from('profiles').select('*').in('id', partnerIds);
+        if (cancelled) return;
         if (partnerProfiles) {
           const profileMap: Record<string, Profile> = {};
           partnerProfiles.map((row) => toProfile(row as ProfileRow)).forEach((p: Profile) => {
@@ -663,6 +681,7 @@ export default function EspacePage() {
         const lastMsgs: Record<string, { content: string; time: string }> = {};
         if (mappedConversations.length) {
           const { data: lastMessageRows } = await supabase.rpc('get_latest_match_messages', { target_match_ids: mappedConversations.map((conversation) => conversation.id) });
+          if (cancelled) return;
           for (const lastMsg of lastMessageRows ?? []) {
             if (lastMsgs[lastMsg.match_id]) continue;
             const timeStr = new Date(lastMsg.created_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
@@ -677,6 +696,7 @@ export default function EspacePage() {
         .select('match_id')
         .eq('receiver_id', user.id)
         .eq('is_read', false);
+      if (cancelled) return;
       if (unreadData) {
         const counts: Record<string, number> = {};
         let total = 0;
@@ -689,7 +709,9 @@ export default function EspacePage() {
         setUnreadCount(total);
       }
       await loadMemberEvents();
+      if (cancelled) return;
     })();
+    return () => { cancelled = true; };
   }, [user, loadMemberEvents, refreshLikeState]);
 
   useEffect(() => {
@@ -741,9 +763,10 @@ export default function EspacePage() {
     if (!user) return;
     setProfileSaved(false);
 
-    const primaryPhoto = profileForm.photo_url || profile?.photo_url || 'https://images.pexels.com/photos/733872/pexels-photo-733872.jpeg?auto=compress&cs=tinysrgb&w=600';
+    const primaryPhoto = [profileForm.photo_url, profile?.avatar_urls?.[0]]
+      .find((photo) => typeof photo === 'string' && photo.length > 0 && !photo.includes('/images/default-avatar.svg')) || '';
     const gallery = Array.from(new Set(galleryPhotos.filter((photo): photo is string => Boolean(photo) && photo !== primaryPhoto)));
-    const avatarUrls = [primaryPhoto, ...gallery];
+    const avatarUrls = [primaryPhoto, ...gallery].filter(Boolean);
 
     const payload = {
       ...(!profile ? { full_name: profileForm.display_name } : {}),
@@ -1313,7 +1336,9 @@ export default function EspacePage() {
   const selectedProfilePhotos = selectedProfileDetail
     ? Array.from(new Set([...(selectedProfileDetail.avatar_urls ?? []), selectedProfileDetail.photo_url].filter((photo): photo is string => Boolean(photo))))
     : [];
-  const ownProfilePhoto = imagePreview || profile?.avatar_urls?.[0] || profile?.photo_url || profileForm.photo_url || 'https://images.pexels.com/photos/733872/pexels-photo-733872.jpeg?auto=compress&cs=tinysrgb&w=600';
+  const ownProfilePhoto = user && profile?.id === user.id
+    ? imagePreview || profile.avatar_urls?.[0] || profile.photo_url || profileForm.photo_url || '/images/default-avatar.svg'
+    : '/images/default-avatar.svg';
 
   useEffect(() => {
     if (!selectedProfileDetail || selectedProfilePhotos.length < 2) return;
@@ -1652,7 +1677,7 @@ export default function EspacePage() {
           )}
 
           {/* PROFILE TAB */}
-          {tab === 'profile' && (
+          {tab === 'profile' && profile?.id === user?.id && (
             <div className="mx-auto max-w-6xl space-y-6">
               {profileSection !== 'profile' && <header className="flex items-center gap-4"><button type="button" onClick={() => { setProfileSection('profile'); setProfileEditOpen(false); }} aria-label="Retour au profil" className="flex h-10 w-10 items-center justify-center rounded-full bg-white text-[#282832] shadow-sm dark:bg-[#202027] dark:text-white"><ArrowLeft size={21} /></button><h1 className="font-display text-2xl font-bold text-[#241c18] dark:text-white">{profileSection === 'visitors' ? 'Visiteurs' : profileSection === 'privacy' ? 'Confidentialité' : profileSection === 'security' ? 'Sécurité du compte' : profileSection === 'subscription' ? 'Abonnement' : profileSection === 'blocks' ? 'Blocages & signalements' : 'Centre d’aide'}</h1></header>}
 
@@ -1662,7 +1687,7 @@ export default function EspacePage() {
                   <article className="rounded-[30px] bg-white p-6 text-center shadow-[0_12px_38px_rgba(20,20,30,.06)] dark:bg-[#1d1d1d] sm:p-8">
                     <input ref={profilePhotoInputRef} type="file" accept="image/png,image/jpeg,image/jpg" className="sr-only" tabIndex={-1} onChange={(event) => { const file = event.target.files?.[0]; if (file) void handleProfileImageSelection(file, null); }} />
                     <button type="button" disabled={uploadingImage} onClick={() => profilePhotoInputRef.current?.click()} aria-label="Changer ma photo de profil" className="group relative mx-auto block h-40 w-40 overflow-hidden rounded-full border-[5px] border-white bg-[#eceef4] shadow-[0_0_0_2px_rgba(236,22,137,.18)] dark:border-[#303036] dark:bg-[#292932] sm:h-48 sm:w-48 disabled:cursor-wait">
-                      <img src={imagePreview || profileForm.photo_url || 'https://images.pexels.com/photos/733872/pexels-photo-733872.jpeg?auto=compress&cs=tinysrgb&w=400'} alt={`Photo de ${profileForm.display_name || 'votre profil'}`} className="h-full w-full object-cover transition group-hover:scale-105" />
+                      <img src={ownProfilePhoto} alt={`Photo de ${profileForm.display_name || 'votre profil'}`} className="h-full w-full object-cover transition group-hover:scale-105" />
                       <span className="absolute inset-0 flex items-center justify-center bg-black/0 text-white transition group-hover:bg-black/35"><span className="absolute bottom-1 right-1 flex h-12 w-12 items-center justify-center rounded-full bg-[#ec1689] text-white shadow-lg"><Camera size={21} /></span></span>
                       {uploadingImage && <span className="absolute inset-0 flex items-center justify-center bg-black/45"><span className="h-8 w-8 animate-spin rounded-full border-2 border-white border-t-transparent" /></span>}
                     </button>
@@ -1686,7 +1711,7 @@ export default function EspacePage() {
 
               {profileSection === 'profile' && profileSettingsOpen && !profileEditOpen && <section className="mx-auto w-full max-w-4xl space-y-6">
                 <header className="flex items-center gap-4"><button type="button" onClick={() => setProfileSettingsOpen(false)} aria-label="Retour à mon profil" className="flex h-10 w-10 items-center justify-center rounded-full bg-white text-[#282832] shadow-sm dark:bg-[#202027] dark:text-white"><ArrowLeft size={21} /></button><h1 className="font-display text-2xl font-bold text-[#241c18] dark:text-white">Paramètres</h1></header>
-                <button type="button" onClick={() => { setProfileSettingsOpen(false); setProfileEditOpen(true); }} className="flex w-full items-center gap-4 rounded-[26px] bg-white p-5 text-left shadow-sm dark:bg-[#202027]"><img src={profileForm.photo_url || 'https://images.pexels.com/photos/733872/pexels-photo-733872.jpeg?auto=compress&cs=tinysrgb&w=200'} alt="" className="h-16 w-16 rounded-full object-cover"/><span className="min-w-0 flex-1"><strong className="block truncate text-lg text-[#292832] dark:text-white">{profileForm.display_name}{profileForm.age ? `, ${profileForm.age}` : ''}</strong><span className="text-sm text-[#858691] dark:text-white/55">Modifier mon profil</span></span><ChevronRight size={20} /></button>
+                <button type="button" onClick={() => { setProfileSettingsOpen(false); setProfileEditOpen(true); }} className="flex w-full items-center gap-4 rounded-[26px] bg-white p-5 text-left shadow-sm dark:bg-[#202027]"><img src={ownProfilePhoto} alt="" className="h-16 w-16 rounded-full object-cover"/><span className="min-w-0 flex-1"><strong className="block truncate text-lg text-[#292832] dark:text-white">{profileForm.display_name}{profileForm.age ? `, ${profileForm.age}` : ''}</strong><span className="text-sm text-[#858691] dark:text-white/55">Modifier mon profil</span></span><ChevronRight size={20} /></button>
                 <section><h2 className="mb-3 px-1 text-sm font-bold text-[#92939d]">Préférences</h2><div className="grid gap-3 md:grid-cols-2">
                   <button type="button" onClick={() => { setSearchFiltersReturnTo('settings'); setProfileSettingsOpen(false); setTab('decouverte'); setShowDiscoveryFilters(true); }} className="flex min-h-[96px] w-full items-center gap-4 rounded-[24px] border border-[#e7e8ee] bg-white p-5 text-left shadow-[0_8px_24px_rgba(25,26,40,.05)] transition hover:-translate-y-0.5 hover:border-sky-200 hover:shadow-[0_14px_32px_rgba(25,26,40,.09)] dark:border-white/[0.07] dark:bg-[#202027] dark:hover:border-sky-400/30"><span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[18px] bg-sky-100 text-sky-600 dark:bg-sky-500/15 dark:text-sky-300"><MapPin size={21} /></span><span className="min-w-0 flex-1"><strong className="block text-sm font-extrabold text-[#292832] dark:text-white">Préférences de recherche</strong><span className="mt-1 block text-xs leading-5 text-[#858691] dark:text-white/50">Âge, distance et profils recherchés</span></span><ChevronRight size={19} className="shrink-0 text-[#9b9ca6]" /></button>
                   <button type="button" onClick={() => setProfileSection('privacy')} className="flex min-h-[96px] w-full items-center gap-4 rounded-[24px] border border-[#e7e8ee] bg-white p-5 text-left shadow-[0_8px_24px_rgba(25,26,40,.05)] transition hover:-translate-y-0.5 hover:border-emerald-200 hover:shadow-[0_14px_32px_rgba(25,26,40,.09)] dark:border-white/[0.07] dark:bg-[#202027] dark:hover:border-emerald-400/30"><span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[18px] bg-emerald-100 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-300"><Eye size={21} /></span><span className="min-w-0 flex-1"><strong className="block text-sm font-extrabold text-[#292832] dark:text-white">Confidentialité & notifications</strong><span className="mt-1 block text-xs leading-5 text-[#858691] dark:text-white/50">Contrôlez votre visibilité et vos alertes</span></span><ChevronRight size={19} className="shrink-0 text-[#9b9ca6]" /></button>
@@ -2181,11 +2206,11 @@ export default function EspacePage() {
           </form>
         </div>
       )}
-      {ownProfilePreviewOpen && profile && (
+      {ownProfilePreviewOpen && profile && profile.id === user?.id && (
         <div className="fixed inset-0 z-[125] flex items-center justify-center bg-black/65 p-3 backdrop-blur-sm sm:p-6" role="dialog" aria-modal="true" aria-label="Mon profil">
           <section className="relative isolate flex h-[min(86dvh,860px)] w-full max-w-[680px] flex-col overflow-y-auto rounded-[32px] bg-[#202027] text-white shadow-[0_28px_90px_rgba(0,0,0,.42)] sm:rounded-[40px]">
             {!ownProfileDetailExpanded ? <>
-              <img src={ownProfilePhoto} alt="" onError={(event) => { event.currentTarget.src = 'https://images.pexels.com/photos/733872/pexels-photo-733872.jpeg?auto=compress&cs=tinysrgb&w=600'; }} className="absolute inset-0 h-full w-full object-cover" />
+              <img src={ownProfilePhoto} alt="" onError={(event) => { event.currentTarget.src = '/images/default-avatar.svg'; }} className="absolute inset-0 h-full w-full object-cover" />
               <div className="absolute inset-0 bg-gradient-to-b from-black/25 via-transparent to-black/85" />
               <button type="button" onClick={() => setOwnProfilePreviewOpen(false)} aria-label="Fermer mon profil" className="absolute right-4 top-4 z-10 flex h-11 w-11 items-center justify-center rounded-full border border-white/30 bg-black/30 text-white backdrop-blur"><X size={21} /></button>
               <div className="relative mt-auto p-6 sm:p-9">
@@ -2205,7 +2230,7 @@ export default function EspacePage() {
               <div className="flex-1 space-y-6 bg-[#f8f9fd] px-5 pb-8 pt-6 text-[#24212b] dark:bg-[#101014] dark:text-white sm:px-8">
                 <div className="text-center">
                   <div className="relative mx-auto h-36 w-36 overflow-hidden rounded-full border-4 border-white bg-[#e4e6ed] shadow-[0_0_0_3px_rgba(236,22,137,.25)] dark:border-[#303036] sm:h-44 sm:w-44">
-                    <img src={ownProfilePhoto} alt={profileForm.display_name} onError={(event) => { event.currentTarget.src = 'https://images.pexels.com/photos/733872/pexels-photo-733872.jpeg?auto=compress&cs=tinysrgb&w=600'; }} className="h-full w-full object-cover" />
+                    <img src={ownProfilePhoto} alt={profileForm.display_name} onError={(event) => { event.currentTarget.src = '/images/default-avatar.svg'; }} className="h-full w-full object-cover" />
                   </div>
                   <h3 className="mt-4 font-display text-3xl font-bold">{profileForm.display_name}{profileForm.age && <>, {profileForm.age}</>}</h3>
                   <p className="mt-1 flex items-center justify-center gap-1.5 text-sm text-[#686b79] dark:text-white/65"><MapPin size={15} className="text-[#ec1689]" />{profileForm.city || 'Ville non renseignée'}</p>

@@ -6,9 +6,6 @@ import { parseHumanProof } from '@/lib/human-proof';
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? process.env.SUPABASE_URL ?? '';
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? process.env.SUPABASE_ANON_KEY ?? '';
 
-const defaultAvatar =
-  'https://images.pexels.com/photos/733872/pexels-photo-733872.jpeg?auto=compress&cs=tinysrgb&w=600';
-
 export async function POST(request: Request) {
   if (!supabaseUrl || !supabaseAnonKey) {
     return NextResponse.json({ error: 'Configuration Supabase manquante.' }, { status: 503 });
@@ -72,7 +69,7 @@ export async function POST(request: Request) {
       full_name: displayName,
       is_active: true,
       is_online: true,
-      avatar_urls: [defaultAvatar],
+      avatar_urls: [],
       interests: [],
       languages: [],
       notif_messages: true,

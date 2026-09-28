@@ -90,7 +90,7 @@ export async function GET(request: Request) {
         full_name: fallbackName,
         is_active: true,
         is_online: true,
-        avatar_urls: [user.user_metadata?.avatar_url ?? 'https://images.pexels.com/photos/733872/pexels-photo-733872.jpeg?auto=compress&cs=tinysrgb&w=600'],
+        avatar_urls: [],
         interests: [],
         languages: [],
         notif_messages: true,
