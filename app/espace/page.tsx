@@ -984,6 +984,11 @@ export default function EspacePage() {
   const formatDate = (d: string) => { const date = new Date(d); return isNaN(date.getTime()) ? '—' : new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'short' }).format(date); };
   const formatEventDate = (d: string) => { const date = new Date(d); return isNaN(date.getTime()) ? 'Date à confirmer' : new Intl.DateTimeFormat('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' }).format(date); };
   const eventCities = Array.from(new Set(events.map((event) => event.city).filter(Boolean)));
+  const profileCitySuggestions = Array.from(new Set([
+    profile?.city,
+    ...discoveryProfiles.map((profileItem) => profileItem.city),
+    ...eventCities,
+  ].map((city) => city?.trim()).filter((city): city is string => Boolean(city))));
   const filteredEvents = events.filter((event) => {
     const query = eventSearch.trim().toLocaleLowerCase('fr');
     const matchesSearch = !query || `${event.title} ${event.description} ${event.location} ${event.city}`.toLocaleLowerCase('fr').includes(query);
@@ -1425,10 +1430,10 @@ export default function EspacePage() {
           }}
         />
 
-        <div className="min-w-0 flex-1 bg-[radial-gradient(ellipse_at_top_right,_rgba(236,59,120,0.08),_transparent_40%)] px-3 pb-28 pt-5 sm:px-6 sm:pt-8 lg:px-10 lg:pt-10 lg:pb-12">
+        <div className={`min-w-0 flex-1 bg-[radial-gradient(ellipse_at_top_right,_rgba(236,59,120,0.08),_transparent_40%)] ${tab === 'decouverte' ? 'h-[calc(100dvh-60px)] overflow-hidden px-3 pb-[calc(76px+env(safe-area-inset-bottom))] pt-3 sm:px-6 sm:pt-4 lg:h-auto lg:overflow-visible lg:px-10 lg:pt-10 lg:pb-12' : 'px-3 pb-28 pt-5 sm:px-6 sm:pt-8 lg:px-10 lg:pt-10 lg:pb-12'}`}>
           {/* DISCOVERY TAB */}
           {tab === 'decouverte' && (
-            <div className="space-y-6">
+            <div className="h-full min-h-0 lg:space-y-6">
               <div className="contents">
                 {showDiscoveryFilters && (
                   <div className="fixed inset-0 z-[80] flex items-stretch justify-center bg-[#f8f9fd] text-[#241c18] dark:bg-[#111111] dark:text-white sm:items-center sm:bg-black/65 sm:p-5 sm:backdrop-blur-sm" onClick={closeDiscoveryFilters}>
@@ -1468,14 +1473,14 @@ export default function EspacePage() {
                 </div>
               ) : (
                 <>
-                {filteredDiscoveryProfiles.length > 0 && mobileDiscoveryIndex >= filteredDiscoveryProfiles.length && <section className="mx-auto flex min-h-[55dvh] w-full max-w-[560px] flex-col items-center justify-center rounded-[30px] bg-white px-6 text-center shadow dark:bg-[#19191f] lg:hidden">
+                {filteredDiscoveryProfiles.length > 0 && mobileDiscoveryIndex >= filteredDiscoveryProfiles.length && <section className="mx-auto flex min-h-0 w-full max-w-[560px] flex-1 flex-col items-center justify-center rounded-[30px] bg-white px-6 text-center shadow dark:bg-[#19191f] lg:hidden">
                   <Users size={44} className="text-[#9a8b82]" />
                   <h3 className="mt-5 font-display text-2xl text-[#241c18] dark:text-white">Plus de profils autour de vous</h3>
                   <p className="mt-2 text-sm text-[#756960] dark:text-white/60">Vous avez vu tous les profils disponibles avec ces filtres. Revenez en arrière ou modifiez votre recherche.</p>
                   <div className="mt-5 flex flex-wrap justify-center gap-3"><button type="button" onClick={goBackMobileDiscovery} className="rounded-full border px-5 py-3 text-sm font-bold">Revenir au profil précédent</button><button type="button" onClick={() => { setMobileDiscoveryIndex(0); setMobileDiscoveryHistory([]); }} className="rounded-full bg-[#ec3b78] px-5 py-3 text-sm font-bold text-white">Recommencer</button></div>
                 </section>}
                 {mobileDiscoveryProfile && (
-                  <section className="mx-auto w-full max-w-[560px] lg:contents" aria-label="Profils à découvrir">
+                  <section className="mx-auto flex h-full min-h-0 w-full max-w-[560px] flex-col lg:contents" aria-label="Profils à découvrir">
                     <article
                       key={mobileDiscoveryProfile.id}
                       ref={() => { setDiscoveryVisitProfileId((currentId) => currentId === mobileDiscoveryProfile.id ? currentId : mobileDiscoveryProfile.id); }}
@@ -1497,41 +1502,34 @@ export default function EspacePage() {
                         if (endX > startX) goBackMobileDiscovery();
                         else advanceMobileDiscovery();
                       }}
-                      className={`relative isolate ${expandedDiscoveryProfile ? 'h-[min(84dvh,820px)]' : 'h-[min(68dvh,680px)] min-h-[430px]'} overflow-hidden rounded-[30px] border border-white/15 bg-[#202027] shadow-[0_22px_60px_rgba(0,0,0,.22)] touch-pan-y sm:rounded-[36px] lg:hidden`}
+                      className="relative mx-auto flex min-h-0 w-full flex-1 flex-col touch-pan-y lg:hidden"
                     >
+                      <div className="relative isolate min-h-[280px] flex-1 overflow-hidden rounded-[30px] border border-white/15 bg-[#202027] shadow-[0_22px_60px_rgba(0,0,0,.22)] sm:rounded-[36px]">
                       {mobileDiscoveryPhotos[discoveryPhotoIndexes[mobileDiscoveryProfile.id] ?? 0] ? (
                         <img src={mobileDiscoveryPhotos[discoveryPhotoIndexes[mobileDiscoveryProfile.id] ?? 0]} alt={mobileDiscoveryProfile.display_name} className="absolute inset-0 h-full w-full object-cover" />
                       ) : (
                         <div className="absolute inset-0 flex items-center justify-center bg-[#292832] text-7xl font-black text-white/70">{mobileDiscoveryProfile.display_name.charAt(0).toUpperCase()}</div>
                       )}
                       <div className="discovery-image-overlay absolute inset-0 bg-gradient-to-b from-black/25 via-transparent to-black/85" />
-                      <div className="absolute left-4 top-4 rounded-full border border-white/45 bg-black/35 px-4 py-2 text-sm font-extrabold text-white backdrop-blur-md">
-                        <MapPin size={15} className="mr-1 inline" />{mobileDiscoveryProfile.city || 'Ville non renseignée'}
-                      </div>
+                      {mobileDiscoveryDistance !== null && <div className="absolute left-4 top-4 inline-flex items-center gap-1.5 rounded-full border border-white/45 bg-black/35 px-4 py-2 text-sm font-extrabold text-white backdrop-blur-md"><MapPin size={15} />{mobileDiscoveryDistance.toLocaleString('fr-FR')} km</div>}
+                      <span role="img" aria-label={mobileDiscoveryProfile.is_online ? 'En ligne' : 'Hors ligne'} className={`absolute right-4 top-4 h-4 w-4 rounded-full border-2 border-white/90 shadow-[0_0_14px_currentColor] ${mobileDiscoveryProfile.is_online ? 'bg-emerald-500 text-emerald-400' : 'bg-red-500 text-red-400'}`} />
                       {mobileDiscoveryPhotos.length > 1 && <div className="absolute inset-x-0 top-4 flex justify-center gap-1.5">{mobileDiscoveryPhotos.map((photo, index) => <button key={photo} type="button" aria-label={`Afficher la photo ${index + 1}`} onClick={() => setDiscoveryPhotoIndexes((current) => ({ ...current, [mobileDiscoveryProfile.id]: index }))} className={`h-1.5 rounded-full ${index === (discoveryPhotoIndexes[mobileDiscoveryProfile.id] ?? 0) ? 'w-7 bg-white' : 'w-1.5 bg-white/55'}`} />)}</div>}
-                      <div className={`absolute inset-x-0 bottom-0 text-white sm:p-7 ${expandedDiscoveryProfile ? 'max-h-[78%] overflow-y-auto overscroll-contain rounded-t-[28px] border-t border-white/15 bg-[#111116]/90 p-5 shadow-[0_-18px_50px_rgba(0,0,0,.25)] backdrop-blur-xl' : 'p-5'}`}>
-                        <p className="text-xs font-extrabold uppercase tracking-[.18em] text-[#ff4b9b]">À découvrir</p>
-                        <h3 className={`mt-1 font-display leading-tight ${expandedDiscoveryProfile ? 'text-3xl sm:text-4xl' : 'text-4xl sm:text-5xl'}`}>
+                      <div className="absolute inset-x-0 bottom-0 text-white p-5 sm:p-7">
+                        <h3 className="font-display text-4xl leading-tight sm:text-5xl">
                           {mobileDiscoveryProfile.display_name}{mobileDiscoveryProfile.age ? `, ${mobileDiscoveryProfile.age}` : ''}
                         </h3>
-                        {mobileDiscoveryProfile.profession && <p className="mt-2 text-base font-semibold text-white/80">{mobileDiscoveryProfile.profession}</p>}
-                        {mobileDiscoveryProfile.bio && <section className="mt-3"><h4 className="text-[10px] font-extrabold uppercase tracking-[.16em] text-white/50">À propos</h4><p className={`mt-1 max-w-prose text-sm leading-6 text-white/80 ${expandedDiscoveryProfile ? '' : 'line-clamp-2'}`}>{mobileDiscoveryProfile.bio}</p></section>}
-                        {expandedDiscoveryProfile && <div className="mt-4 space-y-4">
-                          <section><h4 className="text-[10px] font-extrabold uppercase tracking-[.16em] text-white/50">Informations</h4><div className="mt-2 grid grid-cols-2 gap-2 text-xs">
-                            {[['Ville', mobileDiscoveryProfile.city], ['Profession', mobileDiscoveryProfile.profession], ['Taille', mobileDiscoveryProfile.height ? `${mobileDiscoveryProfile.height} cm` : ''], ['Religion', mobileDiscoveryProfile.religion], ['Situation', mobileDiscoveryProfile.marital_status], ['Langues', mobileDiscoveryProfile.languages?.join(', ')], ['Tabac', mobileDiscoveryProfile.smoking_habit]].filter(([, value]) => Boolean(value)).map(([label, value]) => <div key={label} className="min-w-0 rounded-xl border border-white/10 bg-white/5 p-2.5"><p className="text-[10px] font-semibold text-white/50">{label}</p><p className="mt-1 break-words font-bold text-white/90">{value}</p></div>)}
-                          </div></section>
-                          <section><h4 className="text-[10px] font-extrabold uppercase tracking-[.16em] text-white/50">Centres d&apos;intérêt</h4>{mobileDiscoveryProfile.interests?.length ? <div className="mt-2 flex flex-wrap gap-2">{mobileDiscoveryProfile.interests.map((interest) => <span key={interest} className="rounded-full border border-white/15 bg-white/5 px-3 py-1.5 text-xs font-bold">{interest}</span>)}</div> : <p className="mt-2 text-xs text-white/60">Aucun centre d&apos;intérêt renseigné.</p>}</section>
-                        </div>}
-                        {mobileDiscoveryProfile.interests?.length && !expandedDiscoveryProfile ? <div className="mt-3 flex flex-wrap gap-2">{mobileDiscoveryProfile.interests.slice(0, 3).map((interest) => <span key={interest} className="rounded-full border border-white/35 bg-white/10 px-3 py-1.5 text-xs font-bold text-white backdrop-blur">★ {interest}</span>)}</div> : null}
+                        {mobileDiscoveryProfile.profession && <p className="mt-1.5 text-base font-semibold text-white/90">{mobileDiscoveryProfile.profession}</p>}
+                        <p className="mt-1.5 flex items-center gap-1.5 text-sm text-white/80"><MapPin size={15} className="shrink-0 text-[#ff4b9b]" />{mobileDiscoveryProfile.city || 'Ville non renseignée'}</p>
+                        {mobileDiscoveryProfile.interests?.length ? <div className="mt-3 flex flex-wrap gap-2">{mobileDiscoveryProfile.interests.slice(0, 3).map((interest) => <span key={interest} className="rounded-full border border-white/35 bg-white/10 px-3 py-1.5 text-xs font-bold text-white backdrop-blur">★ {interest}</span>)}</div> : null}
                         <button type="button" onClick={() => setExpandedDiscoveryProfile((expanded) => !expanded)} className="mt-3 inline-flex min-h-10 items-center gap-2 rounded-full bg-[#ec1689] px-5 py-2 text-sm font-extrabold text-white shadow-lg">
-                          {expandedDiscoveryProfile ? 'Voir moins' : 'Voir plus'} <ChevronRight size={16} className={expandedDiscoveryProfile ? '-rotate-90' : 'rotate-90'} />
+                          Voir plus <ChevronRight size={16} className="rotate-90" />
                         </button>
-                        <div className="mt-5 flex items-center justify-center gap-5">
-                          <button type="button" onClick={advanceMobileDiscovery} aria-label="Passer ce profil" className="flex h-14 w-14 items-center justify-center rounded-full bg-black/45 text-white ring-1 ring-white/15 backdrop-blur transition active:scale-95"><X size={25} /></button>
-                          <button type="button" onClick={() => handleDiscoveryMessage(mobileDiscoveryProfile)} aria-label="Envoyer un message" className="flex h-16 w-16 items-center justify-center rounded-full bg-[#292746] text-white shadow-lg transition active:scale-95"><MessageCircle size={27} /></button>
-                          <button type="button" onClick={() => { if (!discoveryLikedIds.has(mobileDiscoveryProfile.id)) void toggleDiscoveryLike(mobileDiscoveryProfile.id); }} aria-label={discoveryLikedIds.has(mobileDiscoveryProfile.id) ? 'Profil aimé' : 'Aimer ce profil'} className={`flex h-14 w-14 items-center justify-center rounded-full text-white shadow-[0_10px_28px_rgba(236,59,120,.32)] transition active:scale-95 ${discoveryLikedIds.has(mobileDiscoveryProfile.id) ? 'bg-[#a20d5d]' : 'bg-[#ec1689]'}`}><Heart size={25} fill="currentColor" /></button>
-                        </div>
-                        <p className="mt-3 text-center text-xs font-semibold text-white/60">Glissez vers la gauche pour passer, vers la droite pour revenir.</p>
+                      </div>
+                      </div>
+                      <div className="mt-2 flex shrink-0 items-center justify-center gap-5">
+                        <button type="button" onClick={advanceMobileDiscovery} aria-label="Passer ce profil" className="flex h-14 w-14 items-center justify-center rounded-full bg-white text-[#292832] shadow-[0_8px_24px_rgba(30,30,45,.12)] transition active:scale-95 dark:bg-white/10 dark:text-white"><X size={25} /></button>
+                        <button type="button" onClick={() => handleDiscoveryMessage(mobileDiscoveryProfile)} aria-label="Envoyer un message" className="flex h-16 w-16 items-center justify-center rounded-full bg-[#292746] text-white shadow-lg transition active:scale-95"><MessageCircle size={27} /></button>
+                        <button type="button" onClick={() => { if (!discoveryLikedIds.has(mobileDiscoveryProfile.id)) void toggleDiscoveryLike(mobileDiscoveryProfile.id); }} aria-label={discoveryLikedIds.has(mobileDiscoveryProfile.id) ? 'Profil aimé' : 'Aimer ce profil'} className={`flex h-14 w-14 items-center justify-center rounded-full text-white shadow-[0_10px_28px_rgba(236,59,120,.32)] transition active:scale-95 ${discoveryLikedIds.has(mobileDiscoveryProfile.id) ? 'bg-[#a20d5d]' : 'bg-[#ec1689]'}`}><Heart size={25} fill="currentColor" /></button>
                       </div>
                     </article>
                     {expandedDiscoveryProfile && (
@@ -1539,7 +1537,6 @@ export default function EspacePage() {
                         <section className="mx-auto flex min-h-dvh w-full max-w-[820px] flex-col">
                           <header className="flex items-start justify-between gap-4 px-5 pb-4 pt-[max(1.25rem,env(safe-area-inset-top))] sm:px-8">
                             <div className="min-w-0">
-                              <p className="text-[10px] font-extrabold uppercase tracking-[.22em] text-[#ec1689] dark:text-[#ff4b9b]">Profil à découvrir</p>
                               <h2 className="mt-1 truncate font-display text-3xl font-bold sm:text-4xl">{mobileDiscoveryProfile.display_name}{mobileDiscoveryProfile.age ? `, ${mobileDiscoveryProfile.age}` : ''}</h2>
                               <p className="mt-1 flex items-center gap-1.5 text-sm text-[#686b79] dark:text-white/65"><MapPin size={14} className="shrink-0 text-[#ec1689]" />{mobileDiscoveryProfile.city || 'Localisation non renseignée'}</p>
                               <div className="mt-2 flex flex-wrap gap-2">
@@ -1559,10 +1556,6 @@ export default function EspacePage() {
                               <button type="button" aria-label="Photo précédente" onClick={() => setDiscoveryPhotoIndexes((current) => ({ ...current, [mobileDiscoveryProfile.id]: ((current[mobileDiscoveryProfile.id] ?? 0) - 1 + mobileDiscoveryPhotos.length) % mobileDiscoveryPhotos.length }))} className="absolute inset-y-12 left-0 w-1/3" />
                               <button type="button" aria-label="Photo suivante" onClick={() => setDiscoveryPhotoIndexes((current) => ({ ...current, [mobileDiscoveryProfile.id]: ((current[mobileDiscoveryProfile.id] ?? 0) + 1) % mobileDiscoveryPhotos.length }))} className="absolute inset-y-12 right-0 w-1/3" />
                             </>}
-                            <div className="absolute bottom-4 left-5 right-5 flex items-end justify-between">
-                              <div>{mobileDiscoveryProfile.profession && <p className="text-sm font-semibold text-white/90">{mobileDiscoveryProfile.profession}</p>}<p className="mt-1 text-xs text-white/65">{mobileDiscoveryPhotos.length > 1 ? `${(discoveryPhotoIndexes[mobileDiscoveryProfile.id] ?? 0) + 1} / ${mobileDiscoveryPhotos.length} photos` : 'Photo de profil'}</p></div>
-                              {mobileDiscoveryPhotos.length > 1 && <span className="rounded-full bg-black/35 px-3 py-1.5 text-[10px] font-bold text-white/85 backdrop-blur">Défilement automatique</span>}
-                            </div>
                           </div>
 
                           <main className="flex-1 space-y-7 px-5 pb-6 pt-7 sm:px-8">
@@ -1814,7 +1807,7 @@ export default function EspacePage() {
                 <div className="mt-6 grid gap-4 sm:grid-cols-2">
                   <label className="block text-xs font-extrabold text-[#625852]">Prénom<input value={profileForm.display_name} readOnly aria-readonly="true" className="mt-2 w-full min-w-0 cursor-not-allowed rounded-xl border-0 bg-[#f8f9fd] px-4 py-3 text-sm text-[#756960] outline-none focus-visible:ring-2 focus-visible:ring-[#ec3b78]/30 dark:bg-white/5 dark:text-white/70" /><span className="mt-1 block text-[10px] font-medium text-[#9a8b82]">Le prénom ne peut pas être modifié ici.</span></label>
                   <label className="block text-xs font-extrabold text-[#625852]">Âge<input value={profileForm.age} readOnly aria-readonly="true" className="mt-2 w-full cursor-not-allowed rounded-xl border-0 bg-[#f8f9fd] px-4 py-3 text-sm text-[#756960] outline-none focus-visible:ring-2 focus-visible:ring-[#ec3b78]/30 dark:bg-white/5" /><span className="mt-1 block text-[10px] font-medium text-[#9a8b82]">L’âge est calculé à partir de votre date de naissance.</span></label>
-                  <label className="block text-xs font-extrabold text-[#625852]">Ville<input value={profileForm.city} onChange={(event) => setProfileForm((current) => ({ ...current, city: event.target.value }))} className="mt-2 w-full rounded-xl border-0 bg-[#f8f9fd] px-4 py-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-[#ec3b78]/30 dark:bg-white/5 dark:text-white" /></label>
+                  <label className="block text-xs font-extrabold text-[#625852]">Ville<input list="profile-city-suggestions" autoComplete="address-level2" value={profileForm.city} onChange={(event) => setProfileForm((current) => ({ ...current, city: event.target.value }))} className="mt-2 w-full rounded-xl border-0 bg-[#f8f9fd] px-4 py-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-[#ec3b78]/30 dark:bg-white/5 dark:text-white" /><datalist id="profile-city-suggestions">{profileCitySuggestions.map((city) => <option key={city} value={city} />)}</datalist></label>
                   <label className="block text-xs font-extrabold text-[#625852]">Genre<input value={profile?.gender || 'Non renseigné'} readOnly aria-readonly="true" className="mt-2 w-full cursor-not-allowed rounded-xl border-0 bg-[#f8f9fd] px-4 py-3 text-sm text-[#756960] outline-none focus-visible:ring-2 focus-visible:ring-[#ec3b78]/30 dark:bg-white/5 dark:text-white/70" /></label>
                   <label className="block text-xs font-extrabold text-[#625852]">Profession<input value={profileForm.profession} onChange={(e) => setProfileForm({ ...profileForm, profession: e.target.value })} className="mt-2 w-full rounded-xl border-0 bg-[#f8f9fd] px-4 py-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-[#ec3b78]/30 dark:bg-white/5 dark:text-white" /></label>
 
@@ -1940,7 +1933,7 @@ export default function EspacePage() {
                       </div>
                       <div className="relative ml-auto shrink-0">
                         <button type="button" aria-label="Actions de la conversation" aria-haspopup="menu" aria-expanded={chatActionsOpen} onClick={() => setChatActionsOpen((open) => !open)} className="flex h-10 w-10 items-center justify-center rounded-full text-[#625852] transition hover:bg-[#f8f9fd] hover:text-[#ec3b78] dark:text-white/75 dark:hover:bg-white/10 dark:hover:text-[#ff80b2]"><EllipsisVertical size={21} /></button>
-                        {chatActionsOpen && <><button type="button" aria-label="Fermer le menu d’actions" className="fixed inset-0 z-20 cursor-default" onClick={() => setChatActionsOpen(false)} /><div role="menu" className="absolute right-0 top-12 z-30 w-56 overflow-hidden rounded-2xl border border-[#e7e8ee] bg-white p-1.5 shadow-[0_16px_45px_rgba(20,20,30,.18)] dark:border-white/10 dark:bg-[#24242b]"><button type="button" role="menuitem" onClick={() => { setChatActionsOpen(false); if (activeConversationProfile) { setReportReason('comportement'); setReportDescription(''); setReportingProfile(activeConversationProfile); } }} className="flex min-h-12 w-full items-center gap-3 rounded-xl px-3 text-left text-sm font-semibold text-[#454650] transition hover:bg-[#f8f9fd] hover:text-[#ec3b78] dark:text-white/80 dark:hover:bg-white/5"><Flag size={17} />Signaler la personne</button><button type="button" role="menuitem" onClick={() => void blockConversationProfile()} className="flex min-h-12 w-full items-center gap-3 rounded-xl px-3 text-left text-sm font-semibold text-[#b4234a] transition hover:bg-[#fff3f5] dark:text-rose-300 dark:hover:bg-rose-500/10"><Ban size={17} />Bloquer</button></div></>}
+                        {chatActionsOpen && <><button type="button" aria-label="Fermer le menu d’actions" className="fixed inset-0 z-20 cursor-default" onClick={() => setChatActionsOpen(false)} /><div role="menu" className="absolute right-0 top-12 z-30 w-[min(12rem,calc(100vw-5rem))] space-y-0.5 rounded-2xl border border-[#e7e8ee] bg-white p-1.5 shadow-[0_12px_32px_rgba(20,20,30,.16)] dark:border-white/10 dark:bg-[#24242b]"><button type="button" role="menuitem" onClick={() => { setChatActionsOpen(false); if (activeConversationProfile) { setReportReason('comportement'); setReportDescription(''); setReportingProfile(activeConversationProfile); } }} className="flex min-h-11 w-full items-center gap-2 rounded-xl px-2 text-left text-[13px] font-semibold leading-5 text-[#454650] transition hover:bg-[#f8f9fd] hover:text-[#ec3b78] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#ec3b78]/50 dark:text-white/80 dark:hover:bg-white/5"><span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#ec3b78]/10 text-[#ec3b78] dark:bg-[#ec3b78]/15 dark:text-[#ff80b2]"><Flag size={15} /></span><span>Signaler</span></button><button type="button" role="menuitem" onClick={() => void blockConversationProfile()} className="flex min-h-11 w-full items-center gap-2 rounded-xl px-2 text-left text-[13px] font-semibold leading-5 text-[#b4234a] transition hover:bg-[#fff3f5] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-rose-400/50 dark:text-rose-300 dark:hover:bg-rose-500/10"><span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-rose-50 text-rose-600 dark:bg-rose-500/15 dark:text-rose-300"><Ban size={15} /></span><span>Bloquer</span></button></div></>}
                       </div>
                     </div>
                     <div className="min-h-0 min-w-0 flex-1 space-y-3 overflow-x-hidden overflow-y-auto rounded-xl bg-[#f8f9fd] p-3 sm:p-4">
@@ -2107,12 +2100,9 @@ export default function EspacePage() {
           {/* EVENTS TAB */}
           {tab === 'events' && (
             <div className="space-y-5">
-              <header className="relative overflow-hidden rounded-[28px] border border-[#eadfd5] bg-[linear-gradient(120deg,#fffdfa,#f9e9ee)] p-6 dark:border-white/10 dark:bg-[linear-gradient(120deg,#201a20,#261821)] sm:p-8">
-                <div className="pointer-events-none absolute -right-10 -top-20 h-64 w-64 rounded-full bg-[#ec3b78]/10 blur-3xl" />
-                <p className="text-xs font-extrabold uppercase tracking-[.18em] text-[#ec3b78]">À vivre ensemble</p>
-                <h2 className="mt-2 font-display text-3xl text-[#241c18] dark:text-white sm:text-4xl">Tes prochains événements</h2>
-                <p className="mt-2 max-w-xl text-sm leading-6 text-[#756960] dark:text-white/60">Découvre les rendez-vous ARAS et confirme ta participation. Tes inscriptions restent accessibles depuis cet espace.</p>
-                <div className="mt-6 grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto]">
+              <header className="space-y-4">
+                <h1 className="font-display text-3xl text-[#241c18] dark:text-white sm:text-4xl">Événements</h1>
+                <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto]">
                   <label className="flex min-h-12 items-center gap-3 rounded-2xl border border-[#eadfd5] bg-white/85 px-4 dark:border-white/10 dark:bg-white/5">
                     <Search size={17} className="shrink-0 text-[#9a8b82]" />
                     <input aria-label="Rechercher un événement" value={eventSearch} onChange={(event) => { setEventSearch(event.target.value); setEventPage(1); }} placeholder="Rechercher un événement, un lieu…" className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-[#9a8b82]" />
@@ -2122,7 +2112,7 @@ export default function EspacePage() {
                     {eventCities.map((city) => <option key={city} value={city}>{city}</option>)}
                   </select>
                 </div>
-                <div className="mt-4 flex gap-2 overflow-x-auto pb-1">
+                <div className="flex gap-2 overflow-x-auto pb-1">
                   {([{ id: 'all', label: 'Tous' }, { id: 'free', label: 'Gratuits' }, { id: 'paid', label: 'Payants' }, { id: 'registered', label: 'Mes participations' }] as const).map((filter) => (
                     <button key={filter.id} type="button" onClick={() => { setEventKindFilter(filter.id); setEventPage(1); }} className={`shrink-0 rounded-full px-4 py-2.5 text-xs font-extrabold transition ${eventKindFilter === filter.id ? 'bg-[#ec3b78] text-white shadow-[0_8px_20px_rgba(236,59,120,.2)]' : 'bg-white text-[#756960] hover:bg-[#f8f9fd] dark:bg-white/5 dark:text-white/75 dark:hover:bg-white/10'}`}>{filter.label}</button>
                   ))}

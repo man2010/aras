@@ -4,7 +4,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { Menu, X, Heart, LogOut, LayoutDashboard, Bell, Moon, Sun, MessageCircle, CalendarDays, ChevronRight, Settings, User, SlidersHorizontal } from 'lucide-react';
+import { Menu, X, Heart, LogOut, LayoutDashboard, Bell, Moon, Sun, MessageCircle, CalendarDays, ChevronRight, Settings, User, SlidersHorizontal, MapPin } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
@@ -327,13 +327,23 @@ export function Navbar() {
             className="flex min-w-0 items-center gap-2"
             aria-label="Mon profil"
           >
-            <span className="relative h-9 w-9 shrink-0 overflow-hidden rounded-full border-2 border-[#ec3b78] bg-white sm:h-10 sm:w-10"><img src={currentMiniProfile?.photo_url || fallbackAvatar} alt="" className="h-full w-full object-cover" /></span>
+            <span className="relative h-9 w-9 shrink-0 overflow-hidden rounded-full border-2 border-[#ec3b78] bg-white sm:h-10 sm:w-10"><img src={currentMiniProfile?.photo_url || fallbackAvatar} alt="" className="h-full w-full object-cover" /><span aria-label={currentMiniProfile?.is_online ? 'En ligne' : 'Hors ligne'} className={`absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-[#f8f9fd] ${currentMiniProfile?.is_online ? 'bg-emerald-500' : 'bg-red-500'}`} /></span>
             <span className="hidden max-w-32 truncate text-sm font-extrabold text-[#241c18] sm:block">{currentMiniProfile?.display_name || 'Mon profil'}</span>
           </Link>
         ) : (
           <Link href="/" className="flex items-center" aria-label="ARAS">
             <Image src="/aras-logo.jpeg" alt="ARAS" width={140} height={56} className="h-11 w-auto object-contain sm:h-12" priority />
           </Link>
+        )}
+
+        {isConnected && appTab === 'decouverte' && (
+          <div className="pointer-events-none absolute left-1/2 top-1/2 max-w-[calc(100%-160px)] -translate-x-1/2 -translate-y-1/2 text-center md:hidden">
+            <p className="truncate text-sm font-extrabold text-[#241c18]">Découvrir</p>
+            <p className="mt-0.5 flex items-center justify-center gap-1 truncate text-[11px] font-medium text-[#777985]">
+              <MapPin size={12} className="shrink-0 text-[#ec3b78]" />
+              <span className="truncate">{currentMiniProfile?.city || 'Ville non renseignée'}</span>
+            </p>
+          </div>
         )}
 
         <div className="hidden items-center gap-7 text-[13px] font-bold text-[#625852] md:flex">

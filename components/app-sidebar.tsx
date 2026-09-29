@@ -99,12 +99,12 @@ export function AppSidebar({ active, onChange }: AppSidebarProps) {
                 aria-current={isActive ? 'page' : undefined}
                 className={`relative flex shrink-0 flex-col items-center justify-center transition ${
                   isLikes
-                    ? 'h-[60px] w-[60px] -translate-y-2 rounded-full bg-[#d92f6b] text-white shadow-[0_8px_24px_rgba(217,47,107,.32)]'
+                    ? 'h-[54px] w-[54px] -translate-y-1 rounded-full bg-[#d92f6b] text-white shadow-[0_1px_4px_rgba(217,47,107,.12)]'
                     : `h-12 min-w-[58px] rounded-xl px-2 ${isActive ? 'text-[#ec3b78]' : 'text-[#9a8b82] dark:text-white/45'}`
                 }`}
               >
                 <item.icon
-                  size={isLikes ? 27 : 23}
+                  size={isLikes ? 24 : 23}
                   strokeWidth={isLikes ? 2.5 : 2.2}
                   fill={isLikes ? 'currentColor' : 'none'}
                 />
