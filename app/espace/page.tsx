@@ -3,7 +3,7 @@
 import { Dispatch, FormEvent, SetStateAction, useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { User, MessageCircle, Heart, CalendarDays, ArrowRight, ArrowLeft, ArrowDownLeft, ArrowUpRight, ArrowLeftRight, ShieldCheck, Send, Plus, Check, X, CheckCheck, Search, MapPin, Users, Eye, EyeOff, ChevronRight, Flag, RotateCcw, AlertTriangle, Music2, Plane, Utensils, Dumbbell, BookOpen, Clapperboard, PartyPopper, Palette, Camera, Shirt, Laptop, Trees, Flower2, Gamepad2, PawPrint, Briefcase, Ruler, Languages, Cigarette, ClipboardList, Settings, SlidersHorizontal, LockKeyhole, CircleHelp, LogOut, EllipsisVertical, Ban } from 'lucide-react';
+import { User, MessageCircle, Heart, CalendarDays, ArrowRight, ArrowLeft, ArrowDownLeft, ArrowUpRight, ArrowLeftRight, ShieldCheck, Send, Plus, Check, CircleCheck, X, CheckCheck, Search, MapPin, Users, Eye, EyeOff, ChevronRight, ChevronDown, Flag, RotateCcw, AlertTriangle, Music2, Plane, Utensils, Dumbbell, BookOpen, Clapperboard, PartyPopper, Palette, Camera, Shirt, Laptop, Trees, Flower2, Gamepad2, PawPrint, Briefcase, Ruler, Languages, Cigarette, ClipboardList, Settings, SlidersHorizontal, LockKeyhole, CircleHelp, LogOut, EllipsisVertical, Ban } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
 import type { Profile, Conversation, Message, Story } from '@/lib/types';
@@ -29,6 +29,13 @@ const PROFILE_MARITAL_OPTIONS = [
   { label: 'Divorcé(e)', value: 'divorced' }, { label: 'Veuf/Veuve', value: 'widowed' },
 ];
 const PROFILE_SMOKING_OPTIONS = ['Non fumeur', 'Fumeur'];
+
+function normalizeGender(gender?: string | null): 'homme' | 'femme' | null {
+  const normalized = gender?.trim().toLocaleLowerCase('fr');
+  if (normalized === 'homme' || normalized === 'male') return 'homme';
+  if (normalized === 'femme' || normalized === 'female') return 'femme';
+  return null;
+}
 
 type PrivacyState = {
   show_age: boolean;
@@ -634,17 +641,17 @@ export default function EspacePage() {
       const { data: discoveryData } = await supabase
         .from('profiles')
         .select(PROFILE_CARD_SELECT)
-        .eq('is_active', true)
         .order('created_at', { ascending: false });
       if (cancelled) return;
 
       if (discoveryData) {
         const allProfiles = (discoveryData as ProfileRow[]).map(toProfile);
-        const currentGender = existing?.gender?.trim().toLowerCase();
+        const currentGender = normalizeGender(existing?.gender);
         const targetGender = currentGender === 'homme' ? 'femme' : currentGender === 'femme' ? 'homme' : null;
         const candidates = allProfiles.filter((profileItem) => {
           if (profileItem.id === user.id) return false;
-          if (targetGender && profileItem.gender?.trim().toLowerCase() !== targetGender) return false;
+          // Un genre inconnu ne doit jamais ouvrir la découverte à tous les genres.
+          if (!targetGender || normalizeGender(profileItem.gender) !== targetGender) return false;
           return true;
         });
         // Shuffle once per discovery load so newer accounts are not always prioritized.
@@ -1336,6 +1343,21 @@ export default function EspacePage() {
   const selectedProfilePhotos = selectedProfileDetail
     ? Array.from(new Set([...(selectedProfileDetail.avatar_urls ?? []), selectedProfileDetail.photo_url].filter((photo): photo is string => Boolean(photo))))
     : [];
+  const hasPrimaryProfilePhoto = Boolean(
+    [profileForm.photo_url, profile?.avatar_urls?.[0], profile?.photo_url]
+      .some((photo) => typeof photo === 'string' && photo.length > 0 && !photo.includes('/images/default-avatar.svg')),
+  );
+  const ownProfileIsComplete = Boolean(
+    profile && profile.id === user?.id &&
+    profileForm.display_name.trim() &&
+    profile.gender?.trim() && profile.birthdate?.trim() &&
+    profileForm.city.trim() && profileForm.city.trim().toLocaleLowerCase('fr') !== 'ville non renseignée' &&
+    hasPrimaryProfilePhoto &&
+    profileForm.profession.trim() && profileForm.interests.length > 0 &&
+    profileForm.languages.length > 0 && profileForm.religion.trim() &&
+    profileForm.caste.trim() && profileForm.marital_status.trim() &&
+    profileForm.smoking_habit.trim() && profileForm.bio.trim(),
+  );
   const ownProfilePhoto = user && profile?.id === user.id
     ? imagePreview || profile.avatar_urls?.[0] || profile.photo_url || profileForm.photo_url || '/images/default-avatar.svg'
     : '/images/default-avatar.svg';
@@ -1636,7 +1658,7 @@ export default function EspacePage() {
                           <div className="mr-auto flex items-center gap-1 text-[9px] font-extrabold uppercase tracking-[.08em] text-[#168079] dark:text-emerald-300">
                             {profileItem.is_verified ? <><ShieldCheck size={12} /> Vérifié</> : profileItem.is_online ? <><span className="h-1.5 w-1.5 rounded-full bg-emerald-500" /> En ligne</> : <span className="text-[#747888] dark:text-white/45">Profil</span>}
                           </div>
-                          <button type="button" onClick={() => { const targetIndex = filteredDiscoveryProfiles.findIndex((item) => item.id === profileItem.id); if (targetIndex >= 0) setMobileDiscoveryIndex(targetIndex); setExpandedDiscoveryProfile(true); }} aria-label={`Voir le profil complet de ${profileItem.display_name}`} className="inline-flex min-h-9 items-center gap-1 rounded-full bg-[#fce6ef] px-3 text-[10px] font-extrabold text-[#bf2168] transition hover:bg-[#f8d4e2] dark:bg-[#ec3b78]/15 dark:text-[#ff83b5] dark:hover:bg-[#ec3b78]/25">Voir plus <ChevronRight size={13} /></button>
+                          <button type="button" onClick={() => { const targetIndex = filteredDiscoveryProfiles.findIndex((item) => item.id === profileItem.id); if (targetIndex >= 0) setMobileDiscoveryIndex(targetIndex); setExpandedDiscoveryProfile(true); }} aria-label={`Voir le profil complet de ${profileItem.display_name}`} className="inline-flex h-10 min-w-[112px] items-center justify-between gap-3 rounded-full bg-gradient-to-r from-[#ec3b78] to-[#d92f6b] px-4 text-xs font-bold text-white shadow-[0_5px_14px_rgba(217,47,107,.22)] transition hover:-translate-y-0.5 hover:shadow-[0_8px_20px_rgba(217,47,107,.3)] active:translate-y-0"><span>Voir plus</span><span className="flex h-6 w-6 items-center justify-center rounded-full bg-white/20"><ChevronDown size={14} /></span></button>
                           <button type="button" onClick={() => handleDiscoveryMessage(profileItem)} aria-label={`Envoyer un message à ${profileItem.display_name}`} className="flex h-9 w-9 items-center justify-center rounded-full bg-[#292746] text-white transition hover:bg-[#3b3964]" title="Message"><MessageCircle size={16} /></button>
                           <button type="button" onClick={() => { if (!discoveryLikedIds.has(profileItem.id)) void toggleDiscoveryLike(profileItem.id); }} aria-label={discoveryLikedIds.has(profileItem.id) ? `Retirer le like de ${profileItem.display_name}` : `Aimer ${profileItem.display_name}`} className={`flex h-9 w-9 items-center justify-center rounded-full transition ${discoveryLikedIds.has(profileItem.id) ? 'bg-[#ec1689] text-white' : 'bg-[#fce6ef] text-[#d72d7a] hover:bg-[#f8d4e2] dark:bg-white/10 dark:text-[#ff83b5] dark:hover:bg-white/15'}`} title="Like"><Heart size={16} fill={discoveryLikedIds.has(profileItem.id) ? 'currentColor' : 'none'} /></button>
                         </div>
@@ -1691,15 +1713,15 @@ export default function EspacePage() {
                       <span className="absolute inset-0 flex items-center justify-center bg-black/0 text-white transition group-hover:bg-black/35"><span className="absolute bottom-1 right-1 flex h-12 w-12 items-center justify-center rounded-full bg-[#ec1689] text-white shadow-lg"><Camera size={21} /></span></span>
                       {uploadingImage && <span className="absolute inset-0 flex items-center justify-center bg-black/45"><span className="h-8 w-8 animate-spin rounded-full border-2 border-white border-t-transparent" /></span>}
                     </button>
-                    <div className="mt-5 flex items-center justify-center gap-2"><h2 className="font-display text-3xl font-bold text-[#272630] dark:text-white">{profileForm.display_name || 'Votre nom'}{profileForm.age ? `, ${profileForm.age}` : ''}</h2>{(!profileForm.bio || !profileForm.profession || !profileForm.interests.length) && <AlertTriangle size={20} className="text-amber-500" aria-label="Profil à compléter" />}</div>
+                    <div className="mt-5 flex items-center justify-center gap-2"><h2 className="font-display text-3xl font-bold text-[#272630] dark:text-white">{profileForm.display_name || 'Votre nom'}{profileForm.age ? `, ${profileForm.age}` : ''}</h2>{ownProfileIsComplete ? <CircleCheck size={21} className="shrink-0 text-emerald-600 dark:text-emerald-400" aria-label="Profil complet" /> : <AlertTriangle size={21} className="shrink-0 text-amber-500" aria-label="Profil incomplet" />}</div>
                     <p className="mt-2 text-base text-[#777985] dark:text-white/60">{profileForm.city || 'Ville non renseignée'}</p>
                     {profile?.is_verified && <span className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-sky-100 px-3 py-1.5 text-xs font-bold text-sky-700 dark:bg-sky-500/15 dark:text-sky-200"><ShieldCheck size={14} /> Profil vérifié</span>}
                     {(!profileForm.bio || !profileForm.profession || !profileForm.interests.length) && <button type="button" onClick={() => setProfileEditOpen(true)} className="mt-6 flex w-full items-center gap-4 rounded-[24px] bg-[#f4f4f6] p-5 text-left text-sm font-bold text-[#555763] dark:bg-[#292929] dark:text-white/75"><span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#ec1689]/10 text-[#ec1689]">✦</span>Complétez votre profil pour avoir plus de chance</button>}
-                    <div className="mt-7 grid gap-3 sm:grid-cols-2">
-                      <button type="button" onClick={() => setProfileEditOpen(true)} className="flex h-[68px] items-center justify-center gap-3 rounded-[22px] border border-white/10 bg-[#ec3b78] dark:bg-[#ec3b78] px-4 text-sm font-extrabold text-white shadow-[0_10px_24px_rgba(236,59,120,.24)] transition hover:-translate-y-0.5 hover:bg-[#d82e69] hover:shadow-[0_14px_28px_rgba(236,59,120,.34)] active:translate-y-0 "><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/10 ring-1 ring-white/10"><SlidersHorizontal size={19} /></span><span>Modifier</span></button>
-                      <button type="button" disabled={!profile} onClick={() => { if (profile) { setOwnProfileDetailExpanded(false); setOwnProfilePreviewOpen(true); } }} className="flex h-[68px] items-center justify-center gap-3 rounded-[22px] border border-white/10 bg-[#ec3b78] dark:bg-[#ec3b78] px-4 text-sm font-extrabold text-white shadow-[0_10px_24px_rgba(236,59,120,.24)] transition hover:-translate-y-0.5 hover:bg-[#d82e69] hover:shadow-[0_14px_28px_rgba(236,59,120,.34)] active:translate-y-0 disabled:cursor-not-allowed disabled:opacity-50 "><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/10 ring-1 ring-white/10"><User size={19} /></span><span>Voir mon profil</span></button>
+                    <div className="mt-7 grid grid-cols-2 gap-3">
+                      <button type="button" onClick={() => setProfileEditOpen(true)} className="flex h-[68px] items-center justify-center gap-2 rounded-[22px] border border-[#e5e5eb] bg-[#f0f0f3] px-2 text-xs font-extrabold text-[#292832] shadow-[0_8px_22px_rgba(30,30,45,.07)] transition hover:-translate-y-0.5 hover:bg-[#e9e9ee] hover:shadow-[0_12px_28px_rgba(30,30,45,.11)] active:translate-y-0 sm:gap-3 sm:px-4 sm:text-sm dark:border-white/[0.06] dark:bg-[#302f52] dark:text-white dark:shadow-[0_10px_24px_rgba(0,0,0,.2)] dark:hover:bg-[#39385f]"><span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-black/[0.04] text-[#ec3b78] ring-1 ring-black/[0.04] dark:bg-white/10 dark:text-white dark:ring-white/10 sm:h-10 sm:w-10"><SlidersHorizontal size={19} /></span><span>Modifier</span></button>
+                      <button type="button" disabled={!profile} onClick={() => { if (profile) { setOwnProfileDetailExpanded(false); setOwnProfilePreviewOpen(true); } }} className="flex h-[68px] items-center justify-center gap-2 rounded-[22px] border border-[#e5e5eb] bg-[#f0f0f3] px-2 text-xs font-extrabold text-[#292832] shadow-[0_8px_22px_rgba(30,30,45,.07)] transition hover:-translate-y-0.5 hover:bg-[#e9e9ee] hover:shadow-[0_12px_28px_rgba(30,30,45,.11)] active:translate-y-0 disabled:cursor-not-allowed disabled:opacity-50 sm:gap-3 sm:px-4 sm:text-sm dark:border-white/[0.06] dark:bg-[#302f52] dark:text-white dark:shadow-[0_10px_24px_rgba(0,0,0,.2)] dark:hover:bg-[#39385f]"><span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-black/[0.04] text-[#ec3b78] ring-1 ring-black/[0.04] dark:bg-white/10 dark:text-white dark:ring-white/10 sm:h-10 sm:w-10"><User size={19} /></span><span>Voir mon profil</span></button>
+                      <button type="button" onClick={() => { setSearchFiltersReturnTo('profile'); setTab('decouverte'); setShowDiscoveryFilters(true); }} className="col-span-2 flex h-[68px] w-full items-center gap-3 rounded-[22px] border border-[#e5e5eb] bg-[#f0f0f3] px-4 text-left text-[#292832] shadow-[0_8px_22px_rgba(30,30,45,.07)] transition hover:-translate-y-0.5 hover:bg-[#e9e9ee] hover:shadow-[0_12px_28px_rgba(30,30,45,.11)] active:translate-y-0 dark:border-white/[0.06] dark:bg-[#302f52] dark:text-white dark:shadow-[0_10px_24px_rgba(0,0,0,.2)] dark:hover:bg-[#39385f]"><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-black/[0.04] text-[#ec3b78] ring-1 ring-black/[0.04] dark:bg-white/10 dark:text-white dark:ring-white/10"><SlidersHorizontal size={20} /></span><span className="min-w-0 flex-1 text-sm font-extrabold">Préférences</span><ChevronRight size={19} className="shrink-0 text-[#858691] dark:text-white/65" /></button>
                     </div>
-                    <button type="button" onClick={() => { setSearchFiltersReturnTo('profile'); setTab('decouverte'); setShowDiscoveryFilters(true); }} className="mt-3 flex h-[72px] w-full items-center gap-4 rounded-[22px] border border-white/10 bg-[#ec3b78] dark:bg-[#ec3b78] px-5 text-left text-white shadow-[0_10px_24px_rgba(236,59,120,.22)] transition hover:-translate-y-0.5 hover:bg-[#d82e69] hover:shadow-[0_14px_28px_rgba(236,59,120,.32)] active:translate-y-0 "><span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white/10 ring-1 ring-white/10"><SlidersHorizontal size={20} /></span><span className="min-w-0 flex-1"><strong className="block text-sm font-extrabold">Préférences de recherche</strong><span className="mt-0.5 block text-xs font-medium text-white/65">Âge, distance et critères</span></span><ChevronRight size={19} className="shrink-0 text-white/65" /></button>
                   </article>
 
                   <aside className="space-y-4">
@@ -1711,7 +1733,7 @@ export default function EspacePage() {
 
               {profileSection === 'profile' && profileSettingsOpen && !profileEditOpen && <section className="mx-auto w-full max-w-4xl space-y-6">
                 <header className="flex items-center gap-4"><button type="button" onClick={() => setProfileSettingsOpen(false)} aria-label="Retour à mon profil" className="flex h-10 w-10 items-center justify-center rounded-full bg-white text-[#282832] shadow-sm dark:bg-[#202027] dark:text-white"><ArrowLeft size={21} /></button><h1 className="font-display text-2xl font-bold text-[#241c18] dark:text-white">Paramètres</h1></header>
-                <button type="button" onClick={() => { setProfileSettingsOpen(false); setProfileEditOpen(true); }} className="flex w-full items-center gap-4 rounded-[26px] bg-white p-5 text-left shadow-sm dark:bg-[#202027]"><img src={ownProfilePhoto} alt="" className="h-16 w-16 rounded-full object-cover"/><span className="min-w-0 flex-1"><strong className="block truncate text-lg text-[#292832] dark:text-white">{profileForm.display_name}{profileForm.age ? `, ${profileForm.age}` : ''}</strong><span className="text-sm text-[#858691] dark:text-white/55">Modifier mon profil</span></span><ChevronRight size={20} /></button>
+                <button type="button" onClick={() => { setProfileSettingsOpen(false); setProfileEditOpen(true); }} className="flex w-full items-center gap-4 rounded-[26px] bg-white p-5 text-left shadow-sm dark:bg-[#202027]"><img src={ownProfilePhoto} alt="" className="h-16 w-16 rounded-full object-cover"/><span className="min-w-0 flex-1"><strong className="flex items-center gap-2 truncate text-lg text-[#292832] dark:text-white">{profileForm.display_name}{profileForm.age ? `, ${profileForm.age}` : ''}{ownProfileIsComplete ? <CircleCheck size={17} className="shrink-0 text-emerald-600 dark:text-emerald-400" aria-label="Profil complet" /> : <AlertTriangle size={17} className="shrink-0 text-amber-500" aria-label="Profil incomplet" />}</strong><span className="text-sm text-[#858691] dark:text-white/55">Modifier mon profil</span></span><ChevronRight size={20} /></button>
                 <section><h2 className="mb-3 px-1 text-sm font-bold text-[#92939d]">Préférences</h2><div className="grid gap-3 md:grid-cols-2">
                   <button type="button" onClick={() => { setSearchFiltersReturnTo('settings'); setProfileSettingsOpen(false); setTab('decouverte'); setShowDiscoveryFilters(true); }} className="flex min-h-[96px] w-full items-center gap-4 rounded-[24px] border border-[#e7e8ee] bg-white p-5 text-left shadow-[0_8px_24px_rgba(25,26,40,.05)] transition hover:-translate-y-0.5 hover:border-sky-200 hover:shadow-[0_14px_32px_rgba(25,26,40,.09)] dark:border-white/[0.07] dark:bg-[#202027] dark:hover:border-sky-400/30"><span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[18px] bg-sky-100 text-sky-600 dark:bg-sky-500/15 dark:text-sky-300"><MapPin size={21} /></span><span className="min-w-0 flex-1"><strong className="block text-sm font-extrabold text-[#292832] dark:text-white">Préférences de recherche</strong><span className="mt-1 block text-xs leading-5 text-[#858691] dark:text-white/50">Âge, distance et profils recherchés</span></span><ChevronRight size={19} className="shrink-0 text-[#9b9ca6]" /></button>
                   <button type="button" onClick={() => setProfileSection('privacy')} className="flex min-h-[96px] w-full items-center gap-4 rounded-[24px] border border-[#e7e8ee] bg-white p-5 text-left shadow-[0_8px_24px_rgba(25,26,40,.05)] transition hover:-translate-y-0.5 hover:border-emerald-200 hover:shadow-[0_14px_32px_rgba(25,26,40,.09)] dark:border-white/[0.07] dark:bg-[#202027] dark:hover:border-emerald-400/30"><span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[18px] bg-emerald-100 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-300"><Eye size={21} /></span><span className="min-w-0 flex-1"><strong className="block text-sm font-extrabold text-[#292832] dark:text-white">Confidentialité & notifications</strong><span className="mt-1 block text-xs leading-5 text-[#858691] dark:text-white/50">Contrôlez votre visibilité et vos alertes</span></span><ChevronRight size={19} className="shrink-0 text-[#9b9ca6]" /></button>
@@ -1791,7 +1813,7 @@ export default function EspacePage() {
 
                 <h2 className="font-display text-2xl">Mes informations</h2>
                 <div className="mt-6 grid gap-4 sm:grid-cols-2">
-                  <label className="block text-xs font-extrabold text-[#625852]">Nom affiché<input value={profileForm.display_name} readOnly aria-readonly="true" className="mt-2 w-full cursor-not-allowed rounded-xl border border-[#dfd2c6] bg-[#f8f9fd] px-4 py-3 text-sm text-[#756960] outline-none dark:bg-white/5 dark:text-white/70" /><span className="mt-1 block text-[10px] font-medium text-[#9a8b82]">Le nom affiché ne peut pas être modifié ici.</span></label>
+                  <label className="block text-xs font-extrabold text-[#625852]">Nom affiché<div className="mt-2 flex items-center gap-3"><input value={profileForm.display_name} readOnly aria-readonly="true" className="w-full min-w-0 cursor-not-allowed rounded-xl border border-[#dfd2c6] bg-[#f8f9fd] px-4 py-3 text-sm text-[#756960] outline-none dark:bg-white/5 dark:text-white/70" />{ownProfileIsComplete ? <CircleCheck size={21} className="shrink-0 text-emerald-600 dark:text-emerald-400" aria-label="Profil complet" /> : <AlertTriangle size={21} className="shrink-0 text-amber-500" aria-label="Profil incomplet" />}</div><span className="mt-1 block text-[10px] font-medium text-[#9a8b82]">Le nom affiché ne peut pas être modifié ici.</span></label>
                   <label className="block text-xs font-extrabold text-[#625852]">Âge<input value={profileForm.age} readOnly aria-readonly="true" className="mt-2 w-full cursor-not-allowed rounded-xl border border-[#dfd2c6] bg-[#f8f9fd] px-4 py-3 text-sm text-[#756960] outline-none dark:bg-white/5" /><span className="mt-1 block text-[10px] font-medium text-[#9a8b82]">L’âge est calculé à partir de votre date de naissance.</span></label>
                   <label className="block text-xs font-extrabold text-[#625852]">Ville<input value={profileForm.city} onChange={(event) => setProfileForm((current) => ({ ...current, city: event.target.value }))} className="mt-2 w-full rounded-xl border border-[#dfd2c6] bg-[#f8f9fd] px-4 py-3 text-sm outline-none focus:border-[#ec3b78] dark:bg-white/5 dark:text-white" /></label>
                   <label className="block text-xs font-extrabold text-[#625852]">Genre<input value={profile?.gender || 'Non renseigné'} readOnly aria-readonly="true" className="mt-2 w-full cursor-not-allowed rounded-xl border border-[#dfd2c6] bg-[#f8f9fd] px-4 py-3 text-sm text-[#756960] outline-none dark:bg-white/5 dark:text-white/70" /></label>
@@ -2215,11 +2237,11 @@ export default function EspacePage() {
               <button type="button" onClick={() => setOwnProfilePreviewOpen(false)} aria-label="Fermer mon profil" className="absolute right-4 top-4 z-10 flex h-11 w-11 items-center justify-center rounded-full border border-white/30 bg-black/30 text-white backdrop-blur"><X size={21} /></button>
               <div className="relative mt-auto p-6 sm:p-9">
                 <p className="text-xs font-extrabold uppercase tracking-[.18em] text-[#ff86bc]">Mon profil</p>
-                <h2 className="mt-2 font-display text-4xl font-bold sm:text-5xl">{profileForm.display_name}{profileForm.age && <>, {profileForm.age}</>}</h2>
+                <h2 className="mt-2 flex items-center gap-2 font-display text-4xl font-bold sm:text-5xl">{profileForm.display_name}{profileForm.age && <>, {profileForm.age}</>}{ownProfileIsComplete ? <CircleCheck size={25} className="shrink-0 text-emerald-400" aria-label="Profil complet" /> : <AlertTriangle size={25} className="shrink-0 text-amber-400" aria-label="Profil incomplet" />}</h2>
                 {profileForm.profession && <p className="mt-2 flex items-center gap-2 text-lg text-white/85"><Briefcase size={18} />{profileForm.profession}</p>}
                 <p className="mt-1 flex items-center gap-2 text-base text-white/75"><MapPin size={17} />{profileForm.city || 'Ville non renseignée'}</p>
                 {!!profileForm.interests.length && <div className="mt-5 flex flex-wrap gap-2">{profileForm.interests.slice(0, 3).map((interest) => <span key={interest} className="rounded-full border border-white/40 bg-black/30 px-4 py-2 text-sm font-bold backdrop-blur">★ {interest}</span>)}</div>}
-                <button type="button" onClick={() => setOwnProfileDetailExpanded(true)} className="mt-7 inline-flex min-h-14 items-center gap-3 rounded-full bg-[#ec1689] px-7 text-base font-extrabold text-white shadow-[0_12px_35px_rgba(236,22,137,.38)] transition hover:bg-[#d82e69]">Voir plus <ChevronRight size={20} className="rotate-90" /></button>
+                <button type="button" onClick={() => setOwnProfileDetailExpanded(true)} className="mt-6 inline-flex h-12 items-center gap-4 rounded-full bg-gradient-to-r from-[#ec3b78] to-[#d92f6b] pl-6 pr-2 text-sm font-bold text-white shadow-[0_8px_22px_rgba(217,47,107,.28)] transition hover:-translate-y-0.5 hover:shadow-[0_12px_28px_rgba(217,47,107,.36)] active:translate-y-0 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#ec3b78]/30"><span>Voir plus</span><span className="flex h-8 w-8 items-center justify-center rounded-full bg-white/20"><ChevronDown size={18} /></span></button>
               </div>
             </> : <>
               <div className="sticky top-0 z-10 flex shrink-0 items-center justify-between bg-[#f8f9fd]/95 px-5 pb-3 pt-[max(1rem,env(safe-area-inset-top))] text-[#24212b] backdrop-blur dark:bg-[#101014]/95 dark:text-white sm:px-8">
@@ -2232,7 +2254,7 @@ export default function EspacePage() {
                   <div className="relative mx-auto h-36 w-36 overflow-hidden rounded-full border-4 border-white bg-[#e4e6ed] shadow-[0_0_0_3px_rgba(236,22,137,.25)] dark:border-[#303036] sm:h-44 sm:w-44">
                     <img src={ownProfilePhoto} alt={profileForm.display_name} onError={(event) => { event.currentTarget.src = '/images/default-avatar.svg'; }} className="h-full w-full object-cover" />
                   </div>
-                  <h3 className="mt-4 font-display text-3xl font-bold">{profileForm.display_name}{profileForm.age && <>, {profileForm.age}</>}</h3>
+                  <h3 className="mt-4 flex items-center justify-center gap-2 font-display text-3xl font-bold">{profileForm.display_name}{profileForm.age && <>, {profileForm.age}</>}{ownProfileIsComplete ? <CircleCheck size={21} className="shrink-0 text-emerald-600 dark:text-emerald-400" aria-label="Profil complet" /> : <AlertTriangle size={21} className="shrink-0 text-amber-500" aria-label="Profil incomplet" />}</h3>
                   <p className="mt-1 flex items-center justify-center gap-1.5 text-sm text-[#686b79] dark:text-white/65"><MapPin size={15} className="text-[#ec1689]" />{profileForm.city || 'Ville non renseignée'}</p>
                   {profile?.is_verified && <span className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-sky-100 px-3 py-1 text-xs font-bold text-sky-700 dark:bg-sky-500/15 dark:text-sky-200"><ShieldCheck size={14} />Profil vérifié</span>}
                 </div>

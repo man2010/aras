@@ -104,7 +104,7 @@ export function AppSidebar({ active, onChange }: AppSidebarProps) {
                 }`}
               >
                 <item.icon
-                  size={isLikes ? 29 : 25}
+                  size={isLikes ? 27 : 23}
                   strokeWidth={isLikes ? 2.5 : 2.2}
                   fill={isLikes ? 'currentColor' : 'none'}
                 />
