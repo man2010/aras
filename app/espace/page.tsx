@@ -309,7 +309,7 @@ export default function EspacePage() {
         <span>{label}</span>
         {warning && <AlertTriangle size={14} aria-label={`${label} : aucun choix sélectionné`} className="text-amber-500" />}
       </div>
-      <div className="mt-3 flex flex-wrap gap-2.5 rounded-2xl bg-[#f8f9fd] p-4 dark:bg-white/[0.06]">
+      <div className="mt-3 flex flex-wrap gap-2.5 rounded-2xl border border-[#ececf1] p-4 dark:border-white/10">
         {options.map(({ label: optionLabel, value, Icon }) => {
           const selected = selectedValues.includes(value);
           return <button key={value} type="button" aria-pressed={selected} onClick={() => onToggle(value)} className={profileOptionClass(selected)}>
@@ -1760,7 +1760,7 @@ export default function EspacePage() {
               {profileSection === 'profile' && profileEditOpen && <div className="grid gap-6">
               <div className="lg:col-span-2 flex items-center gap-3 rounded-2xl bg-white p-4 shadow dark:bg-[#1c1b21]"><button type="button" onClick={() => setProfileEditOpen(false)} aria-label="Retour au profil" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#f4f4f6] text-[#343540] dark:bg-white/10 dark:text-white"><ArrowLeft size={19} /></button><p className="font-bold text-[#292832] dark:text-white">Modifier mon profil</p></div>
               <form onSubmit={saveProfile} className="rounded-[26px] bg-white p-6 shadow-[0_8px_30px_rgba(83,46,32,.05)] lg:p-8">
-                <div className="mt-0 rounded-[22px] border border-[#dfd2c6] bg-[#f8f9fd] p-4 transition dark:border-[#3a3a3a] dark:bg-[#1d1f24]">
+                <div className="mt-0 rounded-[22px] border border-[#dfd2c6] p-4 transition dark:border-white/15">
                   <div className="flex items-center justify-between gap-3">
                     <div>
                       <h3 className="font-display text-xl text-[#241c18] dark:text-white">Photos</h3>
@@ -1793,11 +1793,10 @@ export default function EspacePage() {
                             <button type="button" disabled={galleryUploadingIndex !== null} aria-label={`Supprimer la photo ${index + 1}`} onClick={() => setGalleryPhotos((current) => current.map((photo, photoIndex) => photoIndex === index ? null : photo))} className="absolute right-2 top-2 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-black/70 text-white shadow-lg ring-1 ring-white/50 transition hover:scale-105 hover:bg-[#ec1689] disabled:opacity-50"><X size={17} /></button>
                           </>
                         ) : (
-                          <button type="button" disabled={galleryUploadingIndex !== null} aria-label={`Ajouter la photo ${index + 1}`} onClick={() => { setGalleryUploadIndex(index); galleryFileInputRef.current?.click(); }} className="flex h-full w-full flex-col items-center justify-center gap-2 text-[#9a8b82] disabled:cursor-wait disabled:opacity-70 dark:text-[#c9c3bf]">
-                            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#fce6ee] text-[#ec3b78] dark:bg-[#3a1e2a] dark:text-[#f9bfd2]">
-                              <Plus size={20} />
+                          <button type="button" disabled={galleryUploadingIndex !== null} aria-label={`Ajouter la photo ${index + 1}`} onClick={() => { setGalleryUploadIndex(index); galleryFileInputRef.current?.click(); }} className="flex h-full w-full items-center justify-center text-[#9a8b82] disabled:cursor-wait disabled:opacity-70 dark:text-[#c9c3bf]">
+                            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#fce6ee] text-[#ec3b78] transition-transform hover:scale-105 dark:bg-[#3a1e2a] dark:text-[#f9bfd2]">
+                              <Plus size={20} aria-hidden="true" />
                             </div>
-                            <span className="text-[10px] font-extrabold uppercase tracking-[0.18em]">Ajouter</span>
                           </button>
                         )}
 
@@ -1813,11 +1812,11 @@ export default function EspacePage() {
 
                 <h2 className="font-display text-2xl">Mes informations</h2>
                 <div className="mt-6 grid gap-4 sm:grid-cols-2">
-                  <label className="block text-xs font-extrabold text-[#625852]">Nom affiché<div className="mt-2 flex items-center gap-3"><input value={profileForm.display_name} readOnly aria-readonly="true" className="w-full min-w-0 cursor-not-allowed rounded-xl border border-[#dfd2c6] bg-[#f8f9fd] px-4 py-3 text-sm text-[#756960] outline-none dark:bg-white/5 dark:text-white/70" />{ownProfileIsComplete ? <CircleCheck size={21} className="shrink-0 text-emerald-600 dark:text-emerald-400" aria-label="Profil complet" /> : <AlertTriangle size={21} className="shrink-0 text-amber-500" aria-label="Profil incomplet" />}</div><span className="mt-1 block text-[10px] font-medium text-[#9a8b82]">Le nom affiché ne peut pas être modifié ici.</span></label>
-                  <label className="block text-xs font-extrabold text-[#625852]">Âge<input value={profileForm.age} readOnly aria-readonly="true" className="mt-2 w-full cursor-not-allowed rounded-xl border border-[#dfd2c6] bg-[#f8f9fd] px-4 py-3 text-sm text-[#756960] outline-none dark:bg-white/5" /><span className="mt-1 block text-[10px] font-medium text-[#9a8b82]">L’âge est calculé à partir de votre date de naissance.</span></label>
-                  <label className="block text-xs font-extrabold text-[#625852]">Ville<input value={profileForm.city} onChange={(event) => setProfileForm((current) => ({ ...current, city: event.target.value }))} className="mt-2 w-full rounded-xl border border-[#dfd2c6] bg-[#f8f9fd] px-4 py-3 text-sm outline-none focus:border-[#ec3b78] dark:bg-white/5 dark:text-white" /></label>
-                  <label className="block text-xs font-extrabold text-[#625852]">Genre<input value={profile?.gender || 'Non renseigné'} readOnly aria-readonly="true" className="mt-2 w-full cursor-not-allowed rounded-xl border border-[#dfd2c6] bg-[#f8f9fd] px-4 py-3 text-sm text-[#756960] outline-none dark:bg-white/5 dark:text-white/70" /></label>
-                  <label className="block text-xs font-extrabold text-[#625852]">Profession<input value={profileForm.profession} onChange={(e) => setProfileForm({ ...profileForm, profession: e.target.value })} className="mt-2 w-full rounded-xl border border-[#dfd2c6] bg-[#f8f9fd] px-4 py-3 text-sm outline-none focus:border-[#ec3b78]" /></label>
+                  <label className="block text-xs font-extrabold text-[#625852]">Nom affiché<div className="mt-2 flex items-center gap-3"><input value={profileForm.display_name} readOnly aria-readonly="true" className="w-full min-w-0 cursor-not-allowed rounded-xl border border-[#dfd2c6] bg-transparent px-4 py-3 text-sm text-[#756960] outline-none dark:border-white/15 dark:bg-transparent dark:text-white/70" />{ownProfileIsComplete ? <CircleCheck size={21} className="shrink-0 text-emerald-600 dark:text-emerald-400" aria-label="Profil complet" /> : <AlertTriangle size={21} className="shrink-0 text-amber-500" aria-label="Profil incomplet" />}</div><span className="mt-1 block text-[10px] font-medium text-[#9a8b82]">Le nom affiché ne peut pas être modifié ici.</span></label>
+                  <label className="block text-xs font-extrabold text-[#625852]">Âge<input value={profileForm.age} readOnly aria-readonly="true" className="mt-2 w-full cursor-not-allowed rounded-xl border border-[#dfd2c6] bg-transparent px-4 py-3 text-sm text-[#756960] outline-none dark:border-white/15 dark:bg-transparent" /><span className="mt-1 block text-[10px] font-medium text-[#9a8b82]">L’âge est calculé à partir de votre date de naissance.</span></label>
+                  <label className="block text-xs font-extrabold text-[#625852]">Ville<input value={profileForm.city} onChange={(event) => setProfileForm((current) => ({ ...current, city: event.target.value }))} className="mt-2 w-full rounded-xl border border-[#dfd2c6] bg-transparent px-4 py-3 text-sm outline-none focus:border-[#ec3b78] dark:border-white/15 dark:bg-transparent dark:text-white" /></label>
+                  <label className="block text-xs font-extrabold text-[#625852]">Genre<input value={profile?.gender || 'Non renseigné'} readOnly aria-readonly="true" className="mt-2 w-full cursor-not-allowed rounded-xl border border-[#dfd2c6] bg-transparent px-4 py-3 text-sm text-[#756960] outline-none dark:border-white/15 dark:bg-transparent dark:text-white/70" /></label>
+                  <label className="block text-xs font-extrabold text-[#625852]">Profession<input value={profileForm.profession} onChange={(e) => setProfileForm({ ...profileForm, profession: e.target.value })} className="mt-2 w-full rounded-xl border border-[#dfd2c6] bg-transparent px-4 py-3 text-sm outline-none focus:border-[#ec3b78] dark:border-white/15 dark:text-white" /></label>
 
                   {renderProfileOptionGroup('Tes passions', profileForm.interests.length === 0, PROFILE_INTEREST_OPTIONS.map(({ label, Icon }) => ({ label, value: label, Icon })), profileForm.interests, (value) => setProfileForm((current) => ({ ...current, interests: current.interests.includes(value) ? current.interests.filter((item) => item !== value) : [...current.interests, value] })), true)}
                   {renderProfileOptionGroup('Langues parlées', profileForm.languages.length === 0, PROFILE_LANGUAGE_OPTIONS.map((value) => ({ label: value, value })), profileForm.languages, (value) => setProfileForm((current) => ({ ...current, languages: current.languages.includes(value) ? current.languages.filter((item) => item !== value) : [...current.languages, value] })))}
@@ -1825,7 +1824,7 @@ export default function EspacePage() {
                   {renderProfileOptionGroup('Préférences', !profileForm.caste, PROFILE_PREFERENCE_OPTIONS.map((value) => ({ label: value, value })), profileForm.caste ? [profileForm.caste] : [], (value) => setProfileForm((current) => ({ ...current, caste: current.caste === value ? '' : value })))}
                   {renderProfileOptionGroup('Situation', !profileForm.marital_status, PROFILE_MARITAL_OPTIONS, profileForm.marital_status ? [profileForm.marital_status] : [], (value) => setProfileForm((current) => ({ ...current, marital_status: current.marital_status === value ? '' : value })))}
                   {renderProfileOptionGroup('Fumeur', !profileForm.smoking_habit, PROFILE_SMOKING_OPTIONS.map((value) => ({ label: value, value })), profileForm.smoking_habit ? [profileForm.smoking_habit] : [], (value) => setProfileForm((current) => ({ ...current, smoking_habit: current.smoking_habit === value ? '' : value })))}
-                  <label className="block text-xs font-extrabold text-[#625852] sm:col-span-2">Bio<textarea value={profileForm.bio} onChange={(e) => setProfileForm({ ...profileForm, bio: e.target.value })} rows={4} placeholder="Parlez de vous..." className="mt-2 w-full rounded-xl border border-[#dfd2c6] bg-[#f8f9fd] px-4 py-3 text-sm outline-none focus:border-[#ec3b78]" /></label>
+                  <label className="block text-xs font-extrabold text-[#625852] sm:col-span-2">Bio<textarea value={profileForm.bio} onChange={(e) => setProfileForm({ ...profileForm, bio: e.target.value })} rows={4} placeholder="Parlez de vous..." className="mt-2 w-full rounded-xl border border-[#dfd2c6] bg-transparent px-4 py-3 text-sm outline-none focus:border-[#ec3b78] dark:border-white/15 dark:text-white" /></label>
                 </div>
 
 
