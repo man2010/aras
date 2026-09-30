@@ -38,11 +38,11 @@ function fallbackAnswer(message: string) {
   }
 
   if (lower.includes('profil') || lower.includes('découverte') || lower.includes('decouverte')) {
-    return "Dans la découverte, ARAS met en avant des profils sincères et vérifiés. Vous pouvez consulter les profils, liker un membre ou ouvrir la discussion lorsqu'il y a match.";
+    return "Dans la découverte, ARAS met en avant des profils sincères et vérifiés. Vous pouvez consulter un profil, lui écrire directement depuis l’icône de message ou lui envoyer un like.";
   }
 
   if (lower.includes('message') || lower.includes('match')) {
-    return "Pour envoyer un message, il faut généralement un match ou une condition compatible selon la logique du site. Si vous le souhaitez, je peux vous expliquer le parcours exact.";
+    return "Vous pouvez démarrer une discussion directement depuis un profil en appuyant sur l’icône de message. Les discussions apparaissent ensuite dans la rubrique Messages.";
   }
 
   return "Je suis SARA, l'assistante ARAS. Je peux vous aider sur les profils, la découverte, les messages, les tarifs, l'inscription et la connexion. Indiquez-moi simplement votre besoin.";

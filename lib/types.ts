@@ -59,6 +59,7 @@ export type Conversation = {
   user_a: string;
   user_b: string;
   created_at: string;
+  kind?: 'match' | 'direct';
   last_message?: string | null;
   unread_count_user_1?: number;
   unread_count_user_2?: number;

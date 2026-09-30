@@ -137,7 +137,7 @@ export default function AdminPage() {
       supabase.from('events').select('*', { count: 'exact', head: true }),
       supabase.from('reports').select('*', { count: 'exact', head: true }),
       supabase.from('swipes').select('*', { count: 'exact', head: true }).eq('type', 'like'),
-      supabase.from('matches').select('*', { count: 'exact', head: true }),
+      supabase.from('matches').select('*', { count: 'exact', head: true }).eq('is_match', true),
       supabase.from('messages').select('*', { count: 'exact', head: true }),
     ]);
     
@@ -159,7 +159,7 @@ export default function AdminPage() {
     const [profileResult, messageResult, matchResult, eventResult, loginResult] = await Promise.all([
       supabase.from('profiles').select('id,display_name,city,profession,created_at').gte('created_at', since).order('created_at', { ascending: false }).limit(500),
       supabase.from('messages').select('id,sender_id,receiver_id,match_id,created_at').gte('created_at', since).order('created_at', { ascending: false }).limit(500),
-      supabase.from('matches').select('id,user_1_id,user_2_id,created_at').gte('created_at', since).order('created_at', { ascending: false }).limit(500),
+      supabase.from('matches').select('id,user_1_id,user_2_id,created_at').eq('is_match', true).gte('created_at', since).order('created_at', { ascending: false }).limit(500),
       supabase.from('events').select('id,title,date,location,city,created_at').gte('created_at', since).order('created_at', { ascending: false }).limit(500),
       supabase.from('admin_activity_logs').select('id,user_id,country,region,city,browser,operating_system,device,user_agent,page,created_at').eq('kind', 'login').gte('created_at', since).order('created_at', { ascending: false }).limit(500),
     ]);
@@ -250,7 +250,7 @@ export default function AdminPage() {
     const [profilesResult, messagesResult, matchesResult, swipesResult] = await Promise.all([
       supabase.from('profiles').select('created_at').gte('created_at', fromIso),
       supabase.from('messages').select('created_at').gte('created_at', fromIso),
-      supabase.from('matches').select('created_at').gte('created_at', fromIso),
+      supabase.from('matches').select('created_at').eq('is_match', true).gte('created_at', fromIso),
       supabase.from('swipes').select('swiped_id,created_at').eq('type', 'like').gte('created_at', fromIso),
     ]);
     const dates = Array.from({ length: 90 }, (_, index) => {

@@ -57,11 +57,13 @@ export type MatchRow = {
   last_message: string | null;
   unread_count_user_1: number | null;
   unread_count_user_2: number | null;
+  is_match?: boolean;
 };
 
 export type MessageRow = {
   id: string;
   match_id: string | null;
+  conversation_id?: string | null;
   sender_id: string;
   receiver_id: string;
   content: string;
@@ -159,6 +161,7 @@ export function toConversation(row: MatchRow): Conversation {
     user_a: row.user_1_id,
     user_b: row.user_2_id,
     created_at: row.created_at,
+    kind: row.is_match === false ? 'direct' : 'match',
     last_message: row.last_message,
     unread_count_user_1: row.unread_count_user_1 || 0,
     unread_count_user_2: row.unread_count_user_2 || 0,
@@ -168,7 +171,7 @@ export function toConversation(row: MatchRow): Conversation {
 export function toMessage(row: MessageRow): Message {
   return {
     id: row.id,
-    conversation_id: row.match_id || '',
+    conversation_id: row.conversation_id || row.match_id || '',
     sender_id: row.sender_id,
     receiver_id: row.receiver_id,
     content: row.content,
