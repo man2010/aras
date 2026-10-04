@@ -4,11 +4,6 @@ import { NextResponse } from 'next/server';
 
 export const runtime = 'nodejs';
 
-const genericResponse = {
-  ok: true,
-  message: 'Si cette adresse est associée à un compte, un code de vérification vient d’être envoyé.',
-};
-
 function hashCode(code: string, secret: string) {
   return createHmac('sha256', secret).update(code).digest('hex');
 }
@@ -41,7 +36,9 @@ export async function POST(request: Request) {
       }
       if (data.users.length < 1000) break;
     }
-    if (!userId) return NextResponse.json(genericResponse);
+    if (!userId) {
+      return NextResponse.json({ error: 'Aucun compte ARAS n’est associé à cette adresse e-mail.' }, { status: 404 });
+    }
 
     const { data: recentCode, error: recentError } = await admin.from('password_recovery_codes')
       .select('id, created_at').eq('user_id', userId).eq('channel', 'email').is('consumed_at', null)
@@ -50,12 +47,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Le service de vérification est momentanément indisponible.' }, { status: 503 });
     }
     if (recentCode && Date.now() - new Date(recentCode.created_at).getTime() < 60_000) {
-      return NextResponse.json(genericResponse);
+      return NextResponse.json({ ok: true, message: 'Un code vient d’être envoyé. Vérifiez votre boîte e-mail.' });
     }
 
     const { data, error } = await admin.auth.admin.generateLink({ type: 'recovery', email });
     if (error || !data?.user?.id || !data.user.email) {
-      return NextResponse.json(genericResponse);
+      return NextResponse.json({ error: 'Impossible de préparer le code de vérification. Réessayez dans quelques instants.' }, { status: 503 });
     }
 
     const code = data.properties.email_otp;
@@ -93,7 +90,7 @@ export async function POST(request: Request) {
     }
 
     await admin.from('password_recovery_codes').delete().eq('user_id', userId).neq('id', inserted.id);
-    return NextResponse.json(genericResponse);
+    return NextResponse.json({ ok: true, message: 'Code envoyé. Vérifiez votre boîte e-mail.' });
   } catch {
     return NextResponse.json({ error: 'L’envoi du code par e-mail est momentanément indisponible.' }, { status: 503 });
   }

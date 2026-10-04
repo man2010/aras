@@ -91,20 +91,31 @@ export default function ConnexionPage() {
       return;
     }
     const destination = method === 'phone' ? normalizePhone(contact) : contact.toLowerCase();
-    let sendError = false;
+    let sendError = '';
     if (method === 'email') {
       const response = await fetch('/api/auth/password-recovery-email', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: destination }),
       }).catch(() => null);
-      sendError = !response?.ok;
+      const result = await response?.json().catch(() => null) as { error?: string } | null;
+      if (!response?.ok) sendError = result?.error || 'Impossible d’envoyer le code pour le moment. Réessayez.';
     } else {
-      const { error } = await supabase.auth.signInWithOtp({ phone: destination, options: { shouldCreateUser: false } });
-      sendError = Boolean(error);
+      const response = await fetch('/api/auth/check-recovery-phone', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: destination }),
+      }).catch(() => null);
+      const result = await response?.json().catch(() => null) as { error?: string } | null;
+      if (!response?.ok) {
+        sendError = result?.error || 'Impossible de vérifier ce numéro pour le moment.';
+      } else {
+        const { error } = await supabase.auth.signInWithOtp({ phone: destination, options: { shouldCreateUser: false } });
+        if (error) sendError = 'Le code SMS n’a pas pu être envoyé. Vérifiez le numéro puis réessayez.';
+      }
     }
     if (sendError) {
-      setRecoveryMessage('Impossible d’envoyer le code pour le moment. Vérifiez vos coordonnées et réessayez.');
+      setRecoveryMessage(sendError);
     } else {
       sessionStorage.setItem('aras-password-recovery', JSON.stringify({ method, contact: destination }));
       setRecoveryContact(destination);

@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, ArrowRight, Camera, Check, MapPin, Plus, Sparkles } from 'lucide-react';
+import { ArrowLeft, ArrowRight, BookOpen, Briefcase, Camera, Check, Cigarette, ClipboardList, Heart, Languages, MapPin, MessageCircle, Plus, Sparkles, Users } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
 
@@ -522,45 +522,41 @@ export default function OnboardingPage() {
                 </div>
               </div>
 
-              <div className="rounded-[24px] border border-[#eadfd5] bg-[#f8f9fd] p-4 shadow-[0_20px_60px_rgba(83,46,32,0.08)] dark:border-white/10 dark:bg-[#1d1f24] dark:shadow-[0_40px_120px_rgba(0,0,0,0.35)] sm:rounded-[30px] sm:p-6">
-                <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
-                  <div className="flex items-center gap-4">
-                    <div className="relative flex h-24 w-24 items-center justify-center overflow-hidden rounded-full border-4 border-[#ff7ab3] bg-[#ffedf4] text-2xl font-black text-[#d63373] shadow-lg shadow-[#ff7ab3]/20">
-                      {primaryPhoto ? (
-                        <img src={primaryPhoto} alt={name || 'Photo de profil'} className="h-full w-full object-cover" />
-                      ) : (
-                        <span>{(name || 'A').charAt(0).toUpperCase()}</span>
-                      )}
-                    </div>
-                    <div className="min-w-0">
-                      <h3 className="break-words font-display text-3xl tracking-[-0.04em] text-[#241c18] dark:text-white sm:text-4xl">
-                        {name || 'Ton profil'}{birthdate ? `, ${age}` : ''}
-                      </h3>
-                      <div className="mt-2 flex flex-wrap gap-2 text-xs font-bold uppercase tracking-[0.12em] text-[#625852] dark:text-white/70">
-                        {gender && <span className="rounded-full border border-[#eadfd5] bg-[#f8f9fd] px-2.5 py-1 dark:border-white/10 dark:bg-white/5">{gender}</span>}
-                        {locationLabel && <span className="max-w-full break-words rounded-full border border-[#eadfd5] bg-[#f8f9fd] px-2.5 py-1 dark:border-white/10 dark:bg-white/5">{locationLabel.split(',')[0]}</span>}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="self-start rounded-full border border-[#1d857a]/25 bg-[#eaf7f4] px-4 py-2 text-[10px] font-extrabold uppercase tracking-[0.12em] text-[#1d857a] dark:self-auto dark:border-[#7fe4cb]/30 dark:bg-[#112f2d] dark:text-[#7fe4cb] sm:text-xs sm:tracking-[0.18em]">
-                    Profil vérifié
+              <div className="overflow-hidden rounded-[28px] border border-[#eadfd5] bg-white shadow-[0_20px_60px_rgba(35,38,55,.12)] dark:border-white/10 dark:bg-[#17181b]">
+                <div className="relative aspect-[4/3] max-h-[560px] bg-[#e4e6ed] dark:bg-[#24242c] sm:aspect-[16/9]">
+                  {primaryPhoto ? <img src={primaryPhoto} alt={`Photo de ${name}`} className="h-full w-full object-cover" /> : <div className="flex h-full items-center justify-center text-8xl font-black text-[#9a8b82]">{(name || 'A').charAt(0).toUpperCase()}</div>}
+                  <div className="pointer-events-none absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-black/75 to-transparent" />
+                  <div className="absolute inset-x-5 bottom-5 sm:inset-x-7 sm:bottom-7">
+                    <h3 className="break-words font-display text-3xl font-bold tracking-[-0.04em] text-white sm:text-4xl">{name || 'Ton profil'}{birthdate ? `, ${age}` : ''}</h3>
+                    <p className="mt-2 flex items-center gap-1.5 text-sm text-white/80"><MapPin size={15} className="shrink-0" />{locationLabel.split(',')[0] || 'Localisation non renseignée'}</p>
+                    {gender && <span className="mt-3 inline-flex rounded-full bg-white/15 px-3 py-1.5 text-xs font-bold text-white backdrop-blur">{gender}</span>}
                   </div>
                 </div>
 
-                <div className="mt-6 grid gap-3 sm:grid-cols-3">
-                  {extraPhotos.map((photo, index) => (
-                  <div key={`preview-${index}`} className="overflow-hidden rounded-[22px] border border-[#eadfd5] bg-[#f8f9fd] dark:border-white/10 dark:bg-[#1d1f24]">
-                      {photo ? (
-                        <img src={photo} alt={`Photo optionnelle ${index + 1}`} className="h-40 w-full object-cover" />
-                      ) : (
-                        <div className="flex h-40 items-center justify-center text-sm font-bold uppercase tracking-[0.18em] text-[#9a8b82] dark:text-white/30">
-                          Photo {index + 1}
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
+                <main className="space-y-7 p-5 sm:p-7">
+                  <section>
+                    <h3 className="flex items-center gap-2 text-lg font-extrabold text-[#241c18] dark:text-white"><MessageCircle size={19} className="text-[#ec1689]" />À propos</h3>
+                    <p className="mt-3 whitespace-pre-line text-sm leading-7 text-[#626779] dark:text-white/75">{bio.trim() || 'Tu n’as pas encore ajouté de description.'}</p>
+                  </section>
+
+                  <section>
+                    <h3 className="flex items-center gap-2 text-lg font-extrabold text-[#241c18] dark:text-white"><span className="text-xl text-amber-500">✦</span>Centres d’intérêt</h3>
+                    {interests.length ? <div className="mt-3 flex flex-wrap gap-2">{interests.map((interest) => <span key={interest} className="rounded-full border border-[#dfe1e8] bg-[#f0f1f5] px-3.5 py-2 text-xs font-semibold text-[#3e414d] dark:border-white/15 dark:bg-white/[0.08] dark:text-white/85">{interest}</span>)}</div> : <p className="mt-3 text-sm text-[#747888] dark:text-white/55">Aucun centre d’intérêt renseigné.</p>}
+                  </section>
+
+                  <section>
+                    <h3 className="flex items-center gap-2 text-lg font-extrabold text-[#241c18] dark:text-white"><ClipboardList size={19} className="text-[#ec1689]" />Informations</h3>
+                    <div className="mt-2 divide-y divide-[#e5e6ec] dark:divide-white/10">{[
+                      { label: 'Genre', value: gender, Icon: Users },
+                      { label: 'Profession', value: profession, Icon: Briefcase },
+                      { label: 'Religion', value: religion, Icon: BookOpen },
+                      { label: 'Préférences', value: caste, Icon: Heart },
+                      { label: 'Situation', value: MARITAL_OPTIONS.find((option) => option.value === maritalStatus)?.label ?? '', Icon: Heart },
+                      { label: 'Langues', value: languages.join(', '), Icon: Languages },
+                      { label: 'Tabac', value: smokingHabit, Icon: Cigarette },
+                    ].filter(({ value }) => Boolean(value)).map(({ label, value, Icon }) => <div key={label} className="flex min-w-0 items-center gap-3 py-4"><Icon size={19} className="shrink-0 text-[#d72d7a] dark:text-[#ec3b91]" /><span className="min-w-0 flex-1 text-sm text-[#666a78] dark:text-white/65">{label}</span><span className="max-w-[58%] break-words text-right text-sm font-bold text-[#262733] dark:text-white/90">{value}</span></div>)}</div>
+                  </section>
+                </main>
               </div>
             </div>
           )}
