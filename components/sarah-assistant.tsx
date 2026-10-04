@@ -9,6 +9,88 @@ type ChatItem = {
   content: string;
 };
 
+function normalizeAnswer(content: string) {
+  return content
+    .replace(/[\u00a0\u202f\u2007]/g, ' ')
+    .replace(/[\u2010-\u2015\u2212]/g, '—')
+    .replace(/[\u200b-\u200d\ufeff]/g, '')
+    .trim();
+}
+
+function renderAssistantAnswer(content: string) {
+  const normalized = normalizeAnswer(content);
+  const lines = normalized.split(/\r?\n/);
+  const blocks: Array<{ type: 'paragraph' | 'heading' | 'list'; content: string | string[]; level?: number; ordered?: boolean }> = [];
+  let paragraph: string[] = [];
+  let list: string[] = [];
+  let ordered = false;
+
+  const flushParagraph = () => {
+    if (!paragraph.length) return;
+    blocks.push({ type: 'paragraph', content: paragraph.join(' ') });
+    paragraph = [];
+  };
+  const flushList = () => {
+    if (!list.length) return;
+    blocks.push({ type: 'list', content: list, ordered });
+    list = [];
+  };
+
+  for (const rawLine of lines) {
+    const line = rawLine.trim();
+    if (!line || /^---+$/.test(line)) {
+      flushParagraph();
+      flushList();
+      continue;
+    }
+
+    const heading = line.match(/^#{1,3}\s+(.+)$/);
+    if (heading) {
+      flushParagraph();
+      flushList();
+      blocks.push({ type: 'heading', content: heading[1].replace(/\*\*/g, ''), level: Math.min(line.match(/^#+/)?.[0].length ?? 2, 3) });
+      continue;
+    }
+
+    const item = line.match(/^(?:[-*•]|\d+[.)])\s+(.+)$/);
+    if (item) {
+      flushParagraph();
+      const isOrdered = /^\d/.test(line);
+      if (list.length && ordered !== isOrdered) flushList();
+      ordered = isOrdered;
+      list.push(item[1]);
+      continue;
+    }
+
+    flushList();
+    paragraph.push(line);
+  }
+  flushParagraph();
+  flushList();
+
+  const renderInline = (text: string) => text.split(/(\*\*[^*]+\*\*|\*[^*]+\*)/g).map((part, index) => {
+    if (part.startsWith('**') && part.endsWith('**')) return <strong key={index}>{part.slice(2, -2)}</strong>;
+    if (part.startsWith('*') && part.endsWith('*')) return <em key={index}>{part.slice(1, -1)}</em>;
+    return part;
+  });
+
+  return <div className="space-y-3 break-words">
+    {blocks.map((block, index) => {
+      if (block.type === 'heading') {
+        const className = block.level === 1 ? 'text-base font-extrabold text-[#24171b]' : 'text-sm font-extrabold text-[#24171b]';
+        return <h4 key={index} className={className}>{renderInline(block.content as string)}</h4>;
+      }
+      if (block.type === 'list') {
+        const List = block.ordered ? 'ol' : 'ul';
+        return <List key={index} className={`${block.ordered ? 'list-decimal' : 'list-disc'} space-y-1.5 pl-5`}>
+          {(block.content as string[]).map((item, itemIndex) => <li key={itemIndex}>{renderInline(item)}</li>)}
+        </List>;
+      }
+      return <p key={index}>{renderInline(block.content as string)}</p>;
+    })}
+  </div>;
+}
+
 export function SarahAssistant() {
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState('');
@@ -69,7 +151,7 @@ export function SarahAssistant() {
 
   return (
     <>
-      <button
+      {!open && <button
         type="button"
         aria-label="Ouvrir SARA"
         onClick={() => setOpen(true)}
@@ -79,7 +161,7 @@ export function SarahAssistant() {
           <Image src="/aras-logo.jpeg" alt="ARAS" fill className="object-cover" />
         </span>
         SARA
-      </button>
+      </button>}
 
       {open && (
         <div className="fixed inset-0 z-50 flex items-end justify-end bg-black/30 p-4 sm:items-end sm:justify-end">
@@ -104,7 +186,7 @@ export function SarahAssistant() {
                       : 'ml-auto bg-[#1a6b68] text-white'
                   }`}
                 >
-                  {message.content}
+                  {message.role === 'assistant' ? renderAssistantAnswer(message.content) : message.content}
                 </div>
               ))}
               {loading && (

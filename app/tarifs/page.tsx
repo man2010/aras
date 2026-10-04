@@ -158,7 +158,7 @@ export default function TarifsPage() {
           </div>
 
           <div className="mt-10 flex justify-center">
-            <Link href="/inscription" className="rounded-full bg-[#c88a27] px-8 py-3 text-sm font-extrabold text-white shadow-[0_10px_25px_rgba(200,138,39,.25)] transition hover:-translate-y-0.5 hover:bg-[#b57a21]">
+            <Link href="/golden" className="rounded-full bg-[#c88a27] px-8 py-3 text-sm font-extrabold text-white shadow-[0_10px_25px_rgba(200,138,39,.25)] transition hover:-translate-y-0.5 hover:bg-[#b57a21]">
               Devenir membre Golden
             </Link>
           </div>

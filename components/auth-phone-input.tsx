@@ -8,14 +8,23 @@ type AuthPhoneInputProps = {
   name?: string;
   required?: boolean;
   placeholder?: string;
+  value?: string;
+  onChange?: (value: string) => void;
 };
 
 export function AuthPhoneInput({
   name = 'contact',
   required,
   placeholder = '77 123 45 67',
+  value,
+  onChange,
 }: AuthPhoneInputProps) {
-  const [phone, setPhone] = useState('');
+  const [internalPhone, setInternalPhone] = useState('');
+  const phone = value ?? internalPhone;
+  const updatePhone = (nextPhone: string) => {
+    if (value === undefined) setInternalPhone(nextPhone);
+    onChange?.(nextPhone);
+  };
 
   return (
     <div className="auth-phone-input mt-2">
@@ -23,7 +32,7 @@ export function AuthPhoneInput({
         defaultCountry="sn"
         preferredCountries={['sn', 'fr', 'ci', 'ml', 'gm', 'ma', 'cm', 'cd']}
         value={phone}
-        onChange={(value) => setPhone(value)}
+        onChange={updatePhone}
         placeholder={placeholder}
         disableDialCodeAndPrefix
         showDisabledDialCodeAndPrefix

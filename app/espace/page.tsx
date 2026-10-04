@@ -302,6 +302,7 @@ export default function EspacePage() {
   const discoveryTouchStartX = useRef<number | null>(null);
   const [toggleBusyId, setToggleBusyId] = useState<string | null>(null);
   const [profileForm, setProfileForm] = useState({ display_name: '', age: '', city: 'Dakar', bio: '', profession: '', photo_url: '', interests: [] as string[], languages: [] as string[], religion: '', caste: '', marital_status: '', smoking_habit: '' });
+  const [profileCityFocused, setProfileCityFocused] = useState(false);
   const profileOptionClass = (selected: boolean) => `inline-flex min-h-10 items-center gap-2 rounded-full border px-4 py-2 text-sm font-medium transition-colors ${selected ? 'border-[#ec3b78] bg-[#ec3b78]/10 text-[#ec3b78] dark:bg-[#ec3b78]/15 dark:text-[#ff7ab3]' : 'border-[#dedfe6] bg-white text-[#756960] hover:border-[#ec3b78]/60 dark:border-white/15 dark:bg-white/5 dark:text-white/70 dark:hover:border-[#ec3b78]/60'}`;
   const renderProfileOptionGroup = (label: string, warning: boolean, options: { label: string; value: string; Icon?: typeof Music2 }[], selectedValues: string[], onToggle: (value: string) => void, withIcons = false) => (
     <div className="sm:col-span-2">
@@ -1014,6 +1015,9 @@ export default function EspacePage() {
     ...discoveryProfiles.map((profileItem) => profileItem.city),
     ...eventCities,
   ].map((city) => city?.trim()).filter((city): city is string => Boolean(city))));
+  const matchingProfileCities = profileCitySuggestions
+    .filter((city) => city.toLocaleLowerCase('fr').includes(profileForm.city.trim().toLocaleLowerCase('fr')))
+    .slice(0, 8);
   const filteredEvents = events.filter((event) => {
     const query = eventSearch.trim().toLocaleLowerCase('fr');
     const matchesSearch = !query || `${event.title} ${event.description} ${event.location} ${event.city}`.toLocaleLowerCase('fr').includes(query);
@@ -1519,8 +1523,6 @@ export default function EspacePage() {
                 <>
                 {filteredDiscoveryProfiles.length > 0 && mobileDiscoveryIndex >= filteredDiscoveryProfiles.length && <section className="mx-auto flex min-h-0 w-full max-w-[560px] flex-1 flex-col items-center justify-center rounded-[30px] bg-white px-6 text-center shadow dark:bg-[#19191f] lg:hidden">
                   <Users size={44} className="text-[#9a8b82]" />
-                  <h3 className="mt-5 font-display text-2xl text-[#241c18] dark:text-white">Plus de profils autour de vous</h3>
-                  <p className="mt-2 text-sm text-[#756960] dark:text-white/60">Vous avez vu tous les profils disponibles avec ces filtres. Revenez en arrière ou modifiez votre recherche.</p>
                   <div className="mt-5 flex flex-wrap justify-center gap-3"><button type="button" onClick={goBackMobileDiscovery} className="rounded-full border px-5 py-3 text-sm font-bold">Revenir au profil précédent</button><button type="button" onClick={() => { setMobileDiscoveryIndex(0); setMobileDiscoveryHistory([]); }} className="rounded-full bg-[#ec3b78] px-5 py-3 text-sm font-bold text-white">Recommencer</button></div>
                 </section>}
                 {mobileDiscoveryProfile && (
@@ -1851,7 +1853,40 @@ export default function EspacePage() {
                 <div className="mt-6 grid gap-4 sm:grid-cols-2">
                   <label className="block text-xs font-extrabold text-[#625852]">Prénom<input value={profileForm.display_name} readOnly aria-readonly="true" className="mt-2 w-full min-w-0 cursor-not-allowed rounded-xl border-0 bg-[#f8f9fd] px-4 py-3 text-sm text-[#756960] outline-none focus-visible:ring-2 focus-visible:ring-[#ec3b78]/30 dark:bg-white/5 dark:text-white/70" /><span className="mt-1 block text-[10px] font-medium text-[#9a8b82]">Le prénom ne peut pas être modifié ici.</span></label>
                   <label className="block text-xs font-extrabold text-[#625852]">Âge<input value={profileForm.age} readOnly aria-readonly="true" className="mt-2 w-full cursor-not-allowed rounded-xl border-0 bg-[#f8f9fd] px-4 py-3 text-sm text-[#756960] outline-none focus-visible:ring-2 focus-visible:ring-[#ec3b78]/30 dark:bg-white/5" /><span className="mt-1 block text-[10px] font-medium text-[#9a8b82]">L’âge est calculé à partir de votre date de naissance.</span></label>
-                  <label className="block text-xs font-extrabold text-[#625852]">Ville<input list="profile-city-suggestions" autoComplete="address-level2" value={profileForm.city} onChange={(event) => setProfileForm((current) => ({ ...current, city: event.target.value }))} className="mt-2 w-full rounded-xl border-0 bg-[#f8f9fd] px-4 py-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-[#ec3b78]/30 dark:bg-white/5 dark:text-white" /><datalist id="profile-city-suggestions">{profileCitySuggestions.map((city) => <option key={city} value={city} />)}</datalist></label>
+                  <div className="relative text-xs font-extrabold text-[#625852]">
+                    <label htmlFor="profile-city-input">Ville</label>
+                    <input
+                      id="profile-city-input"
+                      type="text"
+                      autoComplete="off"
+                      autoCapitalize="words"
+                      role="combobox"
+                      aria-autocomplete="list"
+                      aria-expanded={profileCityFocused && matchingProfileCities.length > 0}
+                      aria-controls="profile-city-suggestions"
+                      value={profileForm.city}
+                      onFocus={() => setProfileCityFocused(true)}
+                      onBlur={() => window.setTimeout(() => setProfileCityFocused(false), 150)}
+                      onChange={(event) => setProfileForm((current) => ({ ...current, city: event.target.value }))}
+                      className="mt-2 min-h-12 w-full rounded-xl border-0 bg-[#f8f9fd] px-4 py-3 text-base font-normal outline-none focus-visible:ring-2 focus-visible:ring-[#ec3b78]/30 dark:bg-white/5 dark:text-white sm:text-sm"
+                    />
+                    {profileCityFocused && matchingProfileCities.length > 0 && (
+                      <ul id="profile-city-suggestions" role="listbox" className="absolute inset-x-0 top-full z-50 mt-1 max-h-56 overflow-y-auto rounded-xl border border-[#eadfd5] bg-white p-1 shadow-xl dark:border-white/15 dark:bg-[#1c1b21]">
+                        {matchingProfileCities.map((city) => (
+                          <li key={city} role="option" aria-selected={profileForm.city === city}>
+                            <button
+                              type="button"
+                              onMouseDown={(event) => event.preventDefault()}
+                              onClick={() => { setProfileForm((current) => ({ ...current, city })); setProfileCityFocused(false); }}
+                              className="min-h-12 w-full rounded-lg px-4 py-3 text-left text-base font-medium text-[#292746] hover:bg-[#f8f9fd] focus-visible:bg-[#f8f9fd] dark:text-white dark:hover:bg-white/10 dark:focus-visible:bg-white/10 sm:text-sm"
+                            >
+                              {city}
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
                   <label className="block text-xs font-extrabold text-[#625852]">Genre<input value={profile?.gender || 'Non renseigné'} readOnly aria-readonly="true" className="mt-2 w-full cursor-not-allowed rounded-xl border-0 bg-[#f8f9fd] px-4 py-3 text-sm text-[#756960] outline-none focus-visible:ring-2 focus-visible:ring-[#ec3b78]/30 dark:bg-white/5 dark:text-white/70" /></label>
                   <label className="block text-xs font-extrabold text-[#625852]">Profession<input value={profileForm.profession} onChange={(e) => setProfileForm({ ...profileForm, profession: e.target.value })} className="mt-2 w-full rounded-xl border-0 bg-[#f8f9fd] px-4 py-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-[#ec3b78]/30 dark:bg-white/5 dark:text-white" /></label>
 

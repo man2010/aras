@@ -7,7 +7,18 @@ import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
 
 type Gender = 'Homme' | 'Femme';
-type Step = 0 | 1 | 2 | 3 | 4;
+type Step = 0 | 1 | 2 | 3 | 4 | 5;
+type MaritalStatus = { label: string; value: string };
+
+const INTEREST_OPTIONS = ['Musique', 'Voyages', 'Cuisine', 'Sport', 'Lecture', 'Cinéma', 'Danse', 'Art', 'Photographie', 'Mode', 'Tech', 'Nature', 'Yoga', 'Gaming', 'Animaux'];
+const LANGUAGE_OPTIONS = ['Français', 'Wolof', 'Pulaar', 'Sérère', 'Diola', 'Mandingue', 'Soninké', 'Manjak', 'Mancagne', 'Préfère ne rien dire', 'Anglais', 'Arabe'];
+const RELIGION_OPTIONS = ['Islam', 'Christianisme', 'Préfère ne rien dire'];
+const PREFERENCE_OPTIONS = ['Gueer', 'Gueweul', 'Laobé', 'Tègg', 'Oudé', 'Rabb', 'Gnégho', 'Préfère ne rien dire'];
+const MARITAL_OPTIONS: MaritalStatus[] = [
+  { label: 'Célibataire', value: 'single' }, { label: 'Marié(e)', value: 'married' },
+  { label: 'Divorcé(e)', value: 'divorced' }, { label: 'Veuf/Veuve', value: 'widowed' },
+];
+const SMOKING_OPTIONS = ['Non fumeur', 'Fumeur'];
 
 function ageFromBirthdate(value: string) {
   const birth = new Date(value);
@@ -17,6 +28,30 @@ function ageFromBirthdate(value: string) {
   const monthDelta = today.getMonth() - birth.getMonth();
   if (monthDelta < 0 || (monthDelta === 0 && today.getDate() < birth.getDate())) age--;
   return age;
+}
+
+function ChoiceGroup({ label, options, selected, onToggle }: { label: string; options: string[]; selected: string[]; onToggle: (value: string) => void }) {
+  return (
+    <div>
+      <p className="text-sm font-bold text-[#625852] dark:text-white/80">{label}</p>
+      <div className="mt-2 flex flex-wrap gap-2 rounded-2xl bg-[#f8f9fd] p-3 dark:bg-white/[0.04]">
+        {options.map((option) => {
+          const active = selected.includes(option);
+          return (
+            <button
+              key={option}
+              type="button"
+              aria-pressed={active}
+              onClick={() => onToggle(option)}
+              className={`rounded-full border px-3.5 py-2 text-xs font-semibold transition sm:text-sm ${active ? 'border-[#ec3b78] bg-[#ffedf4] text-[#d63373] dark:border-[#ff7ab3] dark:bg-[#3a1e2a] dark:text-[#f9bfd2]' : 'border-[#dfdfe7] bg-white text-[#756960] hover:border-[#ec3b78] dark:border-white/10 dark:bg-[#1d1f24] dark:text-white/75'}`}
+            >
+              {option}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
 }
 
 async function reverseGeocode(lat: number, lng: number) {
@@ -47,8 +82,16 @@ export default function OnboardingPage() {
   const [primaryPhoto, setPrimaryPhoto] = useState('');
   const [extraPhotos, setExtraPhotos] = useState<Array<string | null>>(Array(6).fill(null));
   const [pendingSlot, setPendingSlot] = useState<number | null>(null);
+  const [profession, setProfession] = useState('');
+  const [interests, setInterests] = useState<string[]>([]);
+  const [languages, setLanguages] = useState<string[]>([]);
+  const [religion, setReligion] = useState('');
+  const [caste, setCaste] = useState('');
+  const [maritalStatus, setMaritalStatus] = useState('');
+  const [smokingHabit, setSmokingHabit] = useState('');
+  const [bio, setBio] = useState('');
 
-  const steps = ['Profil', 'Localisation', 'Photo principale', 'Photos', 'Aperçu'];
+  const steps = ['Profil', 'Localisation', 'Photo principale', 'Photos', 'Infos facultatives', 'Aperçu'];
   const isAdult = useMemo(() => age >= 18, [age]);
   const photoCount = extraPhotos.filter((photo) => Boolean(photo)).length;
 
@@ -155,6 +198,14 @@ export default function OnboardingPage() {
       location_label: locationLabel,
       lat,
       lng,
+      profession: profession.trim() || null,
+      interests,
+      languages,
+      religion: religion || null,
+      caste: caste || null,
+      marital_status: maritalStatus || null,
+      smoking_habit: smokingHabit || null,
+      bio: bio.trim(),
       avatar_urls: photos.length > 0 ? photos : undefined,
       photos,
       profile_status: 'completed',
@@ -173,7 +224,7 @@ export default function OnboardingPage() {
   };
 
   const nextStep = () => {
-    if (step === 4) {
+    if (step === 5) {
       saveProfile();
       return;
     }
@@ -184,7 +235,12 @@ export default function OnboardingPage() {
     }
 
     setMessage('');
-    setStep((prev) => Math.min(prev + 1, 4) as Step);
+    setStep((prev) => Math.min(prev + 1, 5) as Step);
+  };
+
+  const skipStep = () => {
+    setMessage('');
+    setStep((prev) => Math.min(prev + 1, 5) as Step);
   };
 
   const prevStep = () => {
@@ -411,6 +467,52 @@ export default function OnboardingPage() {
           {step === 4 && (
             <div className="space-y-6">
               <div className="flex items-center gap-3">
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#eaf7f4] text-[#1d857a]"><Sparkles size={18} /></div>
+                <div>
+                  <p className="text-[11px] font-extrabold uppercase tracking-[0.18em] text-[#7fe4cb]">Informations facultatives</p>
+                  <h2 className="text-xl font-display text-[#241c18] dark:text-white sm:text-2xl">Quelques détails sur toi</h2>
+                  <p className="mt-1 text-xs font-medium text-[#9a8b82]">Tu peux choisir tes réponses ou passer cette étape.</p>
+                </div>
+              </div>
+
+              <div className="grid gap-5 sm:grid-cols-2">
+                <label className="block text-sm font-bold text-[#625852] dark:text-white/80">
+                  Profession
+                  <input value={profession} onChange={(event) => setProfession(event.target.value)} placeholder="Ta profession (facultatif)" className="mt-2 w-full min-w-0 rounded-xl border border-[#dfd2c6] bg-[#f8f9fd] px-4 py-3 text-sm font-normal outline-none focus:border-[#ec3b78] dark:border-white/10 dark:bg-[#1d1f24] dark:text-white" />
+                </label>
+                <label className="block text-sm font-bold text-[#625852] dark:text-white/80 sm:col-span-2">
+                  Bio
+                  <textarea value={bio} onChange={(event) => setBio(event.target.value)} rows={3} maxLength={500} placeholder="Présente-toi en quelques mots (facultatif)" className="mt-2 w-full rounded-xl border border-[#dfd2c6] bg-[#f8f9fd] px-4 py-3 text-sm font-normal outline-none focus:border-[#ec3b78] dark:border-white/10 dark:bg-[#1d1f24] dark:text-white" />
+                </label>
+
+                <div className="sm:col-span-2">
+                  <ChoiceGroup label="Tes passions" options={INTEREST_OPTIONS} selected={interests} onToggle={(value) => setInterests((current) => current.includes(value) ? current.filter((item) => item !== value) : [...current, value])} />
+                </div>
+                <div className="sm:col-span-2">
+                  <ChoiceGroup label="Langues parlées" options={LANGUAGE_OPTIONS} selected={languages} onToggle={(value) => setLanguages((current) => current.includes(value) ? current.filter((item) => item !== value) : [...current, value])} />
+                </div>
+                <div>
+                  <ChoiceGroup label="Religion" options={RELIGION_OPTIONS} selected={religion ? [religion] : []} onToggle={(value) => setReligion((current) => current === value ? '' : value)} />
+                </div>
+                <div>
+                  <ChoiceGroup label="Préférences" options={PREFERENCE_OPTIONS} selected={caste ? [caste] : []} onToggle={(value) => setCaste((current) => current === value ? '' : value)} />
+                </div>
+                <div>
+                  <ChoiceGroup label="Situation" options={MARITAL_OPTIONS.map((option) => option.label)} selected={MARITAL_OPTIONS.filter((option) => option.value === maritalStatus).map((option) => option.label)} onToggle={(label) => setMaritalStatus((current) => {
+                    const option = MARITAL_OPTIONS.find((item) => item.label === label);
+                    return option?.value === current ? '' : option?.value ?? '';
+                  })} />
+                </div>
+                <div>
+                  <ChoiceGroup label="Fumeur" options={SMOKING_OPTIONS} selected={smokingHabit ? [smokingHabit] : []} onToggle={(value) => setSmokingHabit((current) => current === value ? '' : value)} />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {step === 5 && (
+            <div className="space-y-6">
+              <div className="flex items-center gap-3">
                 <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#eaf7f4] text-[#1d857a]">
                   <Check size={18} />
                 </div>
@@ -477,7 +579,7 @@ export default function OnboardingPage() {
           </div>
 
           <div className="flex w-full flex-col-reverse gap-2 sm:w-auto sm:flex-row sm:gap-3">
-            {step > 0 && step < 4 && (
+            {step > 0 && step < 5 && (
               <button
                 type="button"
                 onClick={prevStep}
@@ -488,13 +590,24 @@ export default function OnboardingPage() {
               </button>
             )}
 
+            {(step === 3 || step === 4) && (
+              <button
+                type="button"
+                onClick={skipStep}
+                disabled={loading}
+                className="inline-flex min-h-12 w-full items-center justify-center rounded-full border border-[#dfd2c6] bg-white px-5 py-3 text-sm font-bold text-[#756960] transition hover:border-[#ec3b78] dark:border-white/10 dark:bg-[#1d1f24] dark:text-white/70 sm:w-auto"
+              >
+                Passer
+              </button>
+            )}
+
             <button
               type="button"
               onClick={nextStep}
               disabled={loading || !stepReady}
               className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-full bg-gradient-to-r from-[#ec3b78] to-[#ff7ab3] px-6 py-3 text-sm font-extrabold text-white shadow-lg shadow-[#ff3e81]/20 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
             >
-              {step === 4 ? 'Terminer' : 'Suivant'}
+              {step === 5 ? 'Terminer' : step === 4 ? 'Continuer' : 'Suivant'}
               <ArrowRight size={16} />
             </button>
           </div>

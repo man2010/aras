@@ -39,6 +39,13 @@ export default function InscriptionPage() {
   const canSubmit = useMemo(() => {
     return isStrongPassword(password) && Boolean(turnstileToken);
   }, [password, turnstileToken]);
+  const passwordChecks = useMemo(() => [
+    { label: '8 caractères minimum', valid: password.length >= 8 },
+    { label: 'Une majuscule', valid: /[A-Z]/.test(password) },
+    { label: 'Un chiffre', valid: /\d/.test(password) },
+    { label: 'Un symbole', valid: /[^A-Za-z0-9]/.test(password) },
+  ], [password]);
+  const passwordStrength = passwordChecks.filter((check) => check.valid).length;
 
   useEffect(() => {
     const errorParam = searchParams.get('error');
@@ -381,6 +388,14 @@ export default function InscriptionPage() {
                     {showPw ? <EyeOff size={18} /> : <Eye size={18} />}
                   </button>
                 </div>
+                <div className="mt-3" aria-live="polite">
+                  <div className="flex items-center justify-between text-[11px]">
+                    <span className="font-semibold text-[#756960]">8 caractères minimum</span>
+                  </div>
+                  <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[#e8e3dd]" role="meter" aria-label={`Robustesse du mot de passe : ${passwordStrength} critères sur 4`} aria-valuemin={0} aria-valuemax={4} aria-valuenow={passwordStrength}>
+                    <div className={`h-full rounded-full transition-[width,background-color] duration-200 ${passwordStrength === 4 ? 'bg-[#1a6b68]' : 'bg-[#c88a27]'}`} style={{ width: `${passwordStrength * 25}%` }} />
+                  </div>
+                </div>
               </div>
 
               <div className="grid gap-2 rounded-2xl bg-white p-4 text-sm text-[#756960]">
@@ -429,11 +444,6 @@ export default function InscriptionPage() {
               >
                 {loading ? 'Un instant...' : 'Créer mon compte'} <ArrowRight size={16} className="ml-2 inline" />
               </button>
-              {!canSubmit && password.length > 0 && (
-                <p className="text-center text-[11px] font-bold text-[#9a8b82]">
-                  Le mot de passe doit contenir 8 caractères minimum, une majuscule, un chiffre et un symbole.
-                </p>
-              )}
             </form>
           ) : (
             <div className="mt-8 space-y-4">
