@@ -273,10 +273,10 @@ export default function OnboardingPage() {
 
         <div className="mt-5 flex gap-1.5 sm:mt-6 sm:gap-2">
           {steps.map((label, index) => (
-            <div key={label} className="min-w-0 flex-1">
-              <div className="mb-2 flex h-7 items-center text-[9px] font-extrabold uppercase leading-tight tracking-normal text-[#756960] dark:text-white/50 sm:h-auto sm:text-[10px] sm:tracking-[0.12em]">
+            <div key={label} className="min-w-0 flex-1 text-center sm:text-left">
+              <div className="mb-2 flex h-7 items-center justify-center overflow-hidden text-[8px] font-extrabold uppercase leading-none tracking-normal text-[#756960] dark:text-white/50 sm:h-auto sm:justify-start sm:overflow-visible sm:text-[10px] sm:leading-tight sm:tracking-[0.12em]">
                 <span className="hidden sm:inline">{label}</span>
-                <span className="sm:hidden">{index + 1}. {label === 'Photo principale' ? 'Photo' : label === 'Aperçu' ? 'Aperçu' : label}</span>
+                <span className="whitespace-nowrap sm:hidden">{['Profil', 'Ville', 'Photo', 'Photos', 'Infos', 'Aperçu'][index]}</span>
               </div>
               <div className="h-1.5 overflow-hidden rounded-full bg-white/10">
                 <div
