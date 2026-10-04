@@ -363,21 +363,25 @@ export default function EspacePage() {
   const [profileVisitors, setProfileVisitors] = useState<Profile[]>([]);
   const [profileVisitorCount, setProfileVisitorCount] = useState(0);
   const [visitorsLoading, setVisitorsLoading] = useState(false);
+  const [visitorsError, setVisitorsError] = useState(false);
   const [visitorsPage, setVisitorsPage] = useState(1);
   const [profileSection, setProfileSection] = useState<'profile' | 'visitors' | 'privacy' | 'security' | 'subscription' | 'blocks' | 'help'>('profile');
   const [profileEditOpen, setProfileEditOpen] = useState(false);
   const [profileSettingsOpen, setProfileSettingsOpen] = useState(false);
   const [isAdminAccount, setIsAdminAccount] = useState(false);
-  const [discoveryVisitProfileId, setDiscoveryVisitProfileId] = useState<string | null>(null);
   const likeRefreshVersion = useRef(0);
 
   const recordProfileVisit = useCallback(async (profileId: string) => {
     if (!user || profileId === user.id) return;
-    const { error } = await supabase.from('profile_visits').upsert(
-      { visitor_id: user.id, profile_id: profileId, last_viewed_at: new Date().toISOString() },
-      { onConflict: 'visitor_id,profile_id' },
-    );
-    if (error) console.error('Impossible d’enregistrer la visite du profil :', error);
+    const { data } = await supabase.auth.getSession();
+    const accessToken = data.session?.access_token;
+    if (!accessToken) return;
+    const response = await fetch('/api/profile-visits', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
+      body: JSON.stringify({ profileId }),
+    }).catch(() => null);
+    if (!response?.ok) console.error('Impossible d’enregistrer la visite du profil.');
   }, [user]);
 
   const refreshLikeState = useCallback(async () => {
@@ -440,15 +444,18 @@ export default function EspacePage() {
   const loadProfileVisitors = useCallback(async () => {
     if (!user) return;
     setVisitorsLoading(true);
-    const { data: visits, error: visitsError } = await supabase.from('profile_visits').select('visitor_id,last_viewed_at').eq('profile_id', user.id).order('last_viewed_at', { ascending: false });
-    if (visitsError) {
-      console.error('Impossible de charger les visites du profil :', visitsError);
-      setProfileVisitorCount(0);
-      setProfileVisitors([]);
+    setVisitorsError(false);
+    const { data: sessionData } = await supabase.auth.getSession();
+    const accessToken = sessionData.session?.access_token;
+    const response = accessToken ? await fetch('/api/profile-visits', { headers: { Authorization: `Bearer ${accessToken}` } }).catch(() => null) : null;
+    const payload = response?.ok ? await response.json().catch(() => null) : null;
+    if (!payload || !Array.isArray(payload.visits)) {
+      console.error('Impossible de charger les visites du profil.');
+      setVisitorsError(true);
       setVisitorsLoading(false);
       return;
     }
-    const visitorIds = Array.from(new Set((visits ?? []).map((visit: { visitor_id: string }) => visit.visitor_id)));
+    const visitorIds = Array.from(new Set((payload.visits as { visitor_id: string }[]).map((visit) => visit.visitor_id)));
     setProfileVisitorCount(visitorIds.length);
     if (visitorIds.length) {
       const { data, error } = await supabase.from('profiles').select('*').in('id', visitorIds);
@@ -752,11 +759,6 @@ export default function EspacePage() {
     })();
     return () => { cancelled = true; };
   }, [user, loadMemberEvents, refreshLikeState]);
-
-  useEffect(() => {
-    if (!user || tab !== 'decouverte' || !discoveryVisitProfileId) return;
-    void recordProfileVisit(discoveryVisitProfileId);
-  }, [discoveryVisitProfileId, tab, user, recordProfileVisit]);
 
   useEffect(() => {
     if (!user || !selectedProfileDetail || selectedProfileDetail.id === user.id) return;
@@ -1381,6 +1383,11 @@ export default function EspacePage() {
   })();
 
   useEffect(() => {
+    if (!user || tab !== 'decouverte' || !mobileDiscoveryProfile) return;
+    void recordProfileVisit(mobileDiscoveryProfile.id);
+  }, [mobileDiscoveryProfile?.id, tab, user, recordProfileVisit]);
+
+  useEffect(() => {
     if (!expandedDiscoveryProfile || !mobileDiscoveryProfile || mobileDiscoveryPhotos.length < 2) return;
     const profileId = mobileDiscoveryProfile.id;
     const photoCount = mobileDiscoveryPhotos.length;
@@ -1529,7 +1536,6 @@ export default function EspacePage() {
                   <section className="mx-auto flex h-full min-h-0 w-full max-w-[560px] flex-col lg:contents" aria-label="Profils à découvrir">
                     <article
                       key={mobileDiscoveryProfile.id}
-                      ref={() => { setDiscoveryVisitProfileId((currentId) => currentId === mobileDiscoveryProfile.id ? currentId : mobileDiscoveryProfile.id); }}
                       onMouseEnter={() => { if (window.matchMedia('(min-width: 1024px)').matches) void recordProfileVisit(mobileDiscoveryProfile.id); }}
                       onTouchStart={(event) => { discoveryTouchStartX.current = event.touches[0]?.clientX ?? null; }}
                       onClick={(event) => {
@@ -1764,7 +1770,7 @@ export default function EspacePage() {
                   </article>
 
                   <aside className="space-y-4">
-                    <button type="button" onClick={() => { setProfileSection('visitors'); void loadProfileVisitors(); }} className="flex min-h-48 w-full flex-col items-center justify-center rounded-[30px] bg-white p-6 text-center shadow-[0_12px_38px_rgba(20,20,30,.06)] transition hover:-translate-y-0.5 dark:bg-[#1d1d1d]"><span className="flex h-14 w-14 items-center justify-center rounded-full bg-[#ec1689]/10 text-[#ec1689]"><Eye size={26} /></span><strong className="mt-4 text-3xl font-extrabold text-[#292746] dark:text-white">{profileVisitorCount}</strong><span className="mt-1 text-sm text-[#777985] dark:text-white/60">Vues profil</span></button>
+                    <button type="button" onClick={() => { setProfileSection('visitors'); void loadProfileVisitors(); }} className="flex min-h-48 w-full flex-col items-center justify-center rounded-[30px] bg-white p-6 text-center shadow-[0_12px_38px_rgba(20,20,30,.06)] transition hover:-translate-y-0.5 dark:bg-[#1d1d1d]"><span className="flex h-14 w-14 items-center justify-center rounded-full bg-[#ec1689]/10 text-[#ec1689]"><Eye size={26} /></span><strong className="mt-4 text-3xl font-extrabold text-[#292746] dark:text-white">{visitorsError ? '—' : profileVisitorCount}</strong><span className="mt-1 text-sm text-[#777985] dark:text-white/60">Vues profil</span></button>
                     {isAdminAccount && <Link href="/admin" className="flex min-h-14 items-center justify-center rounded-[20px] border border-[#dfdfe5] text-sm font-bold text-[#565762] dark:border-white/10 dark:text-white/70">Administration</Link>}
                   </aside>
                 </div>
@@ -1784,7 +1790,7 @@ export default function EspacePage() {
               </section>}
               {profileSection === 'visitors' && <section className="rounded-[26px] bg-white p-5 shadow dark:bg-[#1c1b21]">
                 <div className="mb-4 flex items-center justify-between"><h2 className="font-display text-2xl">Personnes qui ont visité votre profil</h2><button type="button" onClick={() => void loadProfileVisitors()} className="text-xs font-bold text-[#ec3b78]">Actualiser</button></div>
-                {visitorsLoading ? <p className="text-sm text-[#756960]">Chargement des visiteurs…</p> : profileVisitorCount === 0 ? <p className="rounded-2xl bg-[#f8f9fd] p-6 text-center text-sm text-[#756960] dark:bg-white/5">Aucune visite pour le moment.</p> : profileVisitors.length === 0 ? <p className="rounded-2xl bg-[#f8f9fd] p-6 text-center text-sm text-[#756960] dark:bg-white/5">{profileVisitorCount} visite{profileVisitorCount > 1 ? 's' : ''} enregistrée{profileVisitorCount > 1 ? 's' : ''}. Certains profils visiteurs ne sont pas accessibles.</p> : <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{profileVisitors.slice((visitorsPage - 1) * 12, visitorsPage * 12).map((visitor) => <article key={visitor.id} className="flex items-center gap-3 rounded-2xl border border-[#eadfd5] p-3 dark:border-white/10"><img src={visitor.photo_url} alt="" className="h-14 w-14 rounded-xl object-cover"/><div className="min-w-0"><p className="truncate font-bold">{visitor.display_name}{visitor.age ? `, ${visitor.age}` : ''}</p><p className="truncate text-xs text-[#756960]">{visitor.city}</p></div></article>)}</div>}
+                {visitorsLoading ? <p className="text-sm text-[#756960]">Chargement des visiteurs…</p> : visitorsError ? <p className="rounded-2xl bg-[#f8f9fd] p-6 text-center text-sm text-[#756960] dark:bg-white/5">Impossible de charger les visites pour le moment. Réessayez.</p> : profileVisitorCount === 0 ? <p className="rounded-2xl bg-[#f8f9fd] p-6 text-center text-sm text-[#756960] dark:bg-white/5">Aucune visite pour le moment.</p> : profileVisitors.length === 0 ? <p className="rounded-2xl bg-[#f8f9fd] p-6 text-center text-sm text-[#756960] dark:bg-white/5">{profileVisitorCount} visite{profileVisitorCount > 1 ? 's' : ''} enregistrée{profileVisitorCount > 1 ? 's' : ''}. Certains profils visiteurs ne sont pas accessibles.</p> : <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{profileVisitors.slice((visitorsPage - 1) * 12, visitorsPage * 12).map((visitor) => <article key={visitor.id} className="flex items-center gap-3 rounded-2xl border border-[#eadfd5] p-3 dark:border-white/10"><img src={visitor.photo_url} alt="" className="h-14 w-14 rounded-xl object-cover"/><div className="min-w-0"><p className="truncate font-bold">{visitor.display_name}{visitor.age ? `, ${visitor.age}` : ''}</p><p className="truncate text-xs text-[#756960]">{visitor.city}</p></div></article>)}</div>}
                 {profileSection === 'visitors' && profileVisitors.length > 12 && <div className="mt-4 flex items-center justify-between"><p className="text-xs text-[#756960]">Page {visitorsPage} / {Math.ceil(profileVisitors.length / 12)}</p><div className="flex gap-2"><button type="button" disabled={visitorsPage === 1} onClick={() => setVisitorsPage((page) => Math.max(1, page - 1))} className="rounded-full border px-4 py-2 text-xs font-bold disabled:opacity-40">Précédent</button><button type="button" disabled={visitorsPage >= Math.ceil(profileVisitors.length / 12)} onClick={() => setVisitorsPage((page) => Math.min(Math.ceil(profileVisitors.length / 12), page + 1))} className="rounded-full border px-4 py-2 text-xs font-bold disabled:opacity-40">Suivant</button></div></div>}
               </section>}
               {profileSection === 'blocks' && <section className="rounded-[26px] border border-[#e7e8ee] bg-white p-5 shadow-sm dark:border-white/10 dark:bg-[#1c1b21] sm:p-7">
