@@ -13,17 +13,6 @@ function hashCode(code: string, secret: string) {
   return createHmac('sha256', secret).update(code).digest('hex');
 }
 
-async function findUserId(admin: ReturnType<typeof createClient>, email: string) {
-  for (let page = 1; page <= 100; page += 1) {
-    const { data, error } = await admin.auth.admin.listUsers({ page, perPage: 1000 });
-    if (error) throw new Error('user_lookup_failed');
-    const user = data.users.find((candidate) => candidate.email?.toLowerCase() === email);
-    if (user) return user.id;
-    if (data.users.length < 1000) return null;
-  }
-  return null;
-}
-
 export async function POST(request: Request) {
   try {
     const body = await request.json() as { email?: unknown };
@@ -41,7 +30,17 @@ export async function POST(request: Request) {
     }
 
     const admin = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } });
-    const userId = await findUserId(admin, email);
+    let userId: string | null = null;
+    for (let page = 1; page <= 100; page += 1) {
+      const { data, error } = await admin.auth.admin.listUsers({ page, perPage: 1000 });
+      if (error) throw new Error('user_lookup_failed');
+      const user = data.users.find((candidate) => candidate.email?.toLowerCase() === email);
+      if (user) {
+        userId = user.id;
+        break;
+      }
+      if (data.users.length < 1000) break;
+    }
     if (!userId) return NextResponse.json(genericResponse);
 
     const { data: recentCode, error: recentError } = await admin.from('password_recovery_codes')
