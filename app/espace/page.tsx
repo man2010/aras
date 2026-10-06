@@ -12,7 +12,7 @@ import { AppSidebar, type EspaceTab } from '@/components/app-sidebar';
 import { Slider } from '@/components/ui/slider';
 
 type Tab = EspaceTab;
-const PROFILE_CARD_SELECT = 'id,updated_at,full_name,gender,birthdate,city,zone,bio,interests,languages,religion,caste,marital_status,smoking_habit,avatar_urls,lat,lng,is_active,is_online,last_seen_at,is_verified,is_premium,created_at,height,profession,profile_status,onboarding_completed';
+const PROFILE_CARD_SELECT = 'id,updated_at,full_name,gender,birthdate,city,zone,bio,interests,languages,religion,caste,marital_status,smoking_habit,avatar_urls,lat,lng,is_active,is_online,last_seen_at,is_verified,is_premium,show_age,show_online_status,show_distance,created_at,height,profession,profile_status,onboarding_completed';
 
 const PROFILE_INTEREST_OPTIONS = [
   { label: 'Musique', Icon: Music2 }, { label: 'Voyages', Icon: Plane }, { label: 'Cuisine', Icon: Utensils },
@@ -83,9 +83,9 @@ function SettingsPanels({
   tab,
   profile,
   privacySettings,
-  setPrivacySettings,
-  savePrivacy,
+  onPrivacyToggle,
   privacySaved,
+  privacySaveError,
   securityForm,
   setSecurityForm,
   changePassword,
@@ -101,9 +101,9 @@ function SettingsPanels({
   tab: Tab;
   profile: Profile | null;
   privacySettings: PrivacyState;
-  setPrivacySettings: Dispatch<SetStateAction<PrivacyState>>;
-  savePrivacy: () => void;
+  onPrivacyToggle: (key: keyof PrivacyState) => void;
   privacySaved: boolean;
+  privacySaveError: string;
   securityForm: { newPassword: string; confirmPassword: string };
   setSecurityForm: Dispatch<SetStateAction<{ newPassword: string; confirmPassword: string }>>;
   changePassword: (e: FormEvent<HTMLFormElement>) => void;
@@ -166,27 +166,26 @@ function SettingsPanels({
             <h2 className="font-display text-2xl">Confidentialité</h2>
             <p className="mt-2 text-sm leading-6 text-[#756960]">Contrôlez ce que les autres membres peuvent voir.</p>
             <div className="mt-5 space-y-3">
-              <Toggle checked={privacySettings.show_age} onChange={() => setPrivacySettings((s) => ({ ...s, show_age: !s.show_age }))} label="Afficher mon âge" />
-              <Toggle checked={privacySettings.show_online_status} onChange={() => setPrivacySettings((s) => ({ ...s, show_online_status: !s.show_online_status }))} label="Afficher mon statut en ligne" />
-              <Toggle checked={privacySettings.show_distance} onChange={() => setPrivacySettings((s) => ({ ...s, show_distance: !s.show_distance }))} label="Afficher ma ville" />
+              <Toggle checked={privacySettings.show_age} onChange={() => onPrivacyToggle('show_age')} label="Afficher mon âge" />
+              <Toggle checked={privacySettings.show_online_status} onChange={() => onPrivacyToggle('show_online_status')} label="Afficher mon statut en ligne" />
+              <Toggle checked={privacySettings.show_distance} onChange={() => onPrivacyToggle('show_distance')} label="Afficher ma ville" />
             </div>
           </div>
 
           <div className="rounded-[26px] bg-white p-6 shadow-[0_8px_30px_rgba(83,46,32,.05)] sm:p-8">
             <h2 className="font-display text-2xl">Notifications</h2>
             <div className="mt-5 space-y-3">
-              <Toggle checked={privacySettings.notif_messages} onChange={() => setPrivacySettings((s) => ({ ...s, notif_messages: !s.notif_messages }))} label="Nouveaux messages" />
-              <Toggle checked={privacySettings.notif_likes} onChange={() => setPrivacySettings((s) => ({ ...s, notif_likes: !s.notif_likes }))} label="Nouveaux likes" />
-              <Toggle checked={privacySettings.notif_matches} onChange={() => setPrivacySettings((s) => ({ ...s, notif_matches: !s.notif_matches }))} label="Nouveaux matches" />
-              <Toggle checked={privacySettings.notif_events} onChange={() => setPrivacySettings((s) => ({ ...s, notif_events: !s.notif_events }))} label="Événements à venir" />
+              <Toggle checked={privacySettings.notif_messages} onChange={() => onPrivacyToggle('notif_messages')} label="Nouveaux messages" />
+              <Toggle checked={privacySettings.notif_likes} onChange={() => onPrivacyToggle('notif_likes')} label="Nouveaux likes" />
+              <Toggle checked={privacySettings.notif_matches} onChange={() => onPrivacyToggle('notif_matches')} label="Nouveaux matches" />
+              <Toggle checked={privacySettings.notif_events} onChange={() => onPrivacyToggle('notif_events')} label="Événements à venir" />
             </div>
           </div>
 
           <div className="flex items-center gap-4">
-            <button onClick={savePrivacy} className="rounded-full bg-[#ec3b78] px-6 py-3.5 text-sm font-extrabold text-white transition hover:bg-[#c92e63]">
-              Enregistrer
-            </button>
-            {privacySaved && <span className="flex items-center gap-2 text-sm font-bold text-[#1a6b68]"><Check size={16} /> Préférences mises à jour !</span>}
+            <p role={privacySaveError ? 'alert' : 'status'} className={`flex items-center gap-2 text-sm font-bold ${privacySaveError ? 'text-[#c92e63]' : 'text-[#1a6b68]'}`}>
+              {privacySaveError ? privacySaveError : privacySaved ? <><Check size={16} /> Préférences enregistrées automatiquement.</> : 'Chaque changement est enregistré automatiquement.'}
+            </p>
           </div>
         </div>
       )}
@@ -409,7 +408,7 @@ export default function EspacePage() {
       setMatches([]);
       return;
     }
-    const { data: profileRows, error: profileError } = await supabase.from('profiles').select(PROFILE_CARD_SELECT).in('id', profileIds);
+    const { data: profileRows, error: profileError } = await supabase.from('profiles_visible').select(PROFILE_CARD_SELECT).in('id', profileIds);
     if (profileError || !profileRows || refreshVersion !== likeRefreshVersion.current) return;
     const profiles = (profileRows as ProfileRow[]).map(toProfile);
     setLikedProfiles(profiles.filter((item) => sentSet.has(item.id) && !receivedSet.has(item.id)));
@@ -460,7 +459,7 @@ export default function EspacePage() {
     const visitorIds = Array.from(new Set((payload.visits as { visitor_id: string }[]).map((visit) => visit.visitor_id)));
     setProfileVisitorCount(visitorIds.length);
     if (visitorIds.length) {
-      const { data, error } = await supabase.from('profiles').select('*').in('id', visitorIds);
+      const { data, error } = await supabase.from('profiles_visible').select('*').in('id', visitorIds);
       if (error) console.error('Impossible de charger les profils des visiteurs :', error);
       const profiles = (data ?? []).map((row) => toProfile(row as ProfileRow));
       const byId = new Map(profiles.map((item) => [item.id, item]));
@@ -496,6 +495,7 @@ export default function EspacePage() {
     notif_events: true,
   });
   const [privacySaved, setPrivacySaved] = useState(false);
+  const [privacySaveError, setPrivacySaveError] = useState('');
   const [securityForm, setSecurityForm] = useState({ newPassword: '', confirmPassword: '' });
   const [securityMessage, setSecurityMessage] = useState('');
   const [securityLoading, setSecurityLoading] = useState(false);
@@ -532,7 +532,7 @@ export default function EspacePage() {
       setBlockedProfilesLoading(false);
       return;
     }
-    const { data: profileRows } = await supabase.from('profiles').select(PROFILE_CARD_SELECT).in('id', ownBlockedIds);
+    const { data: profileRows } = await supabase.from('profiles_visible').select(PROFILE_CARD_SELECT).in('id', ownBlockedIds);
     setBlockedProfiles((profileRows ?? []).map((row) => toProfile(row as ProfileRow)));
     setBlockedProfilesLoading(false);
   }, [user]);
@@ -701,7 +701,7 @@ export default function EspacePage() {
       }
 
       const { data: discoveryData } = await supabase
-        .from('profiles')
+        .from('profiles_visible')
         .select(PROFILE_CARD_SELECT)
         .order('created_at', { ascending: false });
       if (cancelled) return;
@@ -735,7 +735,7 @@ export default function EspacePage() {
         const mappedConversations = uniqueConversations(convs as MatchRow[], user.id);
         setConversations(mappedConversations);
         const partnerIds = mappedConversations.map((c) => c.user_a === user.id ? c.user_b : c.user_a);
-        const { data: partnerProfiles } = await supabase.from('profiles').select('*').in('id', partnerIds);
+        const { data: partnerProfiles } = await supabase.from('profiles_visible').select('*').in('id', partnerIds);
         if (cancelled) return;
         if (partnerProfiles) {
           const profileMap: Record<string, Profile> = {};
@@ -852,13 +852,22 @@ export default function EspacePage() {
     setTimeout(() => setProfileSaved(false), 3000);
   };
 
-  const savePrivacy = async () => {
+  const togglePrivacySetting = async (key: keyof PrivacyState) => {
     if (!user) return;
-    const { error } = await supabase.from('profiles').update(privacySettings).eq('id', user.id);
-    if (!error) {
-      setPrivacySaved(true);
-      setTimeout(() => setPrivacySaved(false), 2500);
+    const previousValue = privacySettings[key];
+    const nextValue = !previousValue;
+    setPrivacySettings((current) => ({ ...current, [key]: nextValue }));
+    setPrivacySaved(false);
+    setPrivacySaveError('');
+    const { error } = await supabase.from('profiles').update({ [key]: nextValue }).eq('id', user.id);
+    if (error) {
+      setPrivacySettings((current) => current[key] === nextValue ? { ...current, [key]: previousValue } : current);
+      setPrivacySaveError('Impossible d’enregistrer ce réglage. Réessayez.');
+      return;
     }
+    setPrivacySaved(true);
+    window.dispatchEvent(new Event('aras:notifications-refresh'));
+    window.setTimeout(() => setPrivacySaved(false), 3000);
   };
 
   const changePassword = async (e: FormEvent<HTMLFormElement>) => {
@@ -1358,7 +1367,7 @@ export default function EspacePage() {
       return;
     }
     void (async () => {
-      const { data, error } = await supabase.from('profiles').select(PROFILE_CARD_SELECT).eq('id', profileId).maybeSingle();
+      const { data, error } = await supabase.from('profiles_visible').select(PROFILE_CARD_SELECT).eq('id', profileId).maybeSingle();
       if (error || !data) {
         setInfoModal({ title: 'Conversation indisponible', message: 'Ce profil n’est pas disponible pour le moment.', confirmLabel: 'OK' });
         return;
@@ -1402,7 +1411,7 @@ export default function EspacePage() {
     ? Array.from(new Set([...(mobileDiscoveryProfile.avatar_urls ?? []), mobileDiscoveryProfile.photo_url].filter((photo): photo is string => Boolean(photo))))
     : [];
   const mobileDiscoveryDistance = (() => {
-    if (profile?.lat == null || profile.lng == null || mobileDiscoveryProfile?.lat == null || mobileDiscoveryProfile.lng == null) return null;
+    if (mobileDiscoveryProfile?.show_distance === false || profile?.lat == null || profile.lng == null || mobileDiscoveryProfile?.lat == null || mobileDiscoveryProfile.lng == null) return null;
     const radians = (degrees: number) => (degrees * Math.PI) / 180;
     const latitudeDelta = radians(mobileDiscoveryProfile.lat - profile.lat);
     const longitudeDelta = radians(mobileDiscoveryProfile.lng - profile.lng);
@@ -1595,14 +1604,14 @@ export default function EspacePage() {
                       )}
                       <div className="discovery-image-overlay absolute inset-0 bg-gradient-to-b from-black/25 via-transparent to-black/85" />
                       {mobileDiscoveryDistance !== null && <div className="absolute left-4 top-4 inline-flex items-center gap-1.5 rounded-full border border-white/45 bg-black/35 px-4 py-2 text-sm font-extrabold text-white backdrop-blur-md"><MapPin size={15} />{mobileDiscoveryDistance.toLocaleString('fr-FR')} km</div>}
-                      <span role="img" aria-label={mobileDiscoveryProfile.is_online ? 'En ligne' : 'Hors ligne'} className={`absolute right-4 top-4 h-4 w-4 rounded-full border-2 border-white/90 shadow-[0_0_14px_currentColor] ${mobileDiscoveryProfile.is_online ? 'bg-emerald-500 text-emerald-400' : 'bg-red-500 text-red-400'}`} />
+                      {mobileDiscoveryProfile.show_online_status !== false && <span role="img" aria-label={mobileDiscoveryProfile.is_online ? 'En ligne' : 'Hors ligne'} className={`absolute right-4 top-4 h-4 w-4 rounded-full border-2 border-white/90 shadow-[0_0_14px_currentColor] ${mobileDiscoveryProfile.is_online ? 'bg-emerald-500 text-emerald-400' : 'bg-red-500 text-red-400'}`} />}
                       {mobileDiscoveryPhotos.length > 1 && <div className="absolute inset-x-0 top-4 flex justify-center gap-1.5">{mobileDiscoveryPhotos.map((photo, index) => <button key={photo} type="button" aria-label={`Afficher la photo ${index + 1}`} onClick={() => setDiscoveryPhotoIndexes((current) => ({ ...current, [mobileDiscoveryProfile.id]: index }))} className={`h-1.5 rounded-full ${index === (discoveryPhotoIndexes[mobileDiscoveryProfile.id] ?? 0) ? 'w-7 bg-white' : 'w-1.5 bg-white/55'}`} />)}</div>}
                       <div className="absolute inset-x-0 bottom-0 text-white p-5 sm:p-7">
                         <h3 className="font-display text-4xl leading-tight sm:text-5xl">
-                          {mobileDiscoveryProfile.display_name}{mobileDiscoveryProfile.age ? `, ${mobileDiscoveryProfile.age}` : ''}
+                          {mobileDiscoveryProfile.display_name}{mobileDiscoveryProfile.show_age !== false && mobileDiscoveryProfile.age ? `, ${mobileDiscoveryProfile.age}` : ''}
                         </h3>
                         {mobileDiscoveryProfile.profession && <p className="mt-1.5 text-base font-semibold text-white/90">{mobileDiscoveryProfile.profession}</p>}
-                        <p className="mt-1.5 flex items-center gap-1.5 text-sm text-white/80"><MapPin size={15} className="shrink-0 text-[#ff4b9b]" />{mobileDiscoveryProfile.city || 'Ville non renseignée'}</p>
+                        {mobileDiscoveryProfile.show_distance !== false && <p className="mt-1.5 flex items-center gap-1.5 text-sm text-white/80"><MapPin size={15} className="shrink-0 text-[#ff4b9b]" />{mobileDiscoveryProfile.city || 'Ville non renseignée'}</p>}
                         {mobileDiscoveryProfile.interests?.length ? <div className="mt-3 flex flex-wrap gap-2">{mobileDiscoveryProfile.interests.slice(0, 3).map((interest) => <span key={interest} className="rounded-full border border-white/35 bg-white/10 px-3 py-1.5 text-xs font-bold text-white backdrop-blur">★ {interest}</span>)}</div> : null}
                         <button type="button" onClick={() => { void recordProfileVisit(mobileDiscoveryProfile.id); setExpandedDiscoveryProfile((expanded) => !expanded); }} className="mt-3 inline-flex min-h-10 items-center gap-2 rounded-full bg-[#ec1689] px-5 py-2 text-sm font-extrabold text-white shadow-lg">
                           Voir plus <ChevronRight size={16} className="rotate-90" />
@@ -1620,11 +1629,11 @@ export default function EspacePage() {
                         <section className="mx-auto flex min-h-dvh w-full max-w-[820px] flex-col">
                           <header className="flex items-start justify-between gap-4 px-5 pb-4 pt-[max(1.25rem,env(safe-area-inset-top))] sm:px-8">
                             <div className="min-w-0">
-                              <h2 className="mt-1 truncate font-display text-3xl font-bold sm:text-4xl">{mobileDiscoveryProfile.display_name}{mobileDiscoveryProfile.age ? `, ${mobileDiscoveryProfile.age}` : ''}</h2>
-                              <p className="mt-1 flex items-center gap-1.5 text-sm text-[#686b79] dark:text-white/65"><MapPin size={14} className="shrink-0 text-[#ec1689]" />{mobileDiscoveryProfile.city || 'Localisation non renseignée'}</p>
+                              <h2 className="mt-1 truncate font-display text-3xl font-bold sm:text-4xl">{mobileDiscoveryProfile.display_name}{mobileDiscoveryProfile.show_age !== false && mobileDiscoveryProfile.age ? `, ${mobileDiscoveryProfile.age}` : ''}</h2>
+                              {mobileDiscoveryProfile.show_distance !== false && <p className="mt-1 flex items-center gap-1.5 text-sm text-[#686b79] dark:text-white/65"><MapPin size={14} className="shrink-0 text-[#ec1689]" />{mobileDiscoveryProfile.city || 'Localisation non renseignée'}</p>}
                               <div className="mt-2 flex flex-wrap gap-2">
                                 {mobileDiscoveryProfile.is_verified && <span className="rounded-full bg-sky-100 px-2.5 py-1 text-[10px] font-bold text-sky-700 dark:bg-sky-500/20 dark:text-sky-200">✓ Vérifié</span>}
-                                {mobileDiscoveryProfile.is_online && <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-[10px] font-bold text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-200">● En ligne</span>}
+                                {mobileDiscoveryProfile.show_online_status !== false && mobileDiscoveryProfile.is_online && <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-[10px] font-bold text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-200">● En ligne</span>}
                                 {mobileDiscoveryProfile.is_premium && <span className="rounded-full bg-[#fce6ef] px-2.5 py-1 text-[10px] font-bold text-[#c21c6b] dark:bg-[#ec1689]/20 dark:text-[#ff8fc0]">Premium</span>}
                               </div>
                             </div>
@@ -1695,14 +1704,14 @@ export default function EspacePage() {
                         {desktopDiscoveryPhotos.length ? <img src={desktopDiscoveryPhotos[discoveryPhotoIndexes[desktopDiscoveryProfile.id] ?? 0] ?? desktopDiscoveryPhotos[0]} alt={`Photo de ${desktopDiscoveryProfile.display_name}`} className="absolute inset-0 h-full w-full object-cover" /> : <div className="absolute inset-0 flex items-center justify-center font-display text-8xl text-[#b58f7d]">{desktopDiscoveryProfile.display_name.charAt(0).toUpperCase()}</div>}
                         <div className="absolute left-5 top-5 flex flex-wrap gap-2">
                           {desktopDiscoveryProfile.is_verified && <span className="inline-flex items-center gap-1.5 rounded-full bg-white/90 px-3 py-2 text-xs font-bold text-[#168079] backdrop-blur"><ShieldCheck size={15} /> Vérifié</span>}
-                          {desktopDiscoveryProfile.is_online && <span className="inline-flex items-center gap-1.5 rounded-full bg-white/90 px-3 py-2 text-xs font-bold text-[#168079] backdrop-blur"><span className="h-2 w-2 rounded-full bg-emerald-500" /> En ligne</span>}
+                          {desktopDiscoveryProfile.show_online_status !== false && desktopDiscoveryProfile.is_online && <span className="inline-flex items-center gap-1.5 rounded-full bg-white/90 px-3 py-2 text-xs font-bold text-[#168079] backdrop-blur"><span className="h-2 w-2 rounded-full bg-emerald-500" /> En ligne</span>}
                         </div>
                         {desktopDiscoveryPhotos.length > 1 && <><div className="absolute inset-x-4 top-1/2 flex -translate-y-1/2 justify-between"><button type="button" aria-label="Photo précédente" onClick={() => setDiscoveryPhotoIndexes((current) => ({ ...current, [desktopDiscoveryProfile.id]: ((current[desktopDiscoveryProfile.id] ?? 0) - 1 + desktopDiscoveryPhotos.length) % desktopDiscoveryPhotos.length }))} className="flex h-10 w-10 items-center justify-center rounded-full bg-black/35 text-white backdrop-blur"><ArrowLeft size={18} /></button><button type="button" aria-label="Photo suivante" onClick={() => setDiscoveryPhotoIndexes((current) => ({ ...current, [desktopDiscoveryProfile.id]: ((current[desktopDiscoveryProfile.id] ?? 0) + 1) % desktopDiscoveryPhotos.length }))} className="flex h-10 w-10 items-center justify-center rounded-full bg-black/35 text-white backdrop-blur"><ArrowRight size={18} /></button></div><div className="absolute bottom-5 left-0 right-0 flex justify-center gap-1.5">{desktopDiscoveryPhotos.map((photo, index) => <span key={`${photo}-${index}`} className={`h-1.5 rounded-full ${index === (discoveryPhotoIndexes[desktopDiscoveryProfile.id] ?? 0) ? 'w-7 bg-white' : 'w-2 bg-white/55'}`} />)}</div></>}
                       </div>
                       <div className="flex min-h-0 flex-col">
                         <div className="min-h-0 flex-1 overflow-y-auto p-8 xl:p-10">
-                          <h2 className="font-display text-4xl leading-tight text-[#241c18] dark:text-white">{desktopDiscoveryProfile.display_name}, {desktopDiscoveryProfile.age} <span className="text-2xl">ans</span></h2>
-                          <p className="mt-3 flex items-center gap-2 text-sm text-[#756960] dark:text-white/60"><MapPin size={17} /> {desktopDiscoveryProfile.city || 'Ville non renseignée'}</p>
+                          <h2 className="font-display text-4xl leading-tight text-[#241c18] dark:text-white">{desktopDiscoveryProfile.display_name}{desktopDiscoveryProfile.show_age !== false && <>, {desktopDiscoveryProfile.age} <span className="text-2xl">ans</span></>}</h2>
+                          {desktopDiscoveryProfile.show_distance !== false && <p className="mt-3 flex items-center gap-2 text-sm text-[#756960] dark:text-white/60"><MapPin size={17} /> {desktopDiscoveryProfile.city || 'Ville non renseignée'}</p>}
                           {desktopDiscoveryProfile.profession && <p className="mt-7 text-xs font-extrabold uppercase tracking-[.14em] text-[#168079] dark:text-emerald-300">{desktopDiscoveryProfile.profession}</p>}
                           {desktopDiscoveryProfile.bio && <section className="mt-8"><h3 className="text-[11px] font-extrabold uppercase tracking-[.16em] text-[#756960] dark:text-white/50">À propos</h3><p className="mt-3 whitespace-pre-line text-base leading-7 text-[#403b3a] dark:text-white/80">{desktopDiscoveryProfile.bio}</p></section>}
                           {desktopDiscoveryProfile.interests?.length > 0 && <section className="mt-8"><h3 className="text-[11px] font-extrabold uppercase tracking-[.16em] text-[#756960] dark:text-white/50">Centres d’intérêt</h3><div className="mt-3 flex flex-wrap gap-2">{desktopDiscoveryProfile.interests.map((interest) => <span key={interest} className="rounded-full bg-[#fce6ef] px-4 py-2 text-sm font-semibold text-[#8f2351] dark:bg-[#ec3b78]/15 dark:text-[#ff9fc2]">{interest}</span>)}</div></section>}
@@ -1736,16 +1745,16 @@ export default function EspacePage() {
                         <div className="absolute bottom-3 left-3 right-3 flex items-end justify-between gap-2">
                           <div>
                             <h3 className="font-display text-xl leading-none text-white">
-                              {profileItem.display_name}, <span className="text-white/80">{profileItem.age}</span>
+                              {profileItem.display_name}{profileItem.show_age !== false && <span className="text-white/80">, {profileItem.age}</span>}
                             </h3>
                           </div>
                         </div>
                       </div>
 
                       <div className="space-y-2.5 p-3.5">
-                        <p className="flex items-center gap-2 text-xs font-semibold text-[#756960]">
+                        {profileItem.show_distance !== false && <p className="flex items-center gap-2 text-xs font-semibold text-[#756960]">
                           <MapPin size={13} /> {profileItem.city || 'Ville non renseignée'}
-                        </p>
+                        </p>}
 
                         {profileItem.profession && (
                           <p className="text-[10px] font-bold uppercase tracking-[.1em] text-[#1a6b68]">{profileItem.profession}</p>
@@ -1765,7 +1774,7 @@ export default function EspacePage() {
 
                         <div className="flex items-center gap-2 border-t border-[#e5e6ec] pt-3 dark:border-white/10">
                           <div className="mr-auto flex items-center gap-1 text-[9px] font-extrabold uppercase tracking-[.08em] text-[#168079] dark:text-emerald-300">
-                            {profileItem.is_verified ? <><ShieldCheck size={12} /> Vérifié</> : profileItem.is_online ? <><span className="h-1.5 w-1.5 rounded-full bg-emerald-500" /> En ligne</> : <span className="text-[#747888] dark:text-white/45">Profil</span>}
+                            {profileItem.is_verified ? <><ShieldCheck size={12} /> Vérifié</> : profileItem.show_online_status !== false && profileItem.is_online ? <><span className="h-1.5 w-1.5 rounded-full bg-emerald-500" /> En ligne</> : <span className="text-[#747888] dark:text-white/45">Profil</span>}
                           </div>
                           <button type="button" onClick={() => { void recordProfileVisit(profileItem.id); const targetIndex = filteredDiscoveryProfiles.findIndex((item) => item.id === profileItem.id); if (targetIndex >= 0) setMobileDiscoveryIndex(targetIndex); setExpandedDiscoveryProfile(true); }} aria-label={`Voir le profil complet de ${profileItem.display_name}`} className="inline-flex h-10 min-w-[112px] items-center justify-between gap-3 rounded-full bg-gradient-to-r from-[#ec3b78] to-[#d92f6b] px-4 text-xs font-bold text-white shadow-[0_5px_14px_rgba(217,47,107,.22)] transition hover:-translate-y-0.5 hover:shadow-[0_8px_20px_rgba(217,47,107,.3)] active:translate-y-0"><span>Voir plus</span><span className="flex h-6 w-6 items-center justify-center rounded-full bg-white/20"><ChevronDown size={14} /></span></button>
                           <button type="button" onClick={() => handleDiscoveryMessage(profileItem)} aria-label={`Envoyer un message à ${profileItem.display_name}`} className="flex h-9 w-9 items-center justify-center rounded-full bg-[#292746] text-white transition hover:bg-[#3b3964]" title="Message"><MessageCircle size={16} /></button>
@@ -1831,7 +1840,7 @@ export default function EspacePage() {
               </section>}
               {profileSection === 'visitors' && <section className="rounded-[26px] bg-white p-5 shadow dark:bg-[#1c1b21]">
                 <div className="mb-4 flex items-center justify-between"><h2 className="font-display text-2xl">Personnes qui ont visité votre profil</h2><button type="button" onClick={() => void loadProfileVisitors()} className="text-xs font-bold text-[#ec3b78]">Actualiser</button></div>
-                {visitorsLoading ? <p className="text-sm text-[#756960]">Chargement des visiteurs…</p> : visitorsError ? <p className="rounded-2xl bg-[#f8f9fd] p-6 text-center text-sm text-[#756960] dark:bg-white/5">Impossible de charger les visites pour le moment. Réessayez.</p> : profileVisitorCount === 0 ? <p className="rounded-2xl bg-[#f8f9fd] p-6 text-center text-sm text-[#756960] dark:bg-white/5">Aucune visite pour le moment.</p> : profileVisitors.length === 0 ? <p className="rounded-2xl bg-[#f8f9fd] p-6 text-center text-sm text-[#756960] dark:bg-white/5">{profileVisitorCount} visite{profileVisitorCount > 1 ? 's' : ''} enregistrée{profileVisitorCount > 1 ? 's' : ''}. Certains profils visiteurs ne sont pas accessibles.</p> : <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{profileVisitors.slice((visitorsPage - 1) * 12, visitorsPage * 12).map((visitor) => <article key={visitor.id} className="flex items-center gap-3 rounded-2xl border border-[#eadfd5] p-3 dark:border-white/10"><img src={visitor.photo_url} alt="" className="h-14 w-14 rounded-xl object-cover"/><div className="min-w-0"><p className="truncate font-bold">{visitor.display_name}{visitor.age ? `, ${visitor.age}` : ''}</p><p className="truncate text-xs text-[#756960]">{visitor.city}</p></div></article>)}</div>}
+                {visitorsLoading ? <p className="text-sm text-[#756960]">Chargement des visiteurs…</p> : visitorsError ? <p className="rounded-2xl bg-[#f8f9fd] p-6 text-center text-sm text-[#756960] dark:bg-white/5">Impossible de charger les visites pour le moment. Réessayez.</p> : profileVisitorCount === 0 ? <p className="rounded-2xl bg-[#f8f9fd] p-6 text-center text-sm text-[#756960] dark:bg-white/5">Aucune visite pour le moment.</p> : profileVisitors.length === 0 ? <p className="rounded-2xl bg-[#f8f9fd] p-6 text-center text-sm text-[#756960] dark:bg-white/5">{profileVisitorCount} visite{profileVisitorCount > 1 ? 's' : ''} enregistrée{profileVisitorCount > 1 ? 's' : ''}. Certains profils visiteurs ne sont pas accessibles.</p> : <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{profileVisitors.slice((visitorsPage - 1) * 12, visitorsPage * 12).map((visitor) => <article key={visitor.id} className="flex items-center gap-3 rounded-2xl border border-[#eadfd5] p-3 dark:border-white/10"><img src={visitor.photo_url} alt="" className="h-14 w-14 rounded-xl object-cover"/><div className="min-w-0"><p className="truncate font-bold">{visitor.display_name}{visitor.show_age !== false && visitor.age ? `, ${visitor.age}` : ''}</p>{visitor.show_distance !== false && <p className="truncate text-xs text-[#756960]">{visitor.city}</p>}</div></article>)}</div>}
                 {profileSection === 'visitors' && profileVisitors.length > 12 && <div className="mt-4 flex items-center justify-between"><p className="text-xs text-[#756960]">Page {visitorsPage} / {Math.ceil(profileVisitors.length / 12)}</p><div className="flex gap-2"><button type="button" disabled={visitorsPage === 1} onClick={() => setVisitorsPage((page) => Math.max(1, page - 1))} className="rounded-full border px-4 py-2 text-xs font-bold disabled:opacity-40">Précédent</button><button type="button" disabled={visitorsPage >= Math.ceil(profileVisitors.length / 12)} onClick={() => setVisitorsPage((page) => Math.min(Math.ceil(profileVisitors.length / 12), page + 1))} className="rounded-full border px-4 py-2 text-xs font-bold disabled:opacity-40">Suivant</button></div></div>}
               </section>}
               {profileSection === 'blocks' && <section className="rounded-[26px] border border-[#e7e8ee] bg-white p-5 shadow-sm dark:border-white/10 dark:bg-[#1c1b21] sm:p-7">
@@ -1839,10 +1848,10 @@ export default function EspacePage() {
                 {blockedProfilesLoading ? <p className="rounded-2xl bg-[#f8f9fd] p-5 text-center text-sm text-[#756960] dark:bg-white/5 dark:text-white/60">Chargement…</p> : blockedProfiles.length === 0 ? <div className="rounded-2xl bg-[#f8f9fd] p-6 text-center text-sm text-[#756960] dark:bg-white/5 dark:text-white/60">Aucun profil bloqué.</div> : <div className="space-y-3">{blockedProfiles.map((blockedProfile) => <article key={blockedProfile.id} className="flex items-center gap-3 rounded-2xl border border-[#e7e8ee] p-3 dark:border-white/10"><img src={blockedProfile.photo_url} alt="" className="h-12 w-12 shrink-0 rounded-full object-cover"/><div className="min-w-0 flex-1"><p className="truncate text-sm font-bold text-[#292832] dark:text-white">{blockedProfile.display_name}{blockedProfile.age ? `, ${blockedProfile.age}` : ''}</p><p className="truncate text-xs text-[#777985] dark:text-white/50">{blockedProfile.city || 'Ville non renseignée'}</p></div><button type="button" onClick={() => void unblockProfile(blockedProfile)} className="shrink-0 rounded-full border border-[#e7e8ee] px-4 py-2 text-xs font-bold text-[#555763] transition hover:border-[#ec3b78] hover:text-[#ec3b78] dark:border-white/15 dark:text-white/75">Débloquer</button></article>)}</div>}
                 <div className="mt-5 flex items-start gap-3 rounded-2xl bg-[#f8f9fd] p-4 text-sm text-[#777985] dark:bg-white/5 dark:text-white/55"><Flag size={17} className="mt-0.5 shrink-0 text-[#ec3b78]"/><p>Pour signaler une personne, ouvrez sa conversation, puis le menu ⋮ en haut à droite.</p></div>
               </section>}
-              {profileSection === 'privacy' && <SettingsPanels tab="settings-privacy" profile={profile} privacySettings={privacySettings} setPrivacySettings={setPrivacySettings} savePrivacy={savePrivacy} privacySaved={privacySaved} securityForm={securityForm} setSecurityForm={setSecurityForm} changePassword={changePassword} securityMessage={securityMessage} securityLoading={securityLoading} showNewPw={showNewPw} setShowNewPw={setShowNewPw} onGoToProfileTab={() => setProfileSection('profile')} onChangeTab={() => {}} subscriptionPlan={subscriptionPlan} showTabs={false} />}
-              {profileSection === 'security' && <SettingsPanels tab="settings-security" profile={profile} privacySettings={privacySettings} setPrivacySettings={setPrivacySettings} savePrivacy={savePrivacy} privacySaved={privacySaved} securityForm={securityForm} setSecurityForm={setSecurityForm} changePassword={changePassword} securityMessage={securityMessage} securityLoading={securityLoading} showNewPw={showNewPw} setShowNewPw={setShowNewPw} onGoToProfileTab={() => setProfileSection('profile')} onChangeTab={() => {}} subscriptionPlan={subscriptionPlan} showTabs={false} />}
-              {profileSection === 'subscription' && <SettingsPanels tab="settings-subscription" profile={profile} privacySettings={privacySettings} setPrivacySettings={setPrivacySettings} savePrivacy={savePrivacy} privacySaved={privacySaved} securityForm={securityForm} setSecurityForm={setSecurityForm} changePassword={changePassword} securityMessage={securityMessage} securityLoading={securityLoading} showNewPw={showNewPw} setShowNewPw={setShowNewPw} onGoToProfileTab={() => setProfileSection('profile')} onChangeTab={() => {}} subscriptionPlan={subscriptionPlan} showTabs={false} />}
-              {profileSection === 'help' && <SettingsPanels tab="settings-help" profile={profile} privacySettings={privacySettings} setPrivacySettings={setPrivacySettings} savePrivacy={savePrivacy} privacySaved={privacySaved} securityForm={securityForm} setSecurityForm={setSecurityForm} changePassword={changePassword} securityMessage={securityMessage} securityLoading={securityLoading} showNewPw={showNewPw} setShowNewPw={setShowNewPw} onGoToProfileTab={() => setProfileSection('profile')} onChangeTab={() => {}} subscriptionPlan={subscriptionPlan} showTabs={false} />}
+              {profileSection === 'privacy' && <SettingsPanels tab="settings-privacy" profile={profile} privacySettings={privacySettings} onPrivacyToggle={togglePrivacySetting} privacySaved={privacySaved} privacySaveError={privacySaveError} securityForm={securityForm} setSecurityForm={setSecurityForm} changePassword={changePassword} securityMessage={securityMessage} securityLoading={securityLoading} showNewPw={showNewPw} setShowNewPw={setShowNewPw} onGoToProfileTab={() => setProfileSection('profile')} onChangeTab={() => {}} subscriptionPlan={subscriptionPlan} showTabs={false} />}
+              {profileSection === 'security' && <SettingsPanels tab="settings-security" profile={profile} privacySettings={privacySettings} onPrivacyToggle={togglePrivacySetting} privacySaved={privacySaved} privacySaveError={privacySaveError} securityForm={securityForm} setSecurityForm={setSecurityForm} changePassword={changePassword} securityMessage={securityMessage} securityLoading={securityLoading} showNewPw={showNewPw} setShowNewPw={setShowNewPw} onGoToProfileTab={() => setProfileSection('profile')} onChangeTab={() => {}} subscriptionPlan={subscriptionPlan} showTabs={false} />}
+              {profileSection === 'subscription' && <SettingsPanels tab="settings-subscription" profile={profile} privacySettings={privacySettings} onPrivacyToggle={togglePrivacySetting} privacySaved={privacySaved} privacySaveError={privacySaveError} securityForm={securityForm} setSecurityForm={setSecurityForm} changePassword={changePassword} securityMessage={securityMessage} securityLoading={securityLoading} showNewPw={showNewPw} setShowNewPw={setShowNewPw} onGoToProfileTab={() => setProfileSection('profile')} onChangeTab={() => {}} subscriptionPlan={subscriptionPlan} showTabs={false} />}
+              {profileSection === 'help' && <SettingsPanels tab="settings-help" profile={profile} privacySettings={privacySettings} onPrivacyToggle={togglePrivacySetting} privacySaved={privacySaved} privacySaveError={privacySaveError} securityForm={securityForm} setSecurityForm={setSecurityForm} changePassword={changePassword} securityMessage={securityMessage} securityLoading={securityLoading} showNewPw={showNewPw} setShowNewPw={setShowNewPw} onGoToProfileTab={() => setProfileSection('profile')} onChangeTab={() => {}} subscriptionPlan={subscriptionPlan} showTabs={false} />}
               {profileSection === 'profile' && profileEditOpen && <div className="grid gap-6">
               <div className="lg:col-span-2 flex items-center gap-3 rounded-2xl bg-white p-4 shadow dark:bg-[#1c1b21]"><button type="button" onClick={() => setProfileEditOpen(false)} aria-label="Retour au profil" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#f4f4f6] text-[#343540] dark:bg-white/10 dark:text-white"><ArrowLeft size={19} /></button><p className="font-bold text-[#292832] dark:text-white">Modifier mon profil</p></div>
               <form onSubmit={saveProfile} className="rounded-[26px] bg-white p-6 shadow-[0_8px_30px_rgba(83,46,32,.05)] lg:p-8">
@@ -2052,10 +2061,10 @@ export default function EspacePage() {
                         <p className="truncate text-sm font-extrabold text-[#241c18]">
                           {activeConversationProfile?.display_name || 'Utilisateur'}
                         </p>
-                        <p className="flex items-center gap-1.5 text-xs text-[#9a8b82]">
+                        {activeConversationProfile?.show_online_status !== false && <p className="flex items-center gap-1.5 text-xs text-[#9a8b82]">
                           <span className={`h-2 w-2 rounded-full ${activeConversationProfile?.is_online ? 'bg-[#1a6b68]' : 'bg-[#b8aaa1]'}`} />
                           {activeConversationProfile?.is_online ? 'En ligne' : 'Hors ligne'}
-                        </p>
+                        </p>}
                       </div>
                       <div className="relative ml-auto shrink-0">
                         <button type="button" aria-label="Actions de la conversation" aria-haspopup="menu" aria-expanded={chatActionsOpen} onClick={() => setChatActionsOpen((open) => !open)} className="flex h-10 w-10 items-center justify-center rounded-full text-[#625852] transition hover:bg-[#f8f9fd] hover:text-[#ec3b78] dark:text-white/75 dark:hover:bg-white/10 dark:hover:text-[#ff80b2]"><EllipsisVertical size={21} /></button>
@@ -2162,10 +2171,10 @@ export default function EspacePage() {
                           ) : isMatch ? (
                             <span className="absolute left-3 top-3 inline-flex items-center gap-1.5 rounded-full bg-[#ec1689] px-3 py-1.5 text-[9px] font-extrabold uppercase tracking-[.12em] text-white shadow-lg sm:left-4 sm:top-4 sm:text-[10px]"><Heart size={12} fill="currentColor" /> Match</span>
                           ) : null}
-                          {p.is_online && <span aria-label="En ligne" className={`absolute top-3 h-3 w-3 rounded-full border-2 border-white bg-emerald-400 shadow sm:top-4 ${likesView === 'sent' ? 'right-14 sm:right-16' : 'right-3 sm:right-4'}`} />}
+                          {p.show_online_status !== false && p.is_online && <span aria-label="En ligne" className={`absolute top-3 h-3 w-3 rounded-full border-2 border-white bg-emerald-400 shadow sm:top-4 ${likesView === 'sent' ? 'right-14 sm:right-16' : 'right-3 sm:right-4'}`} />}
                           <span className="absolute inset-x-0 bottom-0 p-3 text-white sm:p-4">
-                            <span className="block truncate text-sm font-extrabold sm:text-base">{p.display_name}{p.age ? `, ${p.age}` : ''}</span>
-                            <span className="mt-1 block truncate text-[11px] text-white/80 sm:text-xs">{p.city}{p.profession ? ` · ${p.profession}` : ''}</span>
+                            <span className="block truncate text-sm font-extrabold sm:text-base">{p.display_name}{p.show_age !== false && p.age ? `, ${p.age}` : ''}</span>
+                            <span className="mt-1 block truncate text-[11px] text-white/80 sm:text-xs">{p.show_distance !== false ? p.city : ''}{p.show_distance !== false && p.profession ? ` · ${p.profession}` : p.show_distance === false && p.profession ? p.profession : ''}</span>
                           </span>
                         </button>
                         {likesView === 'received' && !isMatch && (
@@ -2207,10 +2216,10 @@ export default function EspacePage() {
                         <img src={p.photo_url} alt={p.display_name} className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.03]" />
                         <span className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-black/5" />
                         <span className="absolute left-3 top-3 inline-flex items-center gap-1.5 rounded-full bg-[#ec1689] px-3 py-1.5 text-[9px] font-extrabold uppercase tracking-[.12em] text-white shadow-lg sm:left-4 sm:top-4 sm:text-[10px]"><Heart size={12} fill="currentColor" /> Match</span>
-                        {p.is_online && <span aria-label="En ligne" className="absolute right-3 top-3 h-3 w-3 rounded-full border-2 border-white bg-emerald-400 shadow sm:right-4 sm:top-4" />}
+                        {p.show_online_status !== false && p.is_online && <span aria-label="En ligne" className="absolute right-3 top-3 h-3 w-3 rounded-full border-2 border-white bg-emerald-400 shadow sm:right-4 sm:top-4" />}
                         <span className="absolute inset-x-0 bottom-0 p-3 pr-14 text-white sm:p-4 sm:pr-16">
-                          <span className="block truncate text-sm font-extrabold sm:text-base">{p.display_name}{p.age ? `, ${p.age}` : ''}</span>
-                          <span className="mt-1 block truncate text-[11px] text-white/80 sm:text-xs">{p.city}{p.profession ? ` · ${p.profession}` : ''}</span>
+                          <span className="block truncate text-sm font-extrabold sm:text-base">{p.display_name}{p.show_age !== false && p.age ? `, ${p.age}` : ''}</span>
+                          <span className="mt-1 block truncate text-[11px] text-white/80 sm:text-xs">{p.show_distance !== false ? p.city : ''}{p.show_distance !== false && p.profession ? ` · ${p.profession}` : p.show_distance === false && p.profession ? p.profession : ''}</span>
                         </span>
                       </button>
                       <button type="button" onClick={() => handleMatchMessage(p.id)} aria-label={`Envoyer un message à ${p.display_name}`} className="absolute bottom-3 right-3 flex h-10 w-10 items-center justify-center rounded-full bg-[#292746] text-white shadow-lg transition hover:scale-105 active:scale-95 sm:bottom-4 sm:right-4 sm:h-11 sm:w-11">
@@ -2308,9 +2317,9 @@ export default function EspacePage() {
               tab={tab}
               profile={profile}
               privacySettings={privacySettings}
-              setPrivacySettings={setPrivacySettings}
-              savePrivacy={savePrivacy}
+              onPrivacyToggle={togglePrivacySetting}
               privacySaved={privacySaved}
+              privacySaveError={privacySaveError}
               securityForm={securityForm}
               setSecurityForm={setSecurityForm}
               changePassword={changePassword}
@@ -2387,7 +2396,7 @@ export default function EspacePage() {
         <div className="fixed inset-0 z-[120] overflow-y-auto overscroll-contain bg-[#f8f9fd] text-[#24212b] dark:bg-[#101014] dark:text-white" role="dialog" aria-modal="true" aria-label={`Profil de ${selectedProfileDetail.display_name}`}>
           <section className="mx-auto flex min-h-dvh w-full max-w-[820px] flex-col">
             <header className="flex items-start justify-between gap-4 px-5 pb-4 pt-[max(1.25rem,env(safe-area-inset-top))] sm:px-8">
-              <div className="min-w-0"><p className="text-[10px] font-extrabold uppercase tracking-[.22em] text-[#ec1689] dark:text-[#ff4b9b]">Profil</p><h2 className="mt-1 truncate font-display text-3xl font-bold sm:text-4xl">{selectedProfileDetail.display_name}{selectedProfileDetail.age ? `, ${selectedProfileDetail.age}` : ''}</h2><p className="mt-1 flex items-center gap-1.5 text-sm text-[#686b79] dark:text-white/65"><MapPin size={14} className="shrink-0 text-[#ec1689]" />{selectedProfileDetail.city || 'Localisation non renseignée'}</p><div className="mt-2 flex flex-wrap gap-2">{selectedProfileDetail.is_verified && <span className="rounded-full bg-sky-100 px-2.5 py-1 text-[10px] font-bold text-sky-700 dark:bg-sky-500/20 dark:text-sky-200">✓ Vérifié</span>}{selectedProfileDetail.is_online && <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-[10px] font-bold text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-200">● En ligne</span>}{selectedProfileDetail.is_premium && <span className="rounded-full bg-[#fce6ef] px-2.5 py-1 text-[10px] font-bold text-[#c21c6b] dark:bg-[#ec1689]/20 dark:text-[#ff8fc0]">Premium</span>}</div></div>
+              <div className="min-w-0"><p className="text-[10px] font-extrabold uppercase tracking-[.22em] text-[#ec1689] dark:text-[#ff4b9b]">Profil</p><h2 className="mt-1 truncate font-display text-3xl font-bold sm:text-4xl">{selectedProfileDetail.display_name}{selectedProfileDetail.show_age !== false && selectedProfileDetail.age ? `, ${selectedProfileDetail.age}` : ''}</h2>{selectedProfileDetail.show_distance !== false && <p className="mt-1 flex items-center gap-1.5 text-sm text-[#686b79] dark:text-white/65"><MapPin size={14} className="shrink-0 text-[#ec1689]" />{selectedProfileDetail.city || 'Localisation non renseignée'}</p>}<div className="mt-2 flex flex-wrap gap-2">{selectedProfileDetail.is_verified && <span className="rounded-full bg-sky-100 px-2.5 py-1 text-[10px] font-bold text-sky-700 dark:bg-sky-500/20 dark:text-sky-200">✓ Vérifié</span>}{selectedProfileDetail.show_online_status !== false && selectedProfileDetail.is_online && <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-[10px] font-bold text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-200">● En ligne</span>}{selectedProfileDetail.is_premium && <span className="rounded-full bg-[#fce6ef] px-2.5 py-1 text-[10px] font-bold text-[#c21c6b] dark:bg-[#ec1689]/20 dark:text-[#ff8fc0]">Premium</span>}</div></div>
               <button type="button" onClick={() => setSelectedProfileDetail(null)} aria-label="Fermer le profil" className="mt-1 flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#eceef4] text-[#515565] ring-1 ring-[#e1e3eb] transition hover:bg-[#e3e5ed] dark:bg-white/10 dark:text-white dark:ring-white/10 dark:hover:bg-white/15"><X size={21} /></button>
             </header>
             <div className="relative mx-4 h-[min(52dvh,540px)] min-h-[320px] overflow-hidden rounded-[28px] bg-[#e4e6ed] shadow-[0_24px_70px_rgba(35,38,55,.18)] dark:bg-[#24242c] sm:mx-8 sm:rounded-[34px]">

@@ -38,7 +38,7 @@ export default function Home() {
   useEffect(() => {
     (async () => {
       const [{ data: p }, { data: e }] = await Promise.all([
-        supabase.from('profiles').select('*').eq('is_active', true).eq('is_premium', true).limit(8),
+        supabase.from('profiles_visible').select('*').eq('is_active', true).eq('is_premium', true).limit(8),
         supabase.from('events').select('*').eq('is_active', true).gte('date', new Date().toISOString()).order('date', { ascending: true }).limit(3),
       ]);
       if (p && p.length > 0) setProfiles((p as ProfileRow[]).map(toProfile));

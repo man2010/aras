@@ -11,7 +11,7 @@ import { useAuth } from '@/lib/auth-context';
 
 type NotificationPreview = {
   id: string;
-  type: 'message' | 'event' | 'like';
+  type: 'message' | 'event' | 'like' | 'match';
   title: string;
   message: string;
   href: string;
@@ -25,6 +25,8 @@ type MiniProfile = {
   display_name: string;
   photo_url: string;
   is_online: boolean;
+  show_online_status: boolean;
+  show_distance: boolean;
   city: string;
 };
 
@@ -35,6 +37,7 @@ export function Navbar() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [notificationOpen, setNotificationOpen] = useState(false);
+  const [notificationPreferences, setNotificationPreferences] = useState({ notif_messages: true, notif_likes: true, notif_matches: true, notif_events: true });
   const [notifications, setNotifications] = useState<NotificationPreview[]>([]);
   const [unreadEventCount, setUnreadEventCount] = useState(0);
   const [miniProfile, setMiniProfile] = useState<MiniProfile | null>(null);
@@ -47,6 +50,7 @@ export function Navbar() {
   // Le thème sauvegardé n'existe que dans le navigateur : conserver le rendu
   // clair jusqu'au montage évite une divergence serveur/client (icône SVG).
   const isDark = mounted && resolvedTheme === 'dark';
+  const visibleUnreadCount = (notificationPreferences.notif_messages ? unreadCount : 0) + unreadEventCount;
 
   useEffect(() => {
     setMounted(true);
@@ -90,7 +94,7 @@ export function Navbar() {
     const loadMiniProfile = async () => {
       const { data } = await supabase
         .from('profiles')
-        .select('full_name, avatar_urls, is_online, city')
+        .select('full_name, avatar_urls, is_online, city, show_online_status, show_distance')
         .eq('id', user.id)
         .maybeSingle();
       if (!cancelled && data) {
@@ -99,6 +103,8 @@ export function Navbar() {
           display_name: data.full_name || 'Mon profil',
           photo_url: data.avatar_urls?.find((url: string) => !url.includes('images.pexels.com/photos/733872/')) || fallbackAvatar,
           is_online: Boolean(data.is_online),
+          show_online_status: data.show_online_status !== false,
+          show_distance: data.show_distance !== false,
           city: data.city || '',
         });
       }
@@ -112,6 +118,33 @@ export function Navbar() {
 
     return () => {
       cancelled = true;
+      void supabase.removeChannel(channel);
+    };
+  }, [user]);
+
+  useEffect(() => {
+    if (!user) {
+      setNotificationPreferences({ notif_messages: true, notif_likes: true, notif_matches: true, notif_events: true });
+      return;
+    }
+    let cancelled = false;
+    const loadPreferences = async () => {
+      const { data } = await supabase.from('profiles').select('notif_messages, notif_likes, notif_matches, notif_events').eq('id', user.id).maybeSingle();
+      if (!cancelled && data) setNotificationPreferences({
+        notif_messages: data.notif_messages !== false,
+        notif_likes: data.notif_likes !== false,
+        notif_matches: data.notif_matches !== false,
+        notif_events: data.notif_events !== false,
+      });
+    };
+    void loadPreferences();
+    window.addEventListener('aras:notifications-refresh', loadPreferences);
+    const channel = supabase.channel(`navbar-notification-preferences-${user.id}`)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'profiles', filter: `id=eq.${user.id}` }, () => void loadPreferences())
+      .subscribe();
+    return () => {
+      cancelled = true;
+      window.removeEventListener('aras:notifications-refresh', loadPreferences);
       void supabase.removeChannel(channel);
     };
   }, [user]);
@@ -155,14 +188,14 @@ export function Navbar() {
 
       const senderIds = Array.from(new Set((messageRows ?? []).map((row: { sender_id: string }) => row.sender_id)));
       const { data: senderRows } = senderIds.length > 0
-        ? await supabase.from('profiles').select('id, full_name, avatar_urls').in('id', senderIds)
+        ? await supabase.from('profiles_visible').select('id, full_name, avatar_urls').in('id', senderIds)
         : { data: [] };
       const senderMap = new Map((senderRows ?? []).map((row: { id: string; full_name: string | null; avatar_urls: string[] | null }) => [
         row.id,
         { name: row.full_name || 'Nouveau message', avatarUrl: row.avatar_urls?.[0] },
       ]));
       const notificationActorIds = Array.from(new Set((storedNotifications ?? []).map((row: { actor_id: string | null }) => row.actor_id).filter((id: string | null): id is string => Boolean(id))));
-      const { data: notificationActors } = notificationActorIds.length ? await supabase.from('profiles').select('id, avatar_urls').in('id', notificationActorIds) : { data: [] };
+      const { data: notificationActors } = notificationActorIds.length ? await supabase.from('profiles_visible').select('id, avatar_urls').in('id', notificationActorIds) : { data: [] };
       const notificationActorAvatars = new Map((notificationActors ?? []).map((row: { id: string; avatar_urls: string[] | null }) => [row.id, row.avatar_urls?.[0] ?? undefined]));
       let readEventIds: string[] = [];
       try {
@@ -172,7 +205,7 @@ export function Navbar() {
       }
       const readEventSet = new Set(readEventIds);
 
-      const messageNotifications: NotificationPreview[] = (messageRows ?? []).map((row: { id: string; sender_id: string; content: string; created_at: string; match_id: string }) => {
+      const messageNotifications: NotificationPreview[] = notificationPreferences.notif_messages ? (messageRows ?? []).map((row: { id: string; sender_id: string; content: string; created_at: string; match_id: string }) => {
         const sender = senderMap.get(row.sender_id);
         return {
           id: `message-${row.id}`,
@@ -184,8 +217,8 @@ export function Navbar() {
           avatarUrl: sender?.avatarUrl,
           unread: true,
         };
-      });
-      const eventNotifications: NotificationPreview[] = (eventRows ?? []).map((row: { id: string; title: string; description: string | null; date: string; location: string; city: string | null; created_at: string }) => ({
+      }) : [];
+      const eventNotifications: NotificationPreview[] = notificationPreferences.notif_events ? (eventRows ?? []).map((row: { id: string; title: string; description: string | null; date: string; location: string; city: string | null; created_at: string }) => ({
         id: `event-${row.id}`,
         type: 'event' as const,
         title: row.title,
@@ -193,8 +226,8 @@ export function Navbar() {
         href: '/espace?tab=events',
         createdAt: row.created_at,
         unread: true,
-      })).filter((notification) => !readEventSet.has(notification.id.replace('event-', '')));
-      const reminderNotifications: NotificationPreview[] = (reminderRows ?? []).map((row: { id: string; title: string; date: string; location: string; city: string | null; created_at: string | null }) => ({
+      })).filter((notification) => !readEventSet.has(notification.id.replace('event-', ''))) : [];
+      const reminderNotifications: NotificationPreview[] = notificationPreferences.notif_events ? (reminderRows ?? []).map((row: { id: string; title: string; date: string; location: string; city: string | null; created_at: string | null }) => ({
         id: `reminder-${row.id}`,
         type: 'event' as const,
         title: `Rappel · ${row.title}`,
@@ -202,13 +235,17 @@ export function Navbar() {
         href: '/espace?tab=events',
         createdAt: row.created_at || row.date,
         unread: true,
-      })).filter((notification) => !readEventSet.has(notification.id.replace('reminder-', 'reminder-')));
-      const storedEventNotifications: NotificationPreview[] = (storedNotifications ?? []).map((row: { id: string; title: string; body: string; created_at: string; read_at: string | null; kind: string; actor_id: string | null }) => ({
+      })).filter((notification) => !readEventSet.has(notification.id.replace('reminder-', 'reminder-'))) : [];
+      const storedEventNotifications: NotificationPreview[] = (storedNotifications ?? []).filter((row: { kind: string }) => row.kind === 'like_received'
+        ? notificationPreferences.notif_likes
+        : row.kind === 'match_created'
+          ? notificationPreferences.notif_matches
+          : row.kind === 'event_registration' || row.kind === 'event_cancellation' || notificationPreferences.notif_events).map((row: { id: string; title: string; body: string; created_at: string; read_at: string | null; kind: string; actor_id: string | null }) => ({
         id: `db-${row.id}`,
-        type: row.kind === 'like_received' ? 'like' as const : 'event' as const,
+        type: row.kind === 'like_received' ? 'like' as const : row.kind === 'match_created' ? 'match' as const : 'event' as const,
         title: row.title,
         message: row.body,
-        href: row.kind === 'like_received' ? '/espace?tab=likes' : '/espace?tab=events',
+        href: row.kind === 'like_received' ? '/espace?tab=likes' : row.kind === 'match_created' ? '/espace?tab=matches' : '/espace?tab=events',
         createdAt: row.created_at,
         avatarUrl: row.actor_id ? notificationActorAvatars.get(row.actor_id) : undefined,
         unread: !row.read_at,
@@ -235,7 +272,7 @@ export function Navbar() {
       window.removeEventListener('aras:notifications-refresh', loadNotifications);
       void supabase.removeChannel(channel);
     };
-  }, [user]);
+  }, [user, notificationPreferences]);
 
   const handleNotificationClick = async (notification: NotificationPreview) => {
     if (notification.type === 'message') {
@@ -284,6 +321,7 @@ export function Navbar() {
 
   const notificationGroups = [
     { type: 'like' as const, label: 'Likes reçus', Icon: Heart },
+    { type: 'match' as const, label: 'Nouveaux matches', Icon: Heart },
     { type: 'message' as const, label: 'Messages', Icon: MessageCircle },
     { type: 'event' as const, label: 'Événements à venir', Icon: CalendarDays },
   ].map((group) => ({ ...group, items: notifications.filter((notification) => notification.type === group.type) }));
@@ -293,13 +331,13 @@ export function Navbar() {
       {notificationGroups.filter((group) => group.items.length > 0).map(({ type, label, Icon, items }) => (
         <section key={type} aria-label={label} className="mb-2 last:mb-0">
           <h3 className="flex items-center gap-2 px-3 pb-1 pt-2 text-[10px] font-extrabold uppercase tracking-[.12em] text-[#747888] dark:text-white/50">
-            <Icon size={13} className={type === 'like' ? 'text-[#ec3b78]' : type === 'message' ? 'text-sky-500' : 'text-amber-500'} />
+            <Icon size={13} className={type === 'like' || type === 'match' ? 'text-[#ec3b78]' : type === 'message' ? 'text-sky-500' : 'text-amber-500'} />
             {label}
             <span className="ml-auto rounded-full bg-[#eef0f5] px-2 py-0.5 text-[10px] text-[#515565] dark:bg-white/10 dark:text-white/70">{items.length}</span>
           </h3>
           {items.map((notification) => (
             <button key={notification.id} type="button" onClick={() => void handleNotificationClick(notification)} className={`flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left transition hover:bg-[#f1f2f7] dark:hover:bg-white/5 ${notification.unread ? 'bg-[#fdf0f6] dark:bg-[#ec3b78]/10' : ''}`}>
-              <div className={`relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full ${type === 'like' ? 'bg-[#fce6ef] text-[#ec3b78]' : type === 'message' ? 'bg-sky-50 text-sky-600 dark:bg-sky-500/15 dark:text-sky-300' : 'bg-amber-50 text-amber-600 dark:bg-amber-500/15 dark:text-amber-300'}`}>
+              <div className={`relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full ${type === 'like' || type === 'match' ? 'bg-[#fce6ef] text-[#ec3b78]' : type === 'message' ? 'bg-sky-50 text-sky-600 dark:bg-sky-500/15 dark:text-sky-300' : 'bg-amber-50 text-amber-600 dark:bg-amber-500/15 dark:text-amber-300'}`}>
                 {notification.avatarUrl ? <img src={notification.avatarUrl} alt="" className="h-full w-full object-cover" /> : <Icon size={17} />}
                 {notification.unread && <span className="absolute right-0 top-0 h-2.5 w-2.5 rounded-full border-2 border-white bg-[#ec3b78] dark:border-[#1c1b21]" />}
               </div>
@@ -327,7 +365,7 @@ export function Navbar() {
             className="flex min-w-0 items-center gap-2"
             aria-label="Mon profil"
           >
-            <span className="relative h-9 w-9 shrink-0 rounded-full border-2 border-[#ec3b78] bg-white sm:h-10 sm:w-10"><span className="absolute inset-0 overflow-hidden rounded-full"><img src={currentMiniProfile?.photo_url || fallbackAvatar} alt="" className="h-full w-full object-cover" /></span><span aria-label={currentMiniProfile?.is_online ? 'En ligne' : 'Hors ligne'} className={`absolute bottom-0 right-0 z-10 h-3 w-3 translate-x-[15%] translate-y-[15%] rounded-full border-2 border-[#f8f9fd] ${currentMiniProfile?.is_online ? 'bg-emerald-500' : 'bg-red-500'}`} /></span>
+            <span className="relative h-9 w-9 shrink-0 rounded-full border-2 border-[#ec3b78] bg-white sm:h-10 sm:w-10"><span className="absolute inset-0 overflow-hidden rounded-full"><img src={currentMiniProfile?.photo_url || fallbackAvatar} alt="" className="h-full w-full object-cover" /></span>{currentMiniProfile?.show_online_status !== false && <span aria-label={currentMiniProfile?.is_online ? 'En ligne' : 'Hors ligne'} className={`absolute bottom-0 right-0 z-10 h-3 w-3 translate-x-[15%] translate-y-[15%] rounded-full border-2 border-[#f8f9fd] ${currentMiniProfile?.is_online ? 'bg-emerald-500' : 'bg-red-500'}`} />}</span>
             <span className="hidden max-w-32 truncate text-sm font-extrabold text-[#241c18] sm:block">{currentMiniProfile?.display_name || 'Mon profil'}</span>
           </Link>
         ) : (
@@ -339,10 +377,10 @@ export function Navbar() {
         {isConnected && appTab === 'decouverte' && (
           <div className="pointer-events-none absolute left-1/2 top-1/2 max-w-[calc(100%-160px)] -translate-x-1/2 -translate-y-1/2 text-center md:hidden">
             <p className="truncate text-sm font-extrabold text-[#241c18]">Découvrir</p>
-            <p className="mt-0.5 flex items-center justify-center gap-1 truncate text-[11px] font-medium text-[#777985]">
+            {currentMiniProfile?.show_distance !== false && <p className="mt-0.5 flex items-center justify-center gap-1 truncate text-[11px] font-medium text-[#777985]">
               <MapPin size={12} className="shrink-0 text-[#ec3b78]" />
               <span className="truncate">{currentMiniProfile?.city || 'Ville non renseignée'}</span>
-            </p>
+            </p>}
           </div>
         )}
 
@@ -375,9 +413,9 @@ export function Navbar() {
                     className="relative flex items-center gap-2 px-4 py-2.5 text-[13px] font-bold text-[#515565] transition hover:text-[#ec3b78] dark:text-white/75"
                   >
                     <Bell size={16} />
-                    {(unreadCount + unreadEventCount) > 0 && (
+                    {visibleUnreadCount > 0 && (
                       <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-[#ec3b78] px-1 text-[10px] font-extrabold text-white">
-                        {(unreadCount + unreadEventCount) > 9 ? '9+' : unreadCount + unreadEventCount}
+                        {visibleUnreadCount > 9 ? '9+' : visibleUnreadCount}
                       </span>
                     )}
                   </button>
@@ -386,9 +424,9 @@ export function Navbar() {
                     <div className="fixed left-3 right-3 top-[72px] z-50 max-h-[calc(100dvh-88px)] overflow-hidden rounded-2xl border border-[#e1e3eb] bg-white text-[#252532] shadow-[0_18px_50px_rgba(35,38,55,.16)] dark:border-white/10 dark:bg-[#1c1b21] dark:text-white dark:shadow-[0_18px_50px_rgba(0,0,0,.45)] md:absolute md:left-auto md:right-0 md:top-full md:mt-2 md:max-h-none md:w-[min(360px,calc(100vw-2rem))]">
                       <div className="flex items-center justify-between border-b border-[#e8eaf0] px-4 py-3 dark:border-white/10">
                         <p className="text-sm font-extrabold text-[#252532] dark:text-white">Notifications</p>
-                        {(unreadCount + unreadEventCount) > 0 && (
+                        {visibleUnreadCount > 0 && (
                           <span className="text-[10px] font-extrabold uppercase tracking-[.12em] text-[#ec3b78]">
-                            {unreadCount + unreadEventCount} nouvelle{unreadCount + unreadEventCount > 1 ? 's' : ''}
+                            {visibleUnreadCount} nouvelle{visibleUnreadCount > 1 ? 's' : ''}
                           </span>
                         )}
                       </div>
@@ -423,16 +461,16 @@ export function Navbar() {
               <button
                 type="button"
                 onClick={() => setNotificationOpen((openState) => !openState)}
-                aria-label={`Ouvrir les notifications${(unreadCount + unreadEventCount) > 0 ? `, ${unreadCount + unreadEventCount} non lues` : ''}`}
+                aria-label={`Ouvrir les notifications${visibleUnreadCount > 0 ? `, ${visibleUnreadCount} non lues` : ''}`}
                 aria-expanded={notificationOpen}
                 className="relative rounded-full border border-[#e1e3eb] p-2.5 text-[#515565] transition hover:border-[#ec3b78] hover:text-[#ec3b78] dark:border-white/15 dark:text-white/75"
               >
                 <Bell size={18} />
-                {(unreadCount + unreadEventCount) > 0 && <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-[#ec3b78] px-1 text-[10px] font-extrabold text-white">{(unreadCount + unreadEventCount) > 9 ? '9+' : unreadCount + unreadEventCount}</span>}
+                {visibleUnreadCount > 0 && <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-[#ec3b78] px-1 text-[10px] font-extrabold text-white">{visibleUnreadCount > 9 ? '9+' : visibleUnreadCount}</span>}
               </button>
               {notificationOpen && (
                 <div className="fixed left-3 right-3 top-[72px] z-50 max-h-[calc(100dvh-88px)] overflow-hidden rounded-2xl border border-[#e1e3eb] bg-white text-[#252532] shadow-[0_18px_50px_rgba(35,38,55,.16)] dark:border-white/10 dark:bg-[#1c1b21] dark:text-white dark:shadow-[0_18px_50px_rgba(0,0,0,.45)] md:absolute md:left-auto md:right-0 md:top-full md:mt-3 md:max-h-none md:w-[min(360px,calc(100vw-2rem))]">
-                  <div className="flex items-center justify-between border-b border-[#e8eaf0] px-4 py-3 dark:border-white/10"><p className="text-sm font-extrabold text-[#252532] dark:text-white">Notifications</p>{(unreadCount + unreadEventCount) > 0 && <span className="text-[10px] font-extrabold uppercase tracking-[.12em] text-[#ec3b78]">{unreadCount + unreadEventCount} nouvelle{unreadCount + unreadEventCount > 1 ? 's' : ''}</span>}</div>
+                  <div className="flex items-center justify-between border-b border-[#e8eaf0] px-4 py-3 dark:border-white/10"><p className="text-sm font-extrabold text-[#252532] dark:text-white">Notifications</p>{visibleUnreadCount > 0 && <span className="text-[10px] font-extrabold uppercase tracking-[.12em] text-[#ec3b78]">{visibleUnreadCount} nouvelle{visibleUnreadCount > 1 ? 's' : ''}</span>}</div>
                   {notifications.length === 0 ? <div className="px-4 py-8 text-center"><Bell size={22} className="mx-auto text-[#85899a] dark:text-white/40" /><p className="mt-3 text-sm font-bold text-[#4f5362] dark:text-white/75">Aucune notification</p><p className="mt-1 text-xs text-[#747888] dark:text-white/50">Tout est à jour.</p></div> : renderNotificationGroups()}
                 </div>
               )}
@@ -470,13 +508,13 @@ export function Navbar() {
                 >
                   <span className="relative h-11 w-11 shrink-0 overflow-hidden rounded-full bg-[#f8f9fd]">
                     <img src={currentMiniProfile?.photo_url || fallbackAvatar} alt="" className="h-full w-full object-cover" />
-                    <span className={`absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-white ${currentMiniProfile?.is_online ? 'bg-[#1a6b68]' : 'bg-[#b8aaa1]'}`} />
+                    {currentMiniProfile?.show_online_status !== false && <span className={`absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-white ${currentMiniProfile?.is_online ? 'bg-[#1a6b68]' : 'bg-[#b8aaa1]'}`} />}
                   </span>
                   <span className="min-w-0">
                     <span className="block truncate text-sm font-extrabold text-[#241c18]">{currentMiniProfile?.display_name ?? 'Mon profil'}</span>
-                    <span className={`block text-xs font-bold ${currentMiniProfile?.is_online ? 'text-[#1a6b68]' : 'text-[#9a8b82]'}`}>
+                    {currentMiniProfile?.show_online_status !== false && <span className={`block text-xs font-bold ${currentMiniProfile?.is_online ? 'text-[#1a6b68]' : 'text-[#9a8b82]'}`}>
                       {currentMiniProfile?.is_online ? 'En ligne' : 'Hors ligne'}
-                    </span>
+                    </span>}
                   </span>
                 </Link>
 

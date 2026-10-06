@@ -17,6 +17,9 @@ export type Profile = {
   zone?: string | null;
   avatar_urls?: string[];
   is_online?: boolean;
+  show_age?: boolean;
+  show_online_status?: boolean;
+  show_distance?: boolean;
   is_premium?: boolean;
   last_seen_at?: string | null;
   height?: number | null;

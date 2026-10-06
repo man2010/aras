@@ -26,7 +26,7 @@ export default function DecouvertePage() {
 
     (async () => {
       const { data } = await supabase
-        .from('profiles')
+        .from('profiles_visible')
         .select('*')
         .eq('is_active', true)
         .order('created_at', { ascending: false })
@@ -118,14 +118,14 @@ export default function DecouvertePage() {
                   </div>
 
                   <div className="mt-5 space-y-2 text-sm text-[#756960]">
-                    <p className="flex items-center gap-2">
+                    {profile.show_distance !== false && <p className="flex items-center gap-2">
                       <MapPin size={14} className="text-[#1a6b68]" />
                       {profile.city}
-                    </p>
-                    <p className="flex items-center gap-2">
+                    </p>}
+                    {profile.show_age !== false && <p className="flex items-center gap-2">
                       <span className="inline-block h-2.5 w-2.5 rounded-full bg-[#ec3b78]" />
                       {profile.age} ans
-                    </p>
+                    </p>}
                   </div>
 
                   <div className="mt-5 flex flex-wrap gap-2">
