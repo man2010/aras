@@ -1026,16 +1026,20 @@ export default function EspacePage() {
     const previousValue = privacySettings[key];
     const nextValue = !previousValue;
     setPrivacySettings((current) => ({ ...current, [key]: nextValue }));
+    setProfile((current) => current ? { ...current, [key]: nextValue } : current);
+    window.dispatchEvent(new CustomEvent('aras:privacy-preference-updated', { detail: { userId: user.id, key, value: nextValue } }));
     setPrivacySaved(false);
     setPrivacySaveError('');
     const { error } = await supabase.from('profiles').update({ [key]: nextValue }).eq('id', user.id);
     if (error) {
       setPrivacySettings((current) => current[key] === nextValue ? { ...current, [key]: previousValue } : current);
+      setProfile((current) => current ? { ...current, [key]: previousValue } : current);
+      window.dispatchEvent(new CustomEvent('aras:privacy-preference-updated', { detail: { userId: user.id, key, value: previousValue } }));
       setPrivacySaveError('Impossible d’enregistrer ce réglage. Réessayez.');
       return;
     }
     setPrivacySaved(true);
-    window.dispatchEvent(new Event('aras:notifications-refresh'));
+    window.dispatchEvent(new CustomEvent('aras:privacy-preference-updated', { detail: { userId: user.id, key, value: nextValue } }));
     window.setTimeout(() => setPrivacySaved(false), 3000);
   };
 

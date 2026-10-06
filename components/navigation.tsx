@@ -111,6 +111,17 @@ export function Navbar() {
     };
 
     void loadMiniProfile();
+    const onPrivacyPreferenceUpdated = (event: Event) => {
+      const detail = (event as CustomEvent<{ userId?: string; key?: string; value?: boolean }>).detail;
+      if (detail?.userId !== user.id) return;
+      if (detail.key === 'show_online_status') {
+        setMiniProfile((current) => current?.userId === user.id ? { ...current, show_online_status: detail.value !== false } : current);
+      }
+      if (detail.key === 'show_distance') {
+        setMiniProfile((current) => current?.userId === user.id ? { ...current, show_distance: detail.value !== false, city: detail.value === false ? '' : current.city } : current);
+      }
+    };
+    window.addEventListener('aras:privacy-preference-updated', onPrivacyPreferenceUpdated);
     const channel = supabase
       .channel(`navbar-profile-${user.id}`)
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'profiles', filter: `id=eq.${user.id}` }, () => void loadMiniProfile())
@@ -118,6 +129,7 @@ export function Navbar() {
 
     return () => {
       cancelled = true;
+      window.removeEventListener('aras:privacy-preference-updated', onPrivacyPreferenceUpdated);
       void supabase.removeChannel(channel);
     };
   }, [user]);
@@ -139,12 +151,19 @@ export function Navbar() {
     };
     void loadPreferences();
     window.addEventListener('aras:notifications-refresh', loadPreferences);
+    const onPrivacyPreferenceUpdated = (event: Event) => {
+      const detail = (event as CustomEvent<{ userId?: string; key?: string; value?: boolean }>).detail;
+      if (detail?.userId !== user.id || !detail.key?.startsWith('notif_')) return;
+      setNotificationPreferences((current) => ({ ...current, [detail.key as keyof typeof current]: detail.value !== false }));
+    };
+    window.addEventListener('aras:privacy-preference-updated', onPrivacyPreferenceUpdated);
     const channel = supabase.channel(`navbar-notification-preferences-${user.id}`)
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'profiles', filter: `id=eq.${user.id}` }, () => void loadPreferences())
       .subscribe();
     return () => {
       cancelled = true;
       window.removeEventListener('aras:notifications-refresh', loadPreferences);
+      window.removeEventListener('aras:privacy-preference-updated', onPrivacyPreferenceUpdated);
       void supabase.removeChannel(channel);
     };
   }, [user]);
