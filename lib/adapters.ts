@@ -164,6 +164,7 @@ export function toConversation(row: MatchRow): Conversation {
     user_a: row.user_1_id,
     user_b: row.user_2_id,
     created_at: row.created_at,
+    updated_at: row.updated_at,
     kind: row.is_match === false ? 'direct' : 'match',
     last_message: row.last_message,
     unread_count_user_1: row.unread_count_user_1 || 0,

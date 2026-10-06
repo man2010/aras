@@ -18,11 +18,27 @@ export default function EvenementsPage() {
   const { user } = useAuth();
 
   useEffect(() => {
-    (async () => {
+    let cancelled = false;
+    const loadEvents = async (initial = false) => {
+      if (initial) setLoading(true);
       const { data } = await supabase.from('events').select('*').eq('is_active', true).gte('date', new Date().toISOString()).order('date', { ascending: true });
+      if (cancelled) return;
       if (data) setEvents((data as EventRow[]).map(toEvent));
       setLoading(false);
-    })();
+    };
+    void loadEvents(true);
+    const channel = supabase.channel('public-events-live')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'events' }, () => void loadEvents())
+      .subscribe();
+    const refreshOnReturn = () => { if (document.visibilityState === 'visible') void loadEvents(); };
+    window.addEventListener('focus', refreshOnReturn);
+    document.addEventListener('visibilitychange', refreshOnReturn);
+    return () => {
+      cancelled = true;
+      window.removeEventListener('focus', refreshOnReturn);
+      document.removeEventListener('visibilitychange', refreshOnReturn);
+      void supabase.removeChannel(channel);
+    };
   }, []);
 
   const categories = ['all', ...Array.from(new Set(events.map((e) => e.category)))];

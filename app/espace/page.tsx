@@ -416,6 +416,53 @@ export default function EspacePage() {
     setMatches(profiles.filter((item) => matchIds.has(item.id)));
   }, [user]);
 
+  const refreshUnreadMessages = useCallback(async () => {
+    if (!user) return;
+    const { data, error } = await supabase.from('messages').select('match_id').eq('receiver_id', user.id).eq('is_read', false);
+    if (error || !data) return;
+    const counts: Record<string, number> = {};
+    for (const message of data as { match_id: string }[]) counts[message.match_id] = (counts[message.match_id] || 0) + 1;
+    const total = data.length;
+    setUnreadCounts(counts);
+    setTotalUnread(total);
+    setUnreadCount(total);
+  }, [setUnreadCount, user]);
+
+  const refreshConversationList = useCallback(async () => {
+    if (!user) return;
+    const { data: rows, error } = await supabase.from('matches').select('*').or(`user_1_id.eq.${user.id},user_2_id.eq.${user.id}`).order('updated_at', { ascending: false });
+    if (error || !rows) return;
+    const nextConversations = uniqueConversations(rows as MatchRow[], user.id);
+    setConversations(nextConversations);
+    const partnerIds = nextConversations.map((conversation) => conversation.user_a === user.id ? conversation.user_b : conversation.user_a);
+    if (!partnerIds.length) {
+      setConversationProfiles({});
+      setLastMessages({});
+      return;
+    }
+    const [{ data: partnerProfiles }, { data: latestMessages }] = await Promise.all([
+      supabase.from('profiles_visible').select('*').in('id', partnerIds),
+      supabase.rpc('get_latest_match_messages', { target_match_ids: nextConversations.map((conversation) => conversation.id) }),
+    ]);
+    const profileMap: Record<string, Profile> = {};
+    (partnerProfiles ?? []).map((row) => toProfile(row as ProfileRow)).forEach((partner) => {
+      profileMap[partner.id] = partner;
+      if (partner.user_id) profileMap[partner.user_id] = partner;
+    });
+    setConversationProfiles(profileMap);
+    if (latestMessages) {
+      const nextLastMessages: Record<string, { content: string; time: string }> = {};
+      for (const message of latestMessages) {
+        if (nextLastMessages[message.match_id]) continue;
+        nextLastMessages[message.match_id] = {
+          content: message.content,
+          time: new Date(message.created_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
+        };
+      }
+      setLastMessages(nextLastMessages);
+    }
+  }, [user]);
+
   useEffect(() => {
     if (!user) return;
     let refreshTimer: number | undefined;
@@ -442,10 +489,73 @@ export default function EspacePage() {
     };
   }, [user, refreshLikeState]);
 
-  const loadProfileVisitors = useCallback(async () => {
+  useEffect(() => {
     if (!user) return;
-    setVisitorsLoading(true);
-    setVisitorsError(false);
+    let refreshTimer: number | undefined;
+    let matchTimer: number | undefined;
+    const refreshMatchData = (payload?: { eventType: string; new: Record<string, unknown>; old: Record<string, unknown> }) => {
+      if (payload?.eventType === 'UPDATE') {
+        const updatedConversation = toConversation(payload.new as unknown as MatchRow);
+        setConversations((current) => current.map((conversation) => conversation.id === updatedConversation.id ? { ...conversation, ...updatedConversation } : conversation)
+          .sort((first, second) => new Date(second.updated_at || second.created_at).getTime() - new Date(first.updated_at || first.created_at).getTime()));
+        return;
+      }
+      window.clearTimeout(matchTimer);
+      matchTimer = window.setTimeout(() => {
+        void refreshLikeState();
+        void refreshConversationList();
+      }, 120);
+    };
+    const handleMessageChange = (payload: { new: Record<string, unknown> }) => {
+      const message = payload.new as { match_id?: string; content?: string; created_at?: string };
+      if (message.match_id && message.content && message.created_at) {
+        setLastMessages((current) => ({
+          ...current,
+          [message.match_id as string]: {
+            content: message.content as string,
+            time: new Date(message.created_at as string).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
+          },
+        }));
+        setConversations((current) => current.map((conversation) => conversation.id === message.match_id
+          ? { ...conversation, last_message: message.content, updated_at: message.created_at }
+          : conversation).sort((first, second) => new Date(second.updated_at || second.created_at).getTime() - new Date(first.updated_at || first.created_at).getTime()));
+      }
+      window.clearTimeout(refreshTimer);
+      refreshTimer = window.setTimeout(() => void refreshUnreadMessages(), 120);
+    };
+    const channel = supabase.channel(`member-live-data-${user.id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'matches' }, refreshMatchData)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `receiver_id=eq.${user.id}` }, handleMessageChange)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `sender_id=eq.${user.id}` }, handleMessageChange)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'messages', filter: `receiver_id=eq.${user.id}` }, () => void refreshUnreadMessages())
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          void refreshConversationList();
+          void refreshUnreadMessages();
+        }
+      });
+    const refreshOnReturn = () => {
+      if (document.visibilityState !== 'visible') return;
+      refreshMatchData();
+      void refreshUnreadMessages();
+    };
+    window.addEventListener('focus', refreshOnReturn);
+    document.addEventListener('visibilitychange', refreshOnReturn);
+    return () => {
+      window.clearTimeout(refreshTimer);
+      window.clearTimeout(matchTimer);
+      window.removeEventListener('focus', refreshOnReturn);
+      document.removeEventListener('visibilitychange', refreshOnReturn);
+      void supabase.removeChannel(channel);
+    };
+  }, [user, refreshLikeState, refreshConversationList, refreshUnreadMessages]);
+
+  const loadProfileVisitors = useCallback(async (silent = false) => {
+    if (!user) return;
+    if (!silent) {
+      setVisitorsLoading(true);
+      setVisitorsError(false);
+    }
     const { data: sessionData } = await supabase.auth.getSession();
     const accessToken = sessionData.session?.access_token;
     const response = accessToken ? await fetch('/api/profile-visits', { headers: { Authorization: `Bearer ${accessToken}` } }).catch(() => null) : null;
@@ -453,7 +563,7 @@ export default function EspacePage() {
     if (!payload || !Array.isArray(payload.visits)) {
       console.error('Impossible de charger les visites du profil.');
       setVisitorsError(true);
-      setVisitorsLoading(false);
+      if (!silent) setVisitorsLoading(false);
       return;
     }
     const visitorIds = Array.from(new Set((payload.visits as { visitor_id: string }[]).map((visit) => visit.visitor_id)));
@@ -465,7 +575,7 @@ export default function EspacePage() {
       const byId = new Map(profiles.map((item) => [item.id, item]));
       setProfileVisitors(visitorIds.map((id) => byId.get(id)).filter((item): item is Profile => Boolean(item)));
     } else setProfileVisitors([]);
-    setVisitorsLoading(false);
+    if (!silent) setVisitorsLoading(false);
   }, [user]);
 
   const loadMemberEvents = useCallback(async () => {
@@ -555,6 +665,36 @@ export default function EspacePage() {
     if (!user || tab !== 'profile' || profileSection !== 'profile' || profileEditOpen) return;
     void loadProfileVisitors();
   }, [user, tab, profileSection, profileEditOpen, loadProfileVisitors]);
+
+  useEffect(() => {
+    const canRefreshVisitors = tab === 'likes'
+      ? likesView === 'visitors'
+      : tab === 'profile' && (profileSection === 'profile' || profileSection === 'visitors') && !profileEditOpen;
+    if (!user || !canRefreshVisitors) return;
+    let refreshTimer: number | undefined;
+    const scheduleRefresh = () => {
+      window.clearTimeout(refreshTimer);
+      refreshTimer = window.setTimeout(() => void loadProfileVisitors(true), 180);
+    };
+    const channel = supabase.channel(`profile-visitors-${user.id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'profile_visits', filter: `profile_id=eq.${user.id}` }, scheduleRefresh)
+      .subscribe();
+    const poll = window.setInterval(() => {
+      if (document.visibilityState === 'visible') void loadProfileVisitors(true);
+    }, 60_000);
+    const refreshOnReturn = () => {
+      if (document.visibilityState === 'visible') void loadProfileVisitors(true);
+    };
+    window.addEventListener('focus', refreshOnReturn);
+    document.addEventListener('visibilitychange', refreshOnReturn);
+    return () => {
+      window.clearTimeout(refreshTimer);
+      window.clearInterval(poll);
+      window.removeEventListener('focus', refreshOnReturn);
+      document.removeEventListener('visibilitychange', refreshOnReturn);
+      void supabase.removeChannel(channel);
+    };
+  }, [user, tab, likesView, profileSection, profileEditOpen, loadProfileVisitors]);
 
   useEffect(() => {
     if (!authLoading && !user) router.push('/connexion');
@@ -789,31 +929,60 @@ export default function EspacePage() {
 
   useEffect(() => {
     if (!user || tab !== 'events') return;
+    void loadMemberEvents();
     const channel = supabase.channel(`member-events-${user.id}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'events' }, () => void loadMemberEvents())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'event_registrations', filter: `user_id=eq.${user.id}` }, () => void loadMemberEvents())
-      .subscribe();
-    return () => { void supabase.removeChannel(channel); };
+      .subscribe((status) => { if (status === 'SUBSCRIBED') void loadMemberEvents(); });
+    const refreshOnReturn = () => { if (document.visibilityState === 'visible') void loadMemberEvents(); };
+    window.addEventListener('focus', refreshOnReturn);
+    document.addEventListener('visibilitychange', refreshOnReturn);
+    return () => {
+      window.removeEventListener('focus', refreshOnReturn);
+      document.removeEventListener('visibilitychange', refreshOnReturn);
+      void supabase.removeChannel(channel);
+    };
   }, [user, tab, loadMemberEvents]);
 
   useEffect(() => {
     if (!activeConv || !user) return;
-    (async () => {
+    let cancelled = false;
+    let refreshTimer: number | undefined;
+    const loadActiveMessages = async () => {
       const { data } = await supabase.from('messages').select('*').eq('match_id', activeConv).order('created_at', { ascending: true });
-      if (data) {
-        setMessages((data as MessageRow[]).map(toMessage));
-        // Marquer les messages reçus comme lus
-        const receivedMessages = data.filter((m: any) => m.receiver_id === user.id && !m.is_read);
-        if (receivedMessages.length > 0) {
-          await supabase.from('messages').update({ is_read: true }).eq('match_id', activeConv).eq('receiver_id', user.id);
-          setMessages((prev) => prev.map((m) => m.receiver_id === user.id ? { ...m, is_read: true } : m));
-          // Mettre à jour le compteur global
-          setTotalUnread((prev) => Math.max(0, prev - receivedMessages.length));
-          setUnreadCount(Math.max(0, totalUnread - receivedMessages.length));
-        }
+      if (!data || cancelled) return;
+      const receivedMessages = data.filter((message: any) => message.receiver_id === user.id && !message.is_read);
+      const receivedIds = receivedMessages.map((message: any) => message.id);
+      if (receivedIds.length) {
+        await supabase.from('messages').update({ is_read: true }).in('id', receivedIds).eq('receiver_id', user.id);
       }
-    })();
-  }, [activeConv, setUnreadCount, totalUnread, user]);
+      if (cancelled) return;
+      const readIds = new Set(receivedIds);
+      setMessages((data as MessageRow[]).map((row) => {
+        const message = toMessage(row);
+        return readIds.has(row.id) ? { ...message, is_read: true } : message;
+      }));
+      if (receivedIds.length) void refreshUnreadMessages();
+    };
+    const scheduleLoad = () => {
+      window.clearTimeout(refreshTimer);
+      refreshTimer = window.setTimeout(() => void loadActiveMessages(), 80);
+    };
+    const channel = supabase.channel(`active-conversation-${activeConv}`)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `match_id=eq.${activeConv}` }, scheduleLoad)
+      .subscribe((status) => { if (status === 'SUBSCRIBED') void loadActiveMessages(); });
+    const refreshOnReturn = () => { if (document.visibilityState === 'visible') scheduleLoad(); };
+    window.addEventListener('focus', refreshOnReturn);
+    document.addEventListener('visibilitychange', refreshOnReturn);
+    void loadActiveMessages();
+    return () => {
+      cancelled = true;
+      window.clearTimeout(refreshTimer);
+      window.removeEventListener('focus', refreshOnReturn);
+      document.removeEventListener('visibilitychange', refreshOnReturn);
+      void supabase.removeChannel(channel);
+    };
+  }, [activeConv, refreshUnreadMessages, user]);
 
   const saveProfile = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -1381,7 +1550,7 @@ export default function EspacePage() {
     if (discoveryLikedIds.has(profileItem.id)) return false;
     const cityTerm = discoveryCityFilter.trim().toLocaleLowerCase('fr');
     const matchesCity = !cityTerm || profileItem.city.toLocaleLowerCase('fr').includes(cityTerm);
-    const matchesAge = profileItem.age >= filterAgeMin && profileItem.age <= filterAgeMax;
+    const matchesAge = profileItem.show_age === false || (profileItem.age >= filterAgeMin && profileItem.age <= filterAgeMax);
     const matchesProfession = !filterProfession.trim() || profileItem.profession.toLocaleLowerCase('fr').includes(filterProfession.trim().toLocaleLowerCase('fr'));
     const matchesHeight = profileItem.height == null || (profileItem.height >= filterHeightMin && profileItem.height <= filterHeightMax);
     const matchesReligion = !filterReligion.trim() || (profileItem.religion ?? '').toLocaleLowerCase('fr').includes(filterReligion.trim().toLocaleLowerCase('fr'));
@@ -1403,6 +1572,43 @@ export default function EspacePage() {
   const mobileDiscoveryProfile = filteredDiscoveryProfiles[mobileDiscoveryIndex];
   const desktopDiscoverySafeIndex = Math.min(desktopDiscoveryIndex, Math.max(0, filteredDiscoveryProfiles.length - 1));
   const desktopDiscoveryProfile = filteredDiscoveryProfiles[desktopDiscoverySafeIndex];
+  const refreshCurrentDiscoveryProfiles = useCallback(async () => {
+    const visibleIds = Array.from(new Set([mobileDiscoveryProfile?.id, desktopDiscoveryProfile?.id].filter((id): id is string => Boolean(id))));
+    if (!user) return;
+    const [visibleResult, recentResult] = await Promise.all([
+      visibleIds.length ? supabase.from('profiles_visible').select(PROFILE_CARD_SELECT).in('id', visibleIds) : Promise.resolve({ data: [] as ProfileRow[] }),
+      supabase.from('profiles_visible').select(PROFILE_CARD_SELECT).eq('is_active', true).order('created_at', { ascending: false }).limit(20),
+    ]);
+    const refreshed = new Map(((visibleResult.data ?? []) as ProfileRow[]).map((row) => {
+      const mapped = toProfile(row);
+      return [mapped.id, mapped] as const;
+    }));
+    const recent = ((recentResult.data ?? []) as ProfileRow[]).map(toProfile).filter((candidate) => {
+      const ownGender = normalizeGender(profile?.gender);
+      const targetGender = ownGender === 'homme' ? 'femme' : ownGender === 'femme' ? 'homme' : null;
+      return candidate.id !== user.id && targetGender !== null && normalizeGender(candidate.gender) === targetGender;
+    });
+    setDiscoveryProfiles((current) => {
+      const currentIds = new Set(current.map((item) => item.id));
+      const updatedCurrent = current.map((item) => refreshed.get(item.id) ?? item);
+      const newCandidates = recent.filter((candidate) => !currentIds.has(candidate.id));
+      return [...updatedCurrent, ...newCandidates];
+    });
+  }, [user, profile?.gender, mobileDiscoveryProfile?.id, desktopDiscoveryProfile?.id]);
+
+  useEffect(() => {
+    if (!user || tab !== 'decouverte') return;
+    const refreshOnReturn = () => { if (document.visibilityState === 'visible') void refreshCurrentDiscoveryProfiles(); };
+    const poll = window.setInterval(refreshOnReturn, 60_000);
+    window.addEventListener('focus', refreshOnReturn);
+    document.addEventListener('visibilitychange', refreshOnReturn);
+    return () => {
+      window.clearInterval(poll);
+      window.removeEventListener('focus', refreshOnReturn);
+      document.removeEventListener('visibilitychange', refreshOnReturn);
+    };
+  }, [user, tab, refreshCurrentDiscoveryProfiles]);
+
   const desktopDiscoveryPhotos = desktopDiscoveryProfile
     ? Array.from(new Set([...(desktopDiscoveryProfile.avatar_urls ?? []), desktopDiscoveryProfile.photo_url].filter((photo): photo is string => Boolean(photo))))
     : [];

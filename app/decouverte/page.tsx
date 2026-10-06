@@ -23,8 +23,8 @@ export default function DecouvertePage() {
 
   useEffect(() => {
     if (user) return;
-
-    (async () => {
+    let cancelled = false;
+    const loadProfiles = async () => {
       const { data } = await supabase
         .from('profiles_visible')
         .select('*')
@@ -32,12 +32,25 @@ export default function DecouvertePage() {
         .order('created_at', { ascending: false })
         .limit(20);
 
-      if (data) {
+      if (!cancelled && data) {
         const mappedProfiles = (data as ProfileRow[]).map(toProfile);
         setProfiles(mappedProfiles);
       }
-      setLoading(false);
-    })();
+      if (!cancelled) setLoading(false);
+    };
+    void loadProfiles();
+    const poll = window.setInterval(() => {
+      if (document.visibilityState === 'visible') void loadProfiles();
+    }, 60_000);
+    const refreshOnReturn = () => { if (document.visibilityState === 'visible') void loadProfiles(); };
+    window.addEventListener('focus', refreshOnReturn);
+    document.addEventListener('visibilitychange', refreshOnReturn);
+    return () => {
+      cancelled = true;
+      window.clearInterval(poll);
+      window.removeEventListener('focus', refreshOnReturn);
+      document.removeEventListener('visibilitychange', refreshOnReturn);
+    };
   }, [user]);
 
   const getFirstNameInitial = (displayName: string) => {
