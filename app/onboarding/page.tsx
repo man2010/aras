@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, ArrowRight, BookOpen, Briefcase, Camera, Check, Cigarette, ClipboardList, Heart, Languages, MapPin, MessageCircle, Plus, Sparkles, Users } from 'lucide-react';
+import { ArrowLeft, ArrowRight, BookOpen, Briefcase, Camera, Check, Cigarette, ClipboardList, Heart, Languages, MapPin, MessageCircle, Plus, UserRound, Users } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
 
@@ -93,7 +93,6 @@ export default function OnboardingPage() {
 
   const steps = ['Profil', 'Localisation', 'Photo principale', 'Photos', 'Infos facultatives', 'Aperçu'];
   const isAdult = useMemo(() => age >= 18, [age]);
-  const photoCount = extraPhotos.filter((photo) => Boolean(photo)).length;
 
   const stepReady = useMemo(() => {
     if (step === 0) return Boolean(name.trim() && gender && birthdate && isAdult);
@@ -164,7 +163,6 @@ export default function OnboardingPage() {
           return next;
         });
       }
-      setMessage('Photo ajoutée avec succès.');
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Erreur lors de l’upload.');
     } finally {
@@ -293,7 +291,7 @@ export default function OnboardingPage() {
             <div className="space-y-6">
               <div className="flex items-center gap-3">
                 <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#ffedf4] text-[#ff3e81]">
-                  <Sparkles size={18} />
+                  <UserRound size={18} />
                 </div>
                 <div>
                   <p className="text-[11px] font-extrabold uppercase tracking-[0.18em] text-[#ff7ab3]">Identité</p>
@@ -428,8 +426,8 @@ export default function OnboardingPage() {
                   <Plus size={18} />
                 </div>
                 <div>
-                  <p className="text-[11px] font-extrabold uppercase tracking-[0.18em] text-[#91b4ff]">Photos optionnelles</p>
-                  <h2 className="text-xl font-display text-[#241c18] dark:text-white sm:text-2xl">Ajoute jusqu’à 6 photos</h2>
+                  <p className="text-[11px] font-extrabold uppercase tracking-[0.18em] text-[#91b4ff]">Laisse tes photos parler pour toi</p>
+                  <h2 className="text-xl font-display text-[#241c18] dark:text-white sm:text-2xl">Les profils avec plusieurs photos attirent bien plus de regards.</h2>
                 </div>
               </div>
 
@@ -458,16 +456,13 @@ export default function OnboardingPage() {
                 ))}
               </div>
 
-              <div className="rounded-2xl border border-[#eadfd5] bg-[#f8f9fd] p-4 text-sm text-[#625852] dark:border-white/10 dark:bg-[#1d1f24] dark:text-white/65">
-                Tu as ajouté {photoCount} photo{photoCount > 1 ? 's' : ''} optionnelle{photoCount > 1 ? 's' : ''} sur 6.
-              </div>
             </div>
           )}
 
           {step === 4 && (
             <div className="space-y-6">
               <div className="flex items-center gap-3">
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#eaf7f4] text-[#1d857a]"><Sparkles size={18} /></div>
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#eaf7f4] text-[#1d857a]"><ClipboardList size={18} /></div>
                 <div>
                   <p className="text-[11px] font-extrabold uppercase tracking-[0.18em] text-[#7fe4cb]">Informations facultatives</p>
                   <h2 className="text-xl font-display text-[#241c18] dark:text-white sm:text-2xl">Quelques détails sur toi</h2>
@@ -568,12 +563,7 @@ export default function OnboardingPage() {
           </div>
         )}
 
-        <div className="mt-6 flex flex-col gap-4 sm:mt-8 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-2 text-sm text-[#756960] dark:text-white/60">
-            <Check size={16} className="text-[#7fe4cb]" />
-            Profil authentique et prêt à rencontrer
-          </div>
-
+        <div className="mt-6 flex flex-col gap-4 sm:mt-8 sm:flex-row sm:items-center sm:justify-end">
           <div className="flex w-full flex-col-reverse gap-2 sm:w-auto sm:flex-row sm:gap-3">
             {step > 0 && step < 5 && (
               <button

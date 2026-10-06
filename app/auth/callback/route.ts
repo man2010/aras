@@ -84,8 +84,25 @@ export async function GET(request: Request) {
     );
     const fallbackName =
       user.user_metadata?.full_name ?? user.user_metadata?.name ?? user.email?.split('@')[0] ?? 'Utilisateur';
-    const { error: profileError } = await admin.from('profiles').upsert(
-      {
+    const { data: existingProfile, error: existingProfileError } = await admin.from('profiles')
+      .select('is_active')
+      .eq('id', user.id)
+      .maybeSingle();
+    if (existingProfileError) {
+      await supabase.auth.signOut();
+      const response = NextResponse.redirect(`${siteOrigin}/connexion?error=${encodeURIComponent('Impossible de préparer votre profil. Réessayez.')}`);
+      cookieStore.getAll().forEach(({ name }) => response.cookies.delete(name));
+      return response;
+    }
+    const justCreatedOAuthAccount = Date.now() - new Date(user.created_at).getTime() < 5 * 60_000;
+    if (!existingProfile && !justCreatedOAuthAccount) {
+      await supabase.auth.signOut();
+      const response = NextResponse.redirect(`${siteOrigin}/connexion?error=${encodeURIComponent('Ce compte ne possède plus de profil ARAS. Contactez contact@aras.sn pour obtenir de l’aide.')}`);
+      authCookies.forEach(({ name, value, options }) => response.cookies.set(name, value, options));
+      return response;
+    }
+    if (!existingProfile) {
+      const { error: profileError } = await admin.from('profiles').insert({
         id: user.id,
         full_name: fallbackName,
         is_active: true,
@@ -102,23 +119,17 @@ export async function GET(request: Request) {
         notif_events: true,
         profile_status: 'pending',
         onboarding_completed: false,
-      },
-      { onConflict: 'id', ignoreDuplicates: true }
-    );
-
-    if (profileError) {
-      await supabase.auth.signOut();
-      const response = NextResponse.redirect(`${siteOrigin}/connexion?error=${encodeURIComponent('Impossible de préparer votre profil. Réessayez.')}`);
-      cookieStore.getAll().forEach(({ name }) => response.cookies.delete(name));
-      return response;
+      });
+      if (profileError) {
+        await supabase.auth.signOut();
+        const response = NextResponse.redirect(`${siteOrigin}/connexion?error=${encodeURIComponent('Impossible de préparer votre profil. Réessayez.')}`);
+        cookieStore.getAll().forEach(({ name }) => response.cookies.delete(name));
+        return response;
+      }
     }
-    const { data: accessProfile, error: accessError } = await admin.from('profiles').select('is_active').eq('id', user.id).maybeSingle();
-    if (accessError || accessProfile?.is_active === false) {
+    if (existingProfile?.is_active === false) {
       await supabase.auth.signOut();
-      const reason = accessProfile?.is_active === false
-        ? 'Votre compte est bloqué. Veuillez contacter contact@aras.sn pour obtenir de l’aide.'
-        : 'Nous ne pouvons pas vérifier le statut de votre compte pour le moment. Réessayez dans quelques instants.';
-      const response = NextResponse.redirect(`${siteOrigin}/connexion?error=${encodeURIComponent(reason)}`);
+      const response = NextResponse.redirect(`${siteOrigin}/connexion?error=${encodeURIComponent('Votre compte est bloqué. Veuillez contacter contact@aras.sn pour obtenir de l’aide.')}`);
       authCookies.forEach(({ name, value, options }) => response.cookies.set(name, value, options));
       return response;
     }

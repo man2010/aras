@@ -16,6 +16,7 @@ export async function GET(request: Request) {
   const admin = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } });
   const { data: profile, error } = await admin.from('profiles').select('is_active').eq('id', user.id).maybeSingle();
   if (error) return NextResponse.json({ error: 'Vérification du compte impossible.' }, { status: 503 });
+  if (!profile) return NextResponse.json({ blocked: true, reason: 'profile_missing' }, { status: 403 });
   if (profile?.is_active === false) return NextResponse.json({ blocked: true }, { status: 403 });
   return NextResponse.json({ blocked: false });
 }

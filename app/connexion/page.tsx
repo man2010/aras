@@ -8,7 +8,6 @@ import { ArrowRight, Eye, EyeOff, LockKeyhole, Mail, Phone, ShieldCheck, X } fro
 import { GoogleIcon } from '@/components/google-icon';
 import { AuthPhoneInput } from '@/components/auth-phone-input';
 import { normalizePhone, isValidPhone } from '@/lib/phone';
-import { ensureProfile } from '@/lib/create-profile';
 import { getAuthRedirectOrigin, supabase } from '@/lib/supabase';
 
 type Method = 'email' | 'phone';
@@ -174,11 +173,25 @@ export default function ConnexionPage() {
       return;
     }
     setRecoveryLoading(true);
-    const { error } = await supabase.auth.updateUser({ password: recoveryPassword });
-    if (error) {
-      setRecoveryMessage('Impossible de modifier le mot de passe. Vérifiez votre connexion et réessayez.');
-      setRecoveryLoading(false);
-      return;
+    if (method === 'email') {
+      const response = await fetch('/api/auth/password-recovery-update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: recoveryContact, code: recoveryCode, password: recoveryPassword }),
+      }).catch(() => null);
+      const result = await response?.json().catch(() => null) as { error?: string } | null;
+      if (!response?.ok) {
+        setRecoveryMessage(result?.error || 'Impossible de modifier le mot de passe. Réessayez.');
+        setRecoveryLoading(false);
+        return;
+      }
+    } else {
+      const { error } = await supabase.auth.updateUser({ password: recoveryPassword });
+      if (error) {
+        setRecoveryMessage('Impossible de modifier le mot de passe. Vérifiez votre connexion et réessayez.');
+        setRecoveryLoading(false);
+        return;
+      }
     }
     sessionStorage.removeItem('aras-password-recovery');
     setRecoveryStep('done');
@@ -236,7 +249,10 @@ export default function ConnexionPage() {
         const accessCheck = await fetch('/api/auth/access', { headers: { Authorization: `Bearer ${sessionData.session.access_token}` } });
         if (accessCheck.status === 403) {
           await supabase.auth.signOut();
-          setMessage('Votre compte est bloqué. Veuillez contacter contact@aras.sn pour obtenir de l’aide.');
+          const accessResult = await accessCheck.clone().json().catch(() => null) as { reason?: string } | null;
+          setMessage(accessResult?.reason === 'profile_missing'
+            ? 'Ce compte ne possède plus de profil ARAS. Contactez contact@aras.sn pour obtenir de l’aide.'
+            : 'Votre compte est bloqué. Veuillez contacter contact@aras.sn pour obtenir de l’aide.');
           setLoading(false);
           return;
         }
@@ -250,12 +266,16 @@ export default function ConnexionPage() {
       if (sessionData.session?.access_token) {
         void fetch('/api/admin/activity-log', { method: 'POST', headers: { Authorization: `Bearer ${sessionData.session.access_token}` } }).catch(() => undefined);
       }
-      await ensureProfile(data.user.id, method === 'email' ? contact.split('@')[0] : contact);
-      router.push('/espace');
+      router.replace('/espace');
+      return;
     }
 
     setLoading(false);
   };
+
+  if (loading) {
+    return <main className="flex min-h-screen items-center justify-center bg-gradient-to-b from-[#f8f9fd] to-[#f8f9fd] px-5 pt-[72px]"><div role="status" className="flex w-full max-w-[460px] flex-col items-center rounded-[28px] bg-[#f8f9fd] px-8 py-14 text-center shadow-[0_20px_60px_rgba(83,46,32,.08)]"><span className="h-9 w-9 animate-spin rounded-full border-[3px] border-[#ec3b78]/20 border-t-[#ec3b78]"/><p className="mt-5 text-sm font-bold text-[#625852]">Connexion en cours, ouverture de votre espace…</p></div></main>;
+  }
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-gradient-to-b from-[#f8f9fd] to-[#f8f9fd] px-5 pt-[72px]">

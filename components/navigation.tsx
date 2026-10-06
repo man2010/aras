@@ -327,7 +327,7 @@ export function Navbar() {
             className="flex min-w-0 items-center gap-2"
             aria-label="Mon profil"
           >
-            <span className="relative h-9 w-9 shrink-0 overflow-hidden rounded-full border-2 border-[#ec3b78] bg-white sm:h-10 sm:w-10"><img src={currentMiniProfile?.photo_url || fallbackAvatar} alt="" className="h-full w-full object-cover" /><span aria-label={currentMiniProfile?.is_online ? 'En ligne' : 'Hors ligne'} className={`absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-[#f8f9fd] ${currentMiniProfile?.is_online ? 'bg-emerald-500' : 'bg-red-500'}`} /></span>
+            <span className="relative h-9 w-9 shrink-0 rounded-full border-2 border-[#ec3b78] bg-white sm:h-10 sm:w-10"><span className="absolute inset-0 overflow-hidden rounded-full"><img src={currentMiniProfile?.photo_url || fallbackAvatar} alt="" className="h-full w-full object-cover" /></span><span aria-label={currentMiniProfile?.is_online ? 'En ligne' : 'Hors ligne'} className={`absolute bottom-0 right-0 z-10 h-3 w-3 translate-x-[15%] translate-y-[15%] rounded-full border-2 border-[#f8f9fd] ${currentMiniProfile?.is_online ? 'bg-emerald-500' : 'bg-red-500'}`} /></span>
             <span className="hidden max-w-32 truncate text-sm font-extrabold text-[#241c18] sm:block">{currentMiniProfile?.display_name || 'Mon profil'}</span>
           </Link>
         ) : (
@@ -366,11 +366,7 @@ export function Navbar() {
           </button>
           {isConnected ? (
             <>
-                <div
-                  className="relative"
-                  onMouseEnter={() => setNotificationOpen(true)}
-                  onMouseLeave={() => setNotificationOpen(false)}
-                >
+                <div className="relative">
                   <button
                     type="button"
                     onClick={() => setNotificationOpen((openState) => !openState)}

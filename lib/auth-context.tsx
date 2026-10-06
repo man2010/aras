@@ -2,7 +2,6 @@
 
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import type { Session, User } from '@supabase/supabase-js';
-import { ensureProfile } from './create-profile';
 import { supabase } from './supabase';
 
 type AuthContextType = {
@@ -69,17 +68,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const accessToken = session?.access_token;
       if (!accessToken) return;
       const response = await fetch('/api/auth/access', { headers: { Authorization: `Bearer ${accessToken}` } }).catch(() => null);
-      if (!cancelled && response?.status === 403) {
-        await supabase.auth.signOut();
+      if (!cancelled && (response?.status === 401 || response?.status === 403)) {
+        await supabase.auth.signOut({ scope: 'local' });
         setSession(null);
       }
     };
     void verifyAccountAccess();
     const accessCheck = window.setInterval(() => void verifyAccountAccess(), 60_000);
-    void ensureProfile(
-      user.id,
-      user.email?.split('@')[0] ?? user.user_metadata?.full_name ?? 'Utilisateur'
-    );
     const refreshUnreadCount = async () => {
       const { count } = await supabase
         .from('messages')
@@ -114,6 +109,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
     window.addEventListener('beforeunload', handleBeforeUnload);
+    window.addEventListener('focus', verifyAccountAccess);
 
     const channel = supabase
       .channel(`notifications-${user.id}`)
@@ -130,6 +126,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       window.clearInterval(heartbeat);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('beforeunload', handleBeforeUnload);
+      window.removeEventListener('focus', verifyAccountAccess);
       void supabase.removeChannel(channel);
       void updatePresence(false);
     };

@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { ShieldCheck, Database, BellRing, LockKeyhole, Mail, FileText } from 'lucide-react';
 
 export const metadata: Metadata = {
-  title: 'Politique de confidentialité — ARAS',
+  title: 'Politique de confidentialité',
   description: 'Politique de confidentialité détaillée d’ARAS, conforme aux exigences de Google et au RGPD.',
 };
 

@@ -274,6 +274,8 @@ export default function EspacePage() {
   const searchParams = useSearchParams();
   const [tab, setTab] = useState<Tab>('decouverte');
   const [profile, setProfile] = useState<Profile | null>(null);
+  const [profileLoading, setProfileLoading] = useState(true);
+  const [profileLoadError, setProfileLoadError] = useState(false);
   const [discoveryProfiles, setDiscoveryProfiles] = useState<Profile[]>([]);
   const [discoveryLoading, setDiscoveryLoading] = useState(true);
   const [discoveryLikedIds, setDiscoveryLikedIds] = useState<Set<string>>(new Set());
@@ -294,7 +296,7 @@ export default function EspacePage() {
   const [filterPreference, setFilterPreference] = useState('');
   const [filterSituation, setFilterSituation] = useState('');
   const [filterInterests, setFilterInterests] = useState('');
-  const [discoveryPage, setDiscoveryPage] = useState(1);
+  const [desktopDiscoveryIndex, setDesktopDiscoveryIndex] = useState(0);
   const [mobileDiscoveryIndex, setMobileDiscoveryIndex] = useState(0);
   const [mobileDiscoveryHistory, setMobileDiscoveryHistory] = useState<number[]>([]);
   const [expandedDiscoveryProfile, setExpandedDiscoveryProfile] = useState(false);
@@ -600,7 +602,7 @@ export default function EspacePage() {
   useEffect(() => {
     setMobileDiscoveryIndex(0);
     setMobileDiscoveryHistory([]);
-    setDiscoveryPage(1);
+    setDesktopDiscoveryIndex(0);
   }, [discoveryCityFilter, filterAgeMin, filterAgeMax, filterDistance, filterHeightMin, filterHeightMax, filterProfession, filterReligion, filterPreference, filterSituation, filterInterests]);
 
   useEffect(() => {
@@ -637,6 +639,8 @@ export default function EspacePage() {
   useEffect(() => {
     let cancelled = false;
     if (!user) {
+      setProfileLoading(false);
+      setProfileLoadError(false);
       setProfile(null);
       setProfileForm({ display_name: '', age: '', city: '', bio: '', profession: '', photo_url: '', interests: [], languages: [], religion: '', caste: '', marital_status: '', smoking_habit: '' });
       setGalleryPhotos(Array(6).fill(null));
@@ -645,20 +649,38 @@ export default function EspacePage() {
       setConversationProfiles({});
       return () => { cancelled = true; };
     }
+    setProfileLoading(true);
+    setProfileLoadError(false);
     setProfile(null);
     setProfileForm({ display_name: '', age: '', city: '', bio: '', profession: '', photo_url: '', interests: [], languages: [], religion: '', caste: '', marital_status: '', smoking_habit: '' });
     setGalleryPhotos(Array(6).fill(null));
     (async () => {
       setDiscoveryLoading(true);
-      const { data: existing } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle();
+      const { data: existing, error: profileError } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle();
       if (cancelled) return;
+      if (profileError) {
+        setProfileLoadError(true);
+        setProfileLoading(false);
+        return;
+      }
+      if (!existing) {
+        await supabase.auth.signOut({ scope: 'local' });
+        router.replace(`/connexion?error=${encodeURIComponent('Ce compte ne possède plus de profil ARAS. Contactez contact@aras.sn pour obtenir de l’aide.')}`);
+        return;
+      }
+      if (existing.is_active === false) {
+        await supabase.auth.signOut({ scope: 'local' });
+        router.replace(`/connexion?error=${encodeURIComponent('Votre compte est bloqué. Veuillez contacter contact@aras.sn pour obtenir de l’aide.')}`);
+        return;
+      }
       if (existing) {
         const p = toProfile(existing as ProfileRow);
         if (!p.onboarding_completed || p.profile_status !== 'completed') {
-          router.push('/onboarding');
+          router.replace('/onboarding');
           return;
         }
         setProfile(p);
+        setProfileLoading(false);
         setSubscriptionPlan(p.is_premium ? 'premium' : 'discovery');
         setProfileForm({ display_name: p.display_name, age: String(p.age), city: p.city, bio: p.bio, profession: p.profession, photo_url: p.photo_url, interests: p.interests ?? [], languages: p.languages ?? [], religion: p.religion ?? '', caste: p.caste ?? '', marital_status: p.marital_status ?? '', smoking_habit: p.smoking_habit ?? '' });
         const optionalPhotos = (p.avatar_urls ?? []).filter((photo) => Boolean(photo) && photo !== p.photo_url);
@@ -1370,6 +1392,12 @@ export default function EspacePage() {
     return matchesCity && matchesAge && matchesProfession && matchesHeight && matchesReligion && matchesPreference && matchesSituation && matchesInterests && matchesDistance;
   });
   const mobileDiscoveryProfile = filteredDiscoveryProfiles[mobileDiscoveryIndex];
+  const desktopDiscoverySafeIndex = Math.min(desktopDiscoveryIndex, Math.max(0, filteredDiscoveryProfiles.length - 1));
+  const desktopDiscoveryProfile = filteredDiscoveryProfiles[desktopDiscoverySafeIndex];
+  const desktopDiscoveryPhotos = desktopDiscoveryProfile
+    ? Array.from(new Set([...(desktopDiscoveryProfile.avatar_urls ?? []), desktopDiscoveryProfile.photo_url].filter((photo): photo is string => Boolean(photo))))
+    : [];
+  const visibleDiscoveryProfiles = filteredDiscoveryProfiles.slice(0, 12);
   const mobileDiscoveryPhotos = mobileDiscoveryProfile
     ? Array.from(new Set([...(mobileDiscoveryProfile.avatar_urls ?? []), mobileDiscoveryProfile.photo_url].filter((photo): photo is string => Boolean(photo))))
     : [];
@@ -1383,9 +1411,14 @@ export default function EspacePage() {
   })();
 
   useEffect(() => {
-    if (!user || tab !== 'decouverte' || !mobileDiscoveryProfile) return;
+    if (!user || tab !== 'decouverte' || !mobileDiscoveryProfile || window.matchMedia('(min-width: 1024px)').matches) return;
     void recordProfileVisit(mobileDiscoveryProfile.id);
   }, [mobileDiscoveryProfile?.id, tab, user, recordProfileVisit]);
+
+  useEffect(() => {
+    if (!user || tab !== 'decouverte' || !desktopDiscoveryProfile || !window.matchMedia('(min-width: 1024px)').matches) return;
+    void recordProfileVisit(desktopDiscoveryProfile.id);
+  }, [desktopDiscoveryProfile?.id, tab, user, recordProfileVisit]);
 
   useEffect(() => {
     if (!expandedDiscoveryProfile || !mobileDiscoveryProfile || mobileDiscoveryPhotos.length < 2) return;
@@ -1431,8 +1464,11 @@ export default function EspacePage() {
     return () => window.clearInterval(slideshow);
   }, [selectedProfileDetail?.id, selectedProfilePhotos.length]);
 
-  if (authLoading || !user) {
-    return <main className="flex min-h-screen items-center justify-center bg-[#f8f9fd] pt-[72px]"><p className="text-sm font-bold text-[#9a8b82]">Chargement...</p></main>;
+  if (authLoading || !user || profileLoading) {
+    return <main className="flex min-h-screen items-center justify-center bg-[#f8f9fd] pt-[72px]"><div role="status" className="flex flex-col items-center"><span className="h-9 w-9 animate-spin rounded-full border-[3px] border-[#ec3b78]/20 border-t-[#ec3b78]"/><p className="mt-4 text-sm font-bold text-[#9a8b82]">Chargement de votre espace…</p></div></main>;
+  }
+  if (profileLoadError) {
+    return <main className="flex min-h-screen items-center justify-center bg-[#f8f9fd] px-5 pt-[72px]"><div role="alert" className="max-w-md rounded-2xl bg-white p-6 text-center shadow"><p className="font-bold text-[#625852]">Impossible de charger votre profil pour le moment.</p><button type="button" onClick={() => window.location.reload()} className="mt-4 rounded-full bg-[#ec3b78] px-5 py-3 text-sm font-bold text-white">Réessayer</button></div></main>;
   }
 
   const advanceMobileDiscovery = () => {
@@ -1448,13 +1484,8 @@ export default function EspacePage() {
     setMobileDiscoveryIndex((index) => index >= filteredDiscoveryProfiles.length ? Math.max(0, index - 1) : mobileDiscoveryHistory.at(-1) ?? Math.max(0, index - 1));
     setMobileDiscoveryHistory((history) => history.slice(0, -1));
   };
-  const discoveryPageSize = 12;
-  const discoveryTotalPages = Math.max(1, Math.ceil(filteredDiscoveryProfiles.length / discoveryPageSize));
-  const safeDiscoveryPage = Math.min(discoveryPage, discoveryTotalPages);
-  const visibleDiscoveryProfiles = filteredDiscoveryProfiles.slice(
-    (safeDiscoveryPage - 1) * discoveryPageSize,
-    safeDiscoveryPage * discoveryPageSize,
-  );
+  const advanceDesktopDiscovery = () => setDesktopDiscoveryIndex((index) => Math.min(filteredDiscoveryProfiles.length - 1, index + 1));
+  const goBackDesktopDiscovery = () => setDesktopDiscoveryIndex((index) => Math.max(0, index - 1));
   const activeConversation = conversations.find((conversation) => conversation.id === activeConv);
   const activeConversationPartnerId = activeConversation
     ? activeConversation.user_a === user?.id ? activeConversation.user_b : activeConversation.user_a
@@ -1485,7 +1516,7 @@ export default function EspacePage() {
           }}
         />
 
-        <div className={`min-w-0 flex-1 bg-[radial-gradient(ellipse_at_top_right,_rgba(236,59,120,0.08),_transparent_40%)] ${tab === 'decouverte' ? 'h-[calc(100dvh-60px)] overflow-hidden px-3 pb-[calc(76px+env(safe-area-inset-bottom))] pt-3 sm:px-6 sm:pt-4 lg:h-auto lg:overflow-visible lg:px-10 lg:pt-10 lg:pb-12' : 'px-3 pb-28 pt-5 sm:px-6 sm:pt-8 lg:px-10 lg:pt-10 lg:pb-12'}`}>
+        <div className={`min-w-0 flex-1 bg-[radial-gradient(ellipse_at_top_right,_rgba(236,59,120,0.08),_transparent_40%)] ${tab === 'decouverte' ? 'h-[calc(100dvh-60px)] overflow-hidden px-3 pb-[calc(76px+env(safe-area-inset-bottom))] pt-3 sm:px-6 sm:pt-4 lg:h-auto lg:overflow-visible lg:px-10 lg:pt-0 lg:pb-2' : 'px-3 pb-28 pt-5 sm:px-6 sm:pt-8 lg:px-10 lg:pt-10 lg:pb-12'}`}>
           {/* DISCOVERY TAB */}
           {tab === 'decouverte' && (
             <div className="h-full min-h-0 lg:space-y-6">
@@ -1653,7 +1684,40 @@ export default function EspacePage() {
                     </div>
                   </section>
                 )}
-                <div className="hidden gap-5 sm:gap-6 lg:grid lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+                <section className="hidden lg:flex w-full flex-col gap-0 -mt-10">
+                  {desktopDiscoveryProfile && <>
+                    <nav className="flex h-8 items-center justify-end gap-2" aria-label="Navigation des profils">
+                      <button type="button" onClick={goBackDesktopDiscovery} disabled={desktopDiscoverySafeIndex === 0} aria-label="Profil précédent" className="flex h-9 w-9 items-center justify-center rounded-full border bg-white text-[#423a40] shadow-sm hover:border-[#ec3b78] hover:text-[#ec3b78] disabled:opacity-35 dark:border-white/10 dark:bg-[#1c1b21] dark:text-white"><ArrowLeft size={17} /></button>
+                      <button type="button" onClick={advanceDesktopDiscovery} disabled={desktopDiscoverySafeIndex >= filteredDiscoveryProfiles.length - 1} aria-label="Profil suivant" className="flex h-9 w-9 items-center justify-center rounded-full border bg-white text-[#423a40] shadow-sm hover:border-[#ec3b78] hover:text-[#ec3b78] disabled:opacity-35 dark:border-white/10 dark:bg-[#1c1b21] dark:text-white"><ArrowRight size={17} /></button>
+                    </nav>
+                    <article className="mx-auto grid h-[min(42vh,380px)] min-h-[320px] w-full max-w-[1500px] grid-cols-2 overflow-hidden rounded-[30px] border border-[#eadfd5] bg-white shadow-[0_18px_60px_rgba(83,46,32,.11)] dark:border-white/10 dark:bg-[#19191f]">
+                      <div className="relative min-h-0 overflow-hidden bg-[#eee5dc] dark:bg-[#25232a]">
+                        {desktopDiscoveryPhotos.length ? <img src={desktopDiscoveryPhotos[discoveryPhotoIndexes[desktopDiscoveryProfile.id] ?? 0] ?? desktopDiscoveryPhotos[0]} alt={`Photo de ${desktopDiscoveryProfile.display_name}`} className="absolute inset-0 h-full w-full object-cover" /> : <div className="absolute inset-0 flex items-center justify-center font-display text-8xl text-[#b58f7d]">{desktopDiscoveryProfile.display_name.charAt(0).toUpperCase()}</div>}
+                        <div className="absolute left-5 top-5 flex flex-wrap gap-2">
+                          {desktopDiscoveryProfile.is_verified && <span className="inline-flex items-center gap-1.5 rounded-full bg-white/90 px-3 py-2 text-xs font-bold text-[#168079] backdrop-blur"><ShieldCheck size={15} /> Vérifié</span>}
+                          {desktopDiscoveryProfile.is_online && <span className="inline-flex items-center gap-1.5 rounded-full bg-white/90 px-3 py-2 text-xs font-bold text-[#168079] backdrop-blur"><span className="h-2 w-2 rounded-full bg-emerald-500" /> En ligne</span>}
+                        </div>
+                        {desktopDiscoveryPhotos.length > 1 && <><div className="absolute inset-x-4 top-1/2 flex -translate-y-1/2 justify-between"><button type="button" aria-label="Photo précédente" onClick={() => setDiscoveryPhotoIndexes((current) => ({ ...current, [desktopDiscoveryProfile.id]: ((current[desktopDiscoveryProfile.id] ?? 0) - 1 + desktopDiscoveryPhotos.length) % desktopDiscoveryPhotos.length }))} className="flex h-10 w-10 items-center justify-center rounded-full bg-black/35 text-white backdrop-blur"><ArrowLeft size={18} /></button><button type="button" aria-label="Photo suivante" onClick={() => setDiscoveryPhotoIndexes((current) => ({ ...current, [desktopDiscoveryProfile.id]: ((current[desktopDiscoveryProfile.id] ?? 0) + 1) % desktopDiscoveryPhotos.length }))} className="flex h-10 w-10 items-center justify-center rounded-full bg-black/35 text-white backdrop-blur"><ArrowRight size={18} /></button></div><div className="absolute bottom-5 left-0 right-0 flex justify-center gap-1.5">{desktopDiscoveryPhotos.map((photo, index) => <span key={`${photo}-${index}`} className={`h-1.5 rounded-full ${index === (discoveryPhotoIndexes[desktopDiscoveryProfile.id] ?? 0) ? 'w-7 bg-white' : 'w-2 bg-white/55'}`} />)}</div></>}
+                      </div>
+                      <div className="flex min-h-0 flex-col">
+                        <div className="min-h-0 flex-1 overflow-y-auto p-8 xl:p-10">
+                          <h2 className="font-display text-4xl leading-tight text-[#241c18] dark:text-white">{desktopDiscoveryProfile.display_name}, {desktopDiscoveryProfile.age} <span className="text-2xl">ans</span></h2>
+                          <p className="mt-3 flex items-center gap-2 text-sm text-[#756960] dark:text-white/60"><MapPin size={17} /> {desktopDiscoveryProfile.city || 'Ville non renseignée'}</p>
+                          {desktopDiscoveryProfile.profession && <p className="mt-7 text-xs font-extrabold uppercase tracking-[.14em] text-[#168079] dark:text-emerald-300">{desktopDiscoveryProfile.profession}</p>}
+                          {desktopDiscoveryProfile.bio && <section className="mt-8"><h3 className="text-[11px] font-extrabold uppercase tracking-[.16em] text-[#756960] dark:text-white/50">À propos</h3><p className="mt-3 whitespace-pre-line text-base leading-7 text-[#403b3a] dark:text-white/80">{desktopDiscoveryProfile.bio}</p></section>}
+                          {desktopDiscoveryProfile.interests?.length > 0 && <section className="mt-8"><h3 className="text-[11px] font-extrabold uppercase tracking-[.16em] text-[#756960] dark:text-white/50">Centres d’intérêt</h3><div className="mt-3 flex flex-wrap gap-2">{desktopDiscoveryProfile.interests.map((interest) => <span key={interest} className="rounded-full bg-[#fce6ef] px-4 py-2 text-sm font-semibold text-[#8f2351] dark:bg-[#ec3b78]/15 dark:text-[#ff9fc2]">{interest}</span>)}</div></section>}
+                          {(desktopDiscoveryProfile.religion || desktopDiscoveryProfile.marital_status || desktopDiscoveryProfile.smoking_habit || Boolean(desktopDiscoveryProfile.languages?.length)) && <section className="mt-8 border-t border-[#e8e4e8] pt-6 dark:border-white/10"><h3 className="text-[11px] font-extrabold uppercase tracking-[.16em] text-[#756960] dark:text-white/50">Quelques détails</h3><dl className="mt-4 grid grid-cols-2 gap-x-5 gap-y-4 text-sm">{desktopDiscoveryProfile.religion && <div><dt className="text-xs text-[#8c8280]">Religion</dt><dd className="mt-1 font-semibold text-[#403b3a] dark:text-white/80">{desktopDiscoveryProfile.religion}</dd></div>}{desktopDiscoveryProfile.marital_status && <div><dt className="text-xs text-[#8c8280]">Situation</dt><dd className="mt-1 font-semibold text-[#403b3a] dark:text-white/80">{desktopDiscoveryProfile.marital_status}</dd></div>}{desktopDiscoveryProfile.smoking_habit && <div><dt className="text-xs text-[#8c8280]">Tabac</dt><dd className="mt-1 font-semibold text-[#403b3a] dark:text-white/80">{desktopDiscoveryProfile.smoking_habit}</dd></div>}{Boolean(desktopDiscoveryProfile.languages?.length) && <div className="col-span-2"><dt className="text-xs text-[#8c8280]">Langues</dt><dd className="mt-1 font-semibold text-[#403b3a] dark:text-white/80">{(desktopDiscoveryProfile.languages ?? []).join(', ')}</dd></div>}</dl></section>}
+                        </div>
+                      </div>
+                    </article>
+                    <footer className="mx-auto flex w-full max-w-[1500px] shrink-0 items-center justify-center gap-4 pt-4 pb-0">
+                      <button type="button" onClick={advanceDesktopDiscovery} aria-label="Passer ce profil" className="flex h-14 w-14 items-center justify-center rounded-full border border-[#e5e1e8] bg-white text-[#45414a] shadow-sm hover:border-[#ec3b78] hover:text-[#ec3b78] dark:border-white/10 dark:bg-[#1c1b21] dark:text-white"><X size={22} /></button>
+                      <button type="button" onClick={() => handleDiscoveryMessage(desktopDiscoveryProfile)} aria-label={`Envoyer un message à ${desktopDiscoveryProfile.display_name}`} className="flex h-14 w-14 items-center justify-center rounded-full bg-[#292746] text-white shadow-lg hover:scale-105"><MessageCircle size={22} /></button>
+                      <button type="button" onClick={() => { if (!discoveryLikedIds.has(desktopDiscoveryProfile.id)) void toggleDiscoveryLike(desktopDiscoveryProfile.id); }} aria-label={discoveryLikedIds.has(desktopDiscoveryProfile.id) ? 'Profil aimé' : 'Aimer ce profil'} className={`flex h-14 w-14 items-center justify-center rounded-full text-white shadow-lg hover:scale-105 ${discoveryLikedIds.has(desktopDiscoveryProfile.id) ? 'bg-[#a20d5d]' : 'bg-[#ec1689]'}`}><Heart size={22} fill="currentColor" /></button>
+                    </footer>
+                  </>}
+                </section>
+                <div className="hidden">
                   {visibleDiscoveryProfiles.map((profileItem, index) => (
                     <article
                       key={profileItem.id}
@@ -1717,29 +1781,6 @@ export default function EspacePage() {
                 </>
               )}
 
-              {filteredDiscoveryProfiles.length > discoveryPageSize && (
-                <div className="hidden flex-col items-center justify-between gap-3 rounded-[24px] bg-white p-4 shadow-[0_8px_30px_rgba(83,46,32,.05)] sm:flex-row lg:flex">
-                  <p className="text-xs font-bold uppercase tracking-[.14em] text-[#756960]">
-                    Page {safeDiscoveryPage} / {discoveryTotalPages}
-                  </p>
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => setDiscoveryPage((currentPage) => Math.max(1, currentPage - 1))}
-                      disabled={safeDiscoveryPage === 1}
-                      className="rounded-full border border-[#dfd2c6] bg-[#f8f9fd] px-4 py-2 text-xs font-extrabold text-[#625852] transition disabled:cursor-not-allowed disabled:opacity-40"
-                    >
-                      Précédent
-                    </button>
-                    <button
-                      onClick={() => setDiscoveryPage((currentPage) => Math.min(discoveryTotalPages, currentPage + 1))}
-                      disabled={safeDiscoveryPage === discoveryTotalPages}
-                      className="rounded-full bg-[#ec3b78] px-4 py-2 text-xs font-extrabold text-white transition disabled:cursor-not-allowed disabled:opacity-40"
-                    >
-                      Suivant
-                    </button>
-                  </div>
-                </div>
-              )}
             </div>
           )}
 
@@ -1758,7 +1799,7 @@ export default function EspacePage() {
                       <span className="absolute inset-0 flex items-center justify-center bg-black/0 text-white transition group-hover:bg-black/35"><span className="absolute bottom-1 right-1 flex h-12 w-12 items-center justify-center rounded-full bg-[#ec1689] text-white shadow-lg"><Camera size={21} /></span></span>
                       {uploadingImage && <span className="absolute inset-0 flex items-center justify-center bg-black/45"><span className="h-8 w-8 animate-spin rounded-full border-2 border-white border-t-transparent" /></span>}
                     </button>
-                    <div className="mt-5 flex items-center justify-center gap-2"><h2 className="font-display text-3xl font-bold text-[#272630] dark:text-white">{profileForm.display_name || 'Votre nom'}{profileForm.age ? `, ${profileForm.age}` : ''}</h2>{ownProfileIsComplete ? <CircleCheck size={21} className="shrink-0 text-emerald-600 dark:text-emerald-400" aria-label="Profil complet" /> : <AlertTriangle size={21} className="shrink-0 text-amber-500" aria-label="Profil incomplet" />}</div>
+                    <div className="mt-5 flex items-center justify-center gap-2"><h2 className="font-display text-3xl font-bold text-[#272630] dark:text-white">{profileForm.display_name || 'Votre nom'}{profileForm.age ? `, ${profileForm.age}` : ''}</h2>{ownProfileIsComplete ? <CircleCheck size={21} className="shrink-0 text-emerald-600 dark:text-emerald-400" aria-label="Profil complet" /> : <span title="Votre profil est incomplet"><AlertTriangle size={21} className="shrink-0 text-amber-500" aria-label="Profil incomplet" /></span>}</div>
                     <p className="mt-2 text-base text-[#777985] dark:text-white/60">{profileForm.city || 'Ville non renseignée'}</p>
                     {profile?.is_verified && <span className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-sky-100 px-3 py-1.5 text-xs font-bold text-sky-700 dark:bg-sky-500/15 dark:text-sky-200"><ShieldCheck size={14} /> Profil vérifié</span>}
                     {!ownProfileIsComplete && <button type="button" onClick={() => setProfileEditOpen(true)} className="mt-6 flex w-full items-center gap-4 rounded-[24px] bg-[#f4f4f6] p-5 text-left text-sm font-bold text-[#555763] dark:bg-[#292929] dark:text-white/75"><span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#ec1689]/10 text-[#ec1689]">✦</span>Complétez votre profil pour avoir plus de chance</button>}
@@ -2328,7 +2369,7 @@ export default function EspacePage() {
                   <div className="relative mx-auto h-36 w-36 overflow-hidden rounded-full border-4 border-white bg-[#e4e6ed] shadow-[0_0_0_3px_rgba(236,22,137,.25)] dark:border-[#303036] sm:h-44 sm:w-44">
                     <img src={ownProfilePhoto} alt={profileForm.display_name} onError={(event) => { event.currentTarget.src = '/images/default-avatar.svg'; }} className="h-full w-full object-cover" />
                   </div>
-                  <h3 className="mt-4 flex items-center justify-center gap-2 font-display text-3xl font-bold">{profileForm.display_name}{profileForm.age && <>, {profileForm.age}</>}{ownProfileIsComplete ? <CircleCheck size={21} className="shrink-0 text-emerald-600 dark:text-emerald-400" aria-label="Profil complet" /> : <AlertTriangle size={21} className="shrink-0 text-amber-500" aria-label="Profil incomplet" />}</h3>
+                  <h3 className="mt-4 flex items-center justify-center gap-2 font-display text-3xl font-bold">{profileForm.display_name}{profileForm.age && <>, {profileForm.age}</>}{ownProfileIsComplete ? <CircleCheck size={21} className="shrink-0 text-emerald-600 dark:text-emerald-400" aria-label="Profil complet" /> : <span title="Votre profil est incomplet"><AlertTriangle size={21} className="shrink-0 text-amber-500" aria-label="Profil incomplet" /></span>}</h3>
                   <p className="mt-1 flex items-center justify-center gap-1.5 text-sm text-[#686b79] dark:text-white/65"><MapPin size={15} className="text-[#ec1689]" />{profileForm.city || 'Ville non renseignée'}</p>
                   {profile?.is_verified && <span className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-sky-100 px-3 py-1 text-xs font-bold text-sky-700 dark:bg-sky-500/15 dark:text-sky-200"><ShieldCheck size={14} />Profil vérifié</span>}
                 </div>

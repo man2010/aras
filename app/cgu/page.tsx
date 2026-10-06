@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { FileText, Mail } from 'lucide-react';
 
 export const metadata: Metadata = {
-  title: 'Conditions générales d\'utilisation — ARAS',
+  title: 'Conditions générales d\'utilisation',
   description: 'Consultez les conditions générales d\'utilisation de la plateforme ARAS, espace de rencontres sérieuses et respectueuses.',
 };
 
