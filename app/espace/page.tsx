@@ -1675,7 +1675,7 @@ export default function EspacePage() {
     ? imagePreview || profile.avatar_urls?.[0] || profile.photo_url || profileForm.photo_url || '/images/default-avatar.svg'
     : '/images/default-avatar.svg';
   const ownProfilePhotos = user && profile?.id === user.id
-    ? Array.from(new Set([imagePreview, profileForm.photo_url, ...(profile.avatar_urls ?? []), profile.photo_url].filter((photo): photo is string => Boolean(photo && photo !== '/images/default-avatar.svg'))))
+    ? Array.from(new Set([imagePreview, profileForm.photo_url, profile.photo_url, ...(profile.avatar_urls ?? [])].filter((photo): photo is string => Boolean(photo && photo !== '/images/default-avatar.svg'))))
     : [];
 
   useEffect(() => {
