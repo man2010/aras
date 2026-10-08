@@ -283,6 +283,7 @@ export default function EspacePage() {
   const [searchFiltersReturnTo, setSearchFiltersReturnTo] = useState<'discovery' | 'profile' | 'settings'>('discovery');
   const [ownProfilePreviewOpen, setOwnProfilePreviewOpen] = useState(false);
   const [ownProfileDetailExpanded, setOwnProfileDetailExpanded] = useState(false);
+  const [ownProfilePhotoIndex, setOwnProfilePhotoIndex] = useState(0);
   const FILTER_AGE_MIN = 18;
   const [filterAgeMin, setFilterAgeMin] = useState(FILTER_AGE_MIN);
   const [filterAgeMax, setFilterAgeMax] = useState(100);
@@ -1673,6 +1674,25 @@ export default function EspacePage() {
   const ownProfilePhoto = user && profile?.id === user.id
     ? imagePreview || profile.avatar_urls?.[0] || profile.photo_url || profileForm.photo_url || '/images/default-avatar.svg'
     : '/images/default-avatar.svg';
+  const ownProfilePhotos = user && profile?.id === user.id
+    ? Array.from(new Set([imagePreview, profileForm.photo_url, ...(profile.avatar_urls ?? []), profile.photo_url].filter((photo): photo is string => Boolean(photo && photo !== '/images/default-avatar.svg'))))
+    : [];
+
+  useEffect(() => {
+    if (!ownProfilePreviewOpen || ownProfileDetailExpanded || ownProfilePhotos.length < 2) return;
+    const slideshow = window.setInterval(() => {
+      setOwnProfilePhotoIndex((index) => (index + 1) % ownProfilePhotos.length);
+    }, 1000);
+    return () => window.clearInterval(slideshow);
+  }, [ownProfilePreviewOpen, ownProfileDetailExpanded, ownProfilePhotos.length]);
+
+  useEffect(() => {
+    if (!ownProfilePreviewOpen || !ownProfileDetailExpanded || ownProfilePhotos.length < 2) return;
+    const slideshow = window.setInterval(() => {
+      setOwnProfilePhotoIndex((index) => (index + 1) % ownProfilePhotos.length);
+    }, 3500);
+    return () => window.clearInterval(slideshow);
+  }, [ownProfilePreviewOpen, ownProfileDetailExpanded, ownProfilePhotos.length]);
 
   useEffect(() => {
     if (!selectedProfileDetail || selectedProfilePhotos.length < 2) return;
@@ -2025,7 +2045,7 @@ export default function EspacePage() {
                     <div className="mt-7 grid grid-cols-2 gap-3">
                       <button type="button" onClick={() => setProfileEditOpen(true)} className="flex h-[68px] items-center justify-center gap-2 rounded-[22px] border border-[#e5e5eb] bg-[#f0f0f3] px-2 text-xs font-extrabold text-[#292832] shadow-[0_8px_22px_rgba(30,30,45,.07)] transition hover:-translate-y-0.5 hover:bg-[#e9e9ee] hover:shadow-[0_12px_28px_rgba(30,30,45,.11)] active:translate-y-0 sm:gap-3 sm:px-4 sm:text-sm dark:border-white/[0.06] dark:bg-[#302f52] dark:text-white dark:shadow-[0_10px_24px_rgba(0,0,0,.2)] dark:hover:bg-[#39385f]"><span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-black/[0.04] text-[#ec3b78] ring-1 ring-black/[0.04] dark:bg-white/10 dark:text-white dark:ring-white/10 sm:h-10 sm:w-10"><Pencil size={19} /></span><span>Modifier</span></button>
                       <button type="button" disabled={!profile} onClick={() => { if (profile) { setOwnProfileDetailExpanded(false); setOwnProfilePreviewOpen(true); } }} className="flex h-[68px] items-center justify-center gap-2 rounded-[22px] border border-[#e5e5eb] bg-[#f0f0f3] px-2 text-xs font-extrabold text-[#292832] shadow-[0_8px_22px_rgba(30,30,45,.07)] transition hover:-translate-y-0.5 hover:bg-[#e9e9ee] hover:shadow-[0_12px_28px_rgba(30,30,45,.11)] active:translate-y-0 disabled:cursor-not-allowed disabled:opacity-50 sm:gap-3 sm:px-4 sm:text-sm dark:border-white/[0.06] dark:bg-[#302f52] dark:text-white dark:shadow-[0_10px_24px_rgba(0,0,0,.2)] dark:hover:bg-[#39385f]"><span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-black/[0.04] text-[#ec3b78] ring-1 ring-black/[0.04] dark:bg-white/10 dark:text-white dark:ring-white/10 sm:h-10 sm:w-10"><User size={19} /></span><span>Voir mon profil</span></button>
-                      <button type="button" onClick={() => { setSearchFiltersReturnTo('profile'); setTab('decouverte'); setShowDiscoveryFilters(true); }} className="col-span-2 flex h-[68px] w-full items-center gap-3 rounded-[22px] border border-[#e5e5eb] bg-[#f0f0f3] px-4 text-left text-[#292832] shadow-[0_8px_22px_rgba(30,30,45,.07)] transition hover:-translate-y-0.5 hover:bg-[#e9e9ee] hover:shadow-[0_12px_28px_rgba(30,30,45,.11)] active:translate-y-0 dark:border-white/[0.06] dark:bg-[#302f52] dark:text-white dark:shadow-[0_10px_24px_rgba(0,0,0,.2)] dark:hover:bg-[#39385f]"><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-black/[0.04] text-[#ec3b78] ring-1 ring-black/[0.04] dark:bg-white/10 dark:text-white dark:ring-white/10"><SlidersHorizontal size={20} /></span><span className="min-w-0 flex-1 text-sm font-extrabold">Préférences</span><ChevronRight size={19} className="shrink-0 text-[#858691] dark:text-white/65" /></button>
+                      <button type="button" onClick={() => { setSearchFiltersReturnTo('profile'); setTab('decouverte'); setShowDiscoveryFilters(true); }} className="col-span-2 flex h-[68px] w-full items-center gap-3 rounded-[22px] border border-[#e5e5eb] bg-[#f0f0f3] px-4 text-left text-[#292832] shadow-[0_8px_22px_rgba(30,30,45,.07)] transition hover:-translate-y-0.5 hover:bg-[#e9e9ee] hover:shadow-[0_12px_28px_rgba(30,30,45,.11)] active:translate-y-0 dark:border-white/[0.06] dark:bg-[#302f52] dark:text-white dark:shadow-[0_10px_24px_rgba(0,0,0,.2)] dark:hover:bg-[#39385f]"><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-black/[0.04] text-[#ec3b78] ring-1 ring-black/[0.04] dark:bg-white/10 dark:text-white dark:ring-white/10"><SlidersHorizontal size={20} /></span><span className="min-w-0 flex-1 text-sm font-extrabold">Centre préférences</span><ChevronRight size={19} className="shrink-0 text-[#858691] dark:text-white/65" /></button>
                     </div>
                   </article>
 
@@ -2566,9 +2586,10 @@ export default function EspacePage() {
         <div className="fixed inset-0 z-[125] flex items-center justify-center bg-black/65 p-3 backdrop-blur-sm sm:p-6" role="dialog" aria-modal="true" aria-label="Mon profil">
           <section className="relative isolate flex h-[min(86dvh,860px)] w-full max-w-[680px] flex-col overflow-y-auto rounded-[32px] bg-[#202027] text-white shadow-[0_28px_90px_rgba(0,0,0,.42)] sm:rounded-[40px]">
             {!ownProfileDetailExpanded ? <>
-              <img src={ownProfilePhoto} alt="" onError={(event) => { event.currentTarget.src = '/images/default-avatar.svg'; }} className="absolute inset-0 h-full w-full object-cover" />
+              <img key={ownProfilePhotoIndex} src={ownProfilePhotos.length ? ownProfilePhotos[ownProfilePhotoIndex % ownProfilePhotos.length] : ownProfilePhoto} alt="" onError={(event) => { event.currentTarget.src = '/images/default-avatar.svg'; }} className="absolute inset-0 h-full w-full object-cover transition-opacity duration-700" />
               <div className="absolute inset-0 bg-gradient-to-b from-black/25 via-transparent to-black/85" />
               <button type="button" onClick={() => setOwnProfilePreviewOpen(false)} aria-label="Fermer mon profil" className="absolute right-4 top-4 z-10 flex h-11 w-11 items-center justify-center rounded-full border border-white/30 bg-black/30 text-white backdrop-blur"><X size={21} /></button>
+              {ownProfilePhotos.length > 1 && <div className="absolute inset-x-5 top-5 z-10 flex gap-1.5" aria-label={`Photo ${ownProfilePhotoIndex + 1} sur ${ownProfilePhotos.length}`}>{ownProfilePhotos.map((photo, index) => <span key={`${photo}-${index}`} className={`h-1 flex-1 rounded-full transition-colors ${index === ownProfilePhotoIndex ? 'bg-white' : 'bg-white/40'}`} />)}</div>}
               <div className="relative mt-auto p-6 sm:p-9">
                 <p className="text-xs font-extrabold uppercase tracking-[.18em] text-[#ff86bc]">Mon profil</p>
                 <h2 className="mt-2 flex items-center gap-2 font-display text-4xl font-bold sm:text-5xl">{profileForm.display_name}{profileForm.age && <>, {profileForm.age}</>}{ownProfileIsComplete ? <CircleCheck size={25} className="shrink-0 text-emerald-400" aria-label="Profil complet" /> : <AlertTriangle size={25} className="shrink-0 text-amber-400" aria-label="Profil incomplet" />}</h2>
@@ -2586,7 +2607,7 @@ export default function EspacePage() {
               <div className="flex-1 space-y-6 bg-[#f8f9fd] px-5 pb-8 pt-6 text-[#24212b] dark:bg-[#101014] dark:text-white sm:px-8">
                 <div className="text-center">
                   <div className="relative mx-auto h-36 w-36 overflow-hidden rounded-full border-4 border-white bg-[#e4e6ed] shadow-[0_0_0_3px_rgba(236,22,137,.25)] dark:border-[#303036] sm:h-44 sm:w-44">
-                    <img src={ownProfilePhoto} alt={profileForm.display_name} onError={(event) => { event.currentTarget.src = '/images/default-avatar.svg'; }} className="h-full w-full object-cover" />
+                    <img src={ownProfilePhotos.length ? ownProfilePhotos[ownProfilePhotoIndex % ownProfilePhotos.length] : ownProfilePhoto} alt={profileForm.display_name} onError={(event) => { event.currentTarget.src = '/images/default-avatar.svg'; }} className="h-full w-full object-cover transition-opacity duration-700" />
                   </div>
                   <h3 className="mt-4 flex items-center justify-center gap-2 font-display text-3xl font-bold">{profileForm.display_name}{profileForm.age && <>, {profileForm.age}</>}{ownProfileIsComplete ? <CircleCheck size={21} className="shrink-0 text-emerald-600 dark:text-emerald-400" aria-label="Profil complet" /> : <span title="Votre profil est incomplet"><AlertTriangle size={21} className="shrink-0 text-amber-500" aria-label="Profil incomplet" /></span>}</h3>
                   <p className="mt-1 flex items-center justify-center gap-1.5 text-sm text-[#686b79] dark:text-white/65"><MapPin size={15} className="text-[#ec1689]" />{profileForm.city || 'Ville non renseignée'}</p>
