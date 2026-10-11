@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 import {
-  ArrowRight, Sparkles, Heart, Users, ShieldCheck,
+  ArrowRight, Heart, Users, ShieldCheck,
   Check, CalendarDays, MapPin, Quote, ArrowUpRight, MessageCircle, Search,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
@@ -64,10 +64,10 @@ export default function Home() {
         <div className="relative mx-auto grid max-w-[1240px] items-center gap-6 lg:grid-cols-[1fr_0.8fr]">
           <div className="relative z-10 animate-[reveal_.8s_ease_both]">
             <div className={`mb-4 inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-[10px] font-extrabold uppercase tracking-[.18em] ${isDark ? 'border-white/30 bg-white/10 text-white' : 'border-[#d89b52]/40 bg-white/40 text-[#9a682f]'}`}>
-              <Sparkles size={11} /> Là où les âmes se rencontrent
+              Là où les âmes se rencontrent
             </div>
             <h1 className="font-display max-w-[640px] text-[36px] font-semibold leading-[1.1] tracking-[-.055em] text-[#241c18] sm:text-[52px] lg:text-[88px]">
-              Et si la belle histoire <span className="italic text-[#ec3b78]">commençait</span> ici ?
+              Et si votre belle histoire <span className="italic text-[#ec3b78]">commençait</span> ici ?
             </h1>
             <p className="mt-4 max-w-[460px] text-[14px] leading-6 text-[#756960] sm:text-[16px]">
               ARAS est un espace de rencontres sérieuses, authentiques et respectueuses, inspiré par les valeurs de la Téranga sénégalaise.
