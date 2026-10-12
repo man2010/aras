@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 import {
-  ArrowRight, Heart, Users, ShieldCheck, LockKeyhole, CreditCard,
+  ArrowRight, Heart, Users, ShieldCheck, LockKeyhole, CreditCard, Flag, Eye,
   Check, CalendarDays, MapPin, Quote, ArrowUpRight, MessageCircle, Search,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
@@ -438,6 +438,55 @@ export default function Home() {
                 </div>
               </Reveal>
             ))}
+          </div>
+        </div>
+      </section>
+
+      {/* SÉCURITÉ ET QUESTIONS FRÉQUENTES */}
+      <section className="bg-[#f1ece6] px-5 py-16 dark:bg-[#1c191c] lg:px-8 lg:py-20">
+        <div className="mx-auto grid max-w-[1240px] gap-8 lg:grid-cols-2 lg:gap-10">
+          <Reveal dir="left">
+            <div className="h-full rounded-[30px] bg-white p-7 shadow-[0_12px_36px_rgba(83,46,32,.06)] dark:bg-[#252126] sm:p-9">
+              <p className="text-xs font-extrabold uppercase tracking-[.2em] text-[#ec3b78]">Sécurité et respect</p>
+              <h2 className={`font-display mt-4 max-w-[560px] text-4xl leading-[1.08] tracking-[-.04em] sm:text-5xl ${heading}`}>Un espace où l’on se sent <span className="italic text-[#8e3a80]">en confiance</span></h2>
+              <div className="mt-7 divide-y divide-[#eadfd5] dark:divide-white/10">
+                {[
+                  { title: 'Signalez un comportement', text: 'Un problème ? Envoyez un signalement à notre équipe.', icon: Flag },
+                  { title: 'Vous gardez la main', text: 'Bloquez les profils avec lesquels vous ne souhaitez plus échanger.', icon: ShieldCheck },
+                  { title: 'Choisissez votre visibilité', text: 'Gérez l’affichage de votre âge, de votre ville et de votre statut en ligne.', icon: Eye },
+                  { title: 'Vos échanges restent privés', text: 'Discutez depuis la messagerie ARAS et gardez le contrôle de vos informations.', icon: LockKeyhole },
+                ].map(({ title, text, icon: Icon }, index) => (
+                  <Reveal key={title} delay={index * 90}>
+                    <article className="flex gap-3 py-5 first:pt-6 last:pb-1 sm:gap-4">
+                      <span className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#f8e8ed] text-[#c32d70] dark:bg-[#ec3b78]/15 dark:text-[#ff84b5]"><Icon size={19} /></span>
+                      <div><h3 className={`text-sm font-extrabold ${heading}`}>{title}</h3><p className={`mt-1 text-sm leading-6 ${body}`}>{text}</p></div>
+                    </article>
+                  </Reveal>
+                ))}
+              </div>
+            </div>
+          </Reveal>
+
+          <div className="flex flex-col">
+            <Reveal dir="right">
+              <h2 className={`font-display mb-5 text-4xl tracking-[-.04em] sm:text-5xl ${heading}`}>Questions <span className="italic text-[#8e3a80]">fréquentes</span></h2>
+            </Reveal>
+            <div className="space-y-3">
+              {[
+                ['Comment créer un compte ?', 'Inscrivez-vous avec votre numéro de téléphone ou votre adresse e-mail, puis confirmez-le avec le code reçu.'],
+                ['Comment fonctionne ARAS ?', 'Créez votre profil, précisez vos préférences, découvrez des personnes et échangez lorsque l’intérêt est partagé.'],
+                ['Comment signaler ou bloquer un utilisateur ?', 'Depuis une conversation, choisissez « Signaler » ou « Bloquer » et suivez les étapes indiquées.'],
+                ['Puis-je choisir les informations visibles ?', 'Oui. Les paramètres de confidentialité vous permettent de gérer l’affichage de votre âge, de votre ville et de votre statut en ligne.'],
+              ].map(([question, answer], index) => (
+                <Reveal key={question} delay={index * 90}>
+                  <article className="rounded-[22px] bg-white px-5 py-4 shadow-[0_8px_24px_rgba(83,46,32,.05)] dark:bg-[#252126] sm:px-6 sm:py-5">
+                    <h3 className={`text-sm font-extrabold sm:text-base ${heading}`}>{question}</h3>
+                    <p className={`mt-1.5 text-sm leading-6 ${body}`}>{answer}</p>
+                  </article>
+                </Reveal>
+              ))}
+            </div>
+            <Link href="/faq" className="group mt-5 inline-flex w-fit items-center gap-2 border-b-2 border-[#8e3a80] pb-1 text-sm font-extrabold text-[#241c18] transition hover:text-[#8e3a80] dark:text-white">Toutes les questions <ArrowRight size={16} className="transition group-hover:translate-x-1" /></Link>
           </div>
         </div>
       </section>
