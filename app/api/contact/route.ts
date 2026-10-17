@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import nodemailer from 'nodemailer';
 
-const supportEmail = 'terangalovesn@gmail.com';
+const supportEmail = process.env.CONTACT_TO_EMAIL?.trim() || process.env.GMAIL_EMAIL?.trim();
 
 function createEmailTemplate(name: string, email: string, subject: string, message: string): string {
   return `
@@ -70,7 +70,7 @@ export async function POST(request: Request) {
   console.log('GMAIL_EMAIL:', process.env.GMAIL_EMAIL ? 'Configuré' : 'Non configuré');
   console.log('GMAIL_APP_PASSWORD:', process.env.GMAIL_APP_PASSWORD ? 'Configuré' : 'Non configuré');
 
-  if (!process.env.GMAIL_EMAIL || !process.env.GMAIL_APP_PASSWORD) {
+  if (!process.env.GMAIL_EMAIL || !process.env.GMAIL_APP_PASSWORD || !supportEmail) {
     console.error('Variables d\'environnement Gmail manquantes');
     return NextResponse.json({ error: 'Configuration email manquante.' }, { status: 503 });
   }
@@ -89,7 +89,7 @@ export async function POST(request: Request) {
   try {
     console.log('Tentative d\'envoi d\'email...');
     await transporter.sendMail({
-      from: process.env.GMAIL_EMAIL,
+      from: { name: 'SupportAras', address: process.env.CONTACT_FROM_EMAIL?.trim() || process.env.GMAIL_EMAIL },
       to: supportEmail,
       replyTo: email,
       subject: `[ARAS] ${subject}`,

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 
 const ALLOWED_CONTACT_METHODS = new Set(['SMS', 'Appel', 'WhatsApp', 'E-mail']);
+const supportEmail = process.env.CONTACT_TO_EMAIL?.trim() || process.env.GMAIL_EMAIL?.trim();
 
 export async function POST(request: Request) {
   try {
@@ -26,7 +27,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Le lien de paiement Wave configuré est invalide.' }, { status: 503 });
     }
 
-    if (!process.env.GMAIL_EMAIL || !process.env.GMAIL_APP_PASSWORD) {
+    if (!process.env.GMAIL_EMAIL || !process.env.GMAIL_APP_PASSWORD || !supportEmail) {
       return NextResponse.json({ error: 'Le traitement des demandes Golden est momentanément indisponible.' }, { status: 503 });
     }
 
@@ -53,8 +54,8 @@ export async function POST(request: Request) {
     ].join('\n');
 
     await transporter.sendMail({
-      from: process.env.GMAIL_EMAIL,
-      to: 'terangalovesn@gmail.com',
+      from: { name: 'SupportAras', address: process.env.CONTACT_FROM_EMAIL?.trim() || process.env.GMAIL_EMAIL },
+      to: supportEmail,
       subject: '[ARAS] Demande membre Golden',
       text: message,
     });
