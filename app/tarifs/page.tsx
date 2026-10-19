@@ -95,7 +95,7 @@ export default function TarifsPage() {
 
   const faqs = [
     { q: 'La formule gratuite suffit-elle pour commencer ?', r: 'Oui, la formule gratuite permet déjà de créer votre profil, découvrir les profils et tester la plateforme avec les bases essentielles.' },
-    { q: 'Le Premium est-il gratuit pour les femmes ?', r: 'Oui, la formule Premium est à 5 000 FCFA par mois et gratuite pour les femmes.' },
+    { q: 'Le Premium est-il gratuit pour les femmes ?', r: 'Pendant le lancement, toutes les formules sont gratuites pendant au moins deux mois. Ensuite, Premium sera à 5 000 FCFA par mois et restera gratuit pour les femmes.' },
     { q: 'Qu\'est-ce que la formule Elite ?', r: 'La formule Elite donne accès aux avantages les plus complets, dont les événements VIP, l’incognito et le support prioritaire.' },
     { q: 'Mes données sont-elles protégées ?', r: 'Absolument. Vos informations personnelles restent confidentielles et ne sont jamais partagées sans votre accord.' },
   ];
@@ -106,7 +106,12 @@ export default function TarifsPage() {
         <div className="text-center">
           <p className="text-xs font-extrabold uppercase tracking-[.2em] text-[#ec3b78]">Choisissez votre formule</p>
           <h1 className="font-display mt-4 text-5xl tracking-[-.045em] sm:text-6xl">Des formules <span className="italic text-[#1a6b68]">simples</span></h1>
-          <p className="mx-auto mt-4 max-w-[480px] text-sm leading-6 text-[#756960]">Commencez gratuitement. Passez à Premium ou Elite quand vous voulez aller plus loin. Sans engagement.</p>
+          <p className="mx-auto mt-4 max-w-[480px] text-sm leading-6 text-[#756960]">Profitez de toutes les formules gratuitement pendant le lancement.</p>
+        </div>
+
+        <div className="mx-auto mt-8 max-w-[900px] rounded-2xl border border-[#ec3b78]/20 bg-[#fff2f7] px-5 py-4 text-center dark:border-[#ec3b78]/30 dark:bg-[#ec3b78]/10">
+          <p className="text-sm font-extrabold text-[#bd285f] dark:text-[#ff9abb]">Offre de lancement</p>
+          <p className="mt-1 text-sm leading-6 text-[#625852] dark:text-white/75">Toutes les formules sont gratuites pendant au moins les deux premiers mois.</p>
         </div>
 
         <div className="mt-12 grid gap-6 md:grid-cols-3">
@@ -117,7 +122,7 @@ export default function TarifsPage() {
                 <plan.icon size={22} fill={plan.icon === Heart ? 'currentColor' : 'none'} />
               </div>
               <h3 className="mt-6 font-display text-2xl">{plan.name}</h3>
-              <p className="mt-3"><span className="font-display text-4xl font-semibold">{plan.price}</span><span className="ml-2 text-sm opacity-60">{plan.period}</span></p>
+              <p className="mt-3">{plan.name !== 'Gratuit' && <span className="mr-2 text-sm line-through opacity-60">{plan.price} {plan.period}</span>}<span className="font-display text-4xl font-semibold">Gratuit</span>{plan.name !== 'Gratuit' && <span className="ml-2 text-sm opacity-70">actuellement</span>}</p>
               <ul className="mt-7 space-y-3.5">
                 {plan.features.map((f) => (
                   <li key={f} className="flex items-start gap-2 text-sm"><Check size={16} className="mt-0.5 shrink-0" style={{ color: plan.accent }} /> {f}</li>

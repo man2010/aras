@@ -414,7 +414,13 @@ export default function Home() {
             <div className="text-center">
               <p className="text-xs font-extrabold uppercase tracking-[.2em] text-[#ec3b78]">Choisissez votre formule</p>
               <h2 className={`font-display mt-4 text-5xl tracking-[-.045em] ${heading}`}>Commencez <span className="italic text-[#1a6b68]">gratuitement</span></h2>
-              <p className={`mx-auto mt-4 max-w-[460px] text-sm leading-6 ${body}`}>Explorez sans engagement. Passez à Premium quand vous voulez aller plus loin.</p>
+              <p className={`mx-auto mt-4 max-w-[460px] text-sm leading-6 ${body}`}>Explorez sans engagement et profitez de toutes les formules gratuitement pendant le lancement.</p>
+            </div>
+          </Reveal>
+          <Reveal delay={100}>
+            <div className="mx-auto mt-8 max-w-[900px] rounded-2xl border border-[#ec3b78]/20 bg-[#fff2f7] px-5 py-4 text-center dark:border-[#ec3b78]/30 dark:bg-[#ec3b78]/10">
+              <p className="text-sm font-extrabold text-[#bd285f] dark:text-[#ff9abb]">Offre de lancement</p>
+              <p className="mt-1 text-sm leading-6 text-[#625852] dark:text-white/75">Toutes les formules sont gratuites pendant au moins les deux premiers mois.</p>
             </div>
           </Reveal>
           <div className="mt-14 grid items-center gap-6 md:grid-cols-3">
@@ -428,7 +434,7 @@ export default function Home() {
                   {plan.featured && <div aria-hidden className="pointer-events-none absolute -right-10 -top-10 h-40 w-40 rounded-full bg-white/15 blur-2xl" />}
                   {plan.featured && <span className="aras-shine relative mb-4 inline-block rounded-full bg-white/20 px-3 py-1 text-[10px] font-extrabold uppercase tracking-wider">Le plus choisi</span>}
                   <h3 className="relative font-display text-2xl">{plan.name}</h3>
-                  <p className="relative mt-3"><span className="font-display text-4xl font-semibold">{plan.price}</span><span className="text-sm opacity-60">{plan.period}</span></p>
+                  <p className="relative mt-3">{plan.name !== 'Découverte' && <span className="mr-2 align-middle text-sm line-through opacity-60">{plan.price}</span>}<span className={`font-display text-4xl font-semibold ${plan.name !== 'Découverte' ? 'text-3xl' : ''}`}>{plan.name === 'Découverte' ? plan.price : 'Gratuit'}</span><span className="ml-1 text-sm opacity-70">{plan.name === 'Découverte' ? plan.period : 'actuellement'}</span></p>
                   <ul className="relative mt-7 space-y-3">
                     {plan.features.map((f) => (
                       <li key={f} className="flex items-center gap-2 text-sm"><Check size={16} style={{ color: plan.accent }} /> {f}</li>

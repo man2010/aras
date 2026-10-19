@@ -246,6 +246,23 @@ export default function ConnexionPage() {
         return;
       }
       {
+        const reactivation = await fetch('/api/auth/reactivate-account', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${sessionData.session.access_token}` },
+        });
+        if (reactivation.status === 403) {
+          await supabase.auth.signOut();
+          const result = await reactivation.clone().json().catch(() => null) as { error?: string } | null;
+          setMessage(result?.error || 'Ce compte ne peut pas être réactivé. Contactez le support.');
+          setLoading(false);
+          return;
+        }
+        if (!reactivation.ok) {
+          await supabase.auth.signOut();
+          setMessage('Nous ne pouvons pas vérifier le statut de votre compte pour le moment. Réessayez dans quelques instants.');
+          setLoading(false);
+          return;
+        }
         const accessCheck = await fetch('/api/auth/access', { headers: { Authorization: `Bearer ${sessionData.session.access_token}` } });
         if (accessCheck.status === 403) {
           await supabase.auth.signOut();

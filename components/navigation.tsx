@@ -570,14 +570,9 @@ export function Footer() {
         <div className="grid gap-10 pb-14 md:grid-cols-[1.4fr_1fr_1fr_1.2fr]">
           <div>
             <Link href="/" className="inline-block">
-              <Image src="/aras-logo.jpeg" alt="ARAS" width={140} height={56} className="h-12 w-auto object-contain" />
+              <span className="font-display text-3xl font-semibold tracking-[.18em] text-[#ec3b78]">ARAS</span>
             </Link>
             <p className="mt-5 max-w-[240px] text-sm leading-6 text-white/55">Des rencontres qui ont du sens, dans un espace pensé pour le vrai.</p>
-            <div className="mt-6 flex gap-3">
-              <span className="flex items-center gap-2 rounded-full border border-white/15 px-4 py-2 text-xs text-white/60">
-                <Heart size={14} className="text-[#ec3b78]" /> Fait avec intention
-              </span>
-            </div>
           </div>
           <div>
             <p className="text-xs font-extrabold uppercase tracking-[.18em] text-[#f4c27a]">Découvrir</p>
@@ -611,7 +606,6 @@ export function Footer() {
               Conditions générales d&apos;utilisation
             </Link>
           </div>
-          <span className="sm:text-right">Fait avec intention à Dakar.</span>
         </div>
       </div>
     </footer>

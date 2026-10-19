@@ -22,6 +22,25 @@ const AuthContext = createContext<AuthContextType>({
   setUnreadCount: () => {},
 });
 
+function getDeviceSessionKey(userId: string) {
+  const storageKey = `aras-device-session-${userId}`;
+  let sessionKey = window.localStorage.getItem(storageKey);
+  if (!sessionKey) {
+    sessionKey = typeof crypto.randomUUID === 'function'
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    window.localStorage.setItem(storageKey, sessionKey);
+  }
+  return sessionKey;
+}
+
+function getDeviceLabel() {
+  const ua = navigator.userAgent;
+  const device = /tablet|ipad/i.test(ua) ? 'Tablette' : /mobile|android|iphone/i.test(ua) ? 'Téléphone' : 'Ordinateur';
+  const browser = /edg/i.test(ua) ? 'Edge' : /firefox/i.test(ua) ? 'Firefox' : /chrome/i.test(ua) ? 'Chrome' : /safari/i.test(ua) ? 'Safari' : 'Navigateur';
+  return `${device} · ${browser}`;
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
@@ -30,8 +49,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let disposed = false;
     let authEventRevision = 0;
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, sess) => {
+    const { data: listener } = supabase.auth.onAuthStateChange((event, sess) => {
       authEventRevision += 1;
+      const revision = authEventRevision;
+      if (event === 'SIGNED_IN' && sess?.access_token) {
+        void fetch('/api/auth/reactivate-account', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${sess.access_token}` },
+        }).catch(() => null).finally(() => {
+          if (disposed || revision !== authEventRevision) return;
+          setSession(sess);
+          setLoading(false);
+        });
+        return;
+      }
       setSession(sess);
       setLoading(false);
     });
@@ -90,6 +121,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .from('profiles')
         .update({ is_online: online, last_seen_at: new Date().toISOString() })
         .eq('id', user.id);
+      const sessionKey = getDeviceSessionKey(user.id);
+      await supabase.from('account_sessions').upsert({
+        user_id: user.id,
+        session_key: sessionKey,
+        device_label: getDeviceLabel(),
+        last_seen_at: new Date().toISOString(),
+      }, { onConflict: 'user_id,session_key' });
     };
 
     void refreshUnreadCount();
@@ -118,6 +156,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         { event: '*', schema: 'public', table: 'messages', filter: `receiver_id=eq.${user.id}` },
         () => void refreshUnreadCount(),
       )
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'profiles', filter: `id=eq.${user.id}` },
+        (payload) => {
+          const updatedProfile = payload.new as { is_active?: boolean; is_temporarily_deactivated?: boolean };
+          if (updatedProfile.is_active === false || updatedProfile.is_temporarily_deactivated === true) {
+            setSession(null);
+            void supabase.auth.signOut({ scope: 'local' });
+          }
+        },
+      )
       .subscribe();
 
     return () => {
@@ -137,6 +186,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setSession(null);
     setUnreadCount(0);
     if (userId) {
+      const sessionKey = getDeviceSessionKey(userId);
+      void supabase.from('account_sessions').delete().eq('user_id', userId).eq('session_key', sessionKey);
       void supabase.from('profiles').update({ is_online: false, last_seen_at: new Date().toISOString() }).eq('id', userId);
     }
     await supabase.auth.signOut();

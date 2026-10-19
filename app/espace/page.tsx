@@ -3,7 +3,7 @@
 import { Dispatch, FormEvent, SetStateAction, useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { User, MessageCircle, Heart, CalendarDays, ArrowRight, ArrowLeft, ArrowDownLeft, ArrowUpRight, ArrowLeftRight, ShieldCheck, Send, Plus, Check, CircleCheck, X, CheckCheck, Search, MapPin, Users, Eye, EyeOff, ChevronRight, ChevronDown, Flag, RotateCcw, AlertTriangle, Music2, Plane, Utensils, Dumbbell, BookOpen, Clapperboard, PartyPopper, Palette, Camera, Shirt, Laptop, Trees, Flower2, Gamepad2, PawPrint, Briefcase, Ruler, Languages, Cigarette, ClipboardList, Settings, SlidersHorizontal, Pencil, LockKeyhole, CircleHelp, LogOut, EllipsisVertical, Ban } from 'lucide-react';
+import { User, MessageCircle, Heart, CalendarDays, ArrowRight, ArrowLeft, ArrowDownLeft, ArrowUpRight, ArrowLeftRight, ShieldCheck, Send, Plus, Check, CircleCheck, X, CheckCheck, Search, MapPin, Users, Eye, EyeOff, ChevronRight, ChevronDown, Flag, RotateCcw, AlertTriangle, Music2, Plane, Utensils, Dumbbell, BookOpen, Clapperboard, PartyPopper, Palette, Camera, Shirt, Laptop, Trees, Flower2, Gamepad2, PawPrint, Briefcase, Ruler, Languages, Cigarette, ClipboardList, Settings, SlidersHorizontal, Pencil, LockKeyhole, CircleHelp, LogOut, EllipsisVertical, Ban, Monitor, Trash2, UserRoundX } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
 import type { Profile, Conversation, Message, Story } from '@/lib/types';
@@ -97,6 +97,11 @@ function SettingsPanels({
   onChangeTab,
   subscriptionPlan,
   showTabs = true,
+  activeSessionCount = null,
+  accountActionLoading = null,
+  accountActionError = '',
+  onDeactivateAccount,
+  onDeleteAccount,
 }: {
   tab: Tab;
   profile: Profile | null;
@@ -115,7 +120,13 @@ function SettingsPanels({
   onChangeTab: (tab: Tab) => void;
   subscriptionPlan: 'discovery' | 'premium' | 'elite';
   showTabs?: boolean;
+  activeSessionCount?: number | null;
+  accountActionLoading?: 'deactivate' | 'delete' | null;
+  accountActionError?: string;
+  onDeactivateAccount?: () => void;
+  onDeleteAccount?: () => void;
 }) {
+  const [passwordEditOpen, setPasswordEditOpen] = useState(false);
   const subTabs: { id: Tab; label: string }[] = [
     { id: 'settings-profile', label: 'Mon profil' },
     { id: 'settings-privacy', label: 'Confidentialité' },
@@ -196,7 +207,9 @@ function SettingsPanels({
           <p className="mt-2 text-sm leading-6 text-[#756960]">
             Changez votre mot de passe pour sécuriser votre compte et mieux protéger vos informations personnelles.
           </p>
-          <form onSubmit={changePassword} className="mt-6 max-w-md space-y-4">
+          {!passwordEditOpen ? <button type="button" onClick={() => setPasswordEditOpen(true)} className="mt-6 inline-flex items-center gap-3 rounded-full bg-[#1a6b68] px-6 py-3.5 text-sm font-extrabold text-white transition hover:bg-[#125552]"><LockKeyhole size={17} />Changer le mot de passe<ChevronRight size={17} /></button> : <div className="mt-6 max-w-md">
+            <button type="button" onClick={() => setPasswordEditOpen(false)} className="mb-4 inline-flex items-center gap-2 text-sm font-bold text-[#756960] transition hover:text-[#ec3b78]"><ArrowLeft size={16} />Retour à la sécurité</button>
+            <form onSubmit={changePassword} className="space-y-4">
             <label className="block text-xs font-extrabold text-[#625852]">
               Nouveau mot de passe
               <div className="relative mt-2">
@@ -230,7 +243,27 @@ function SettingsPanels({
             <button disabled={securityLoading} className="rounded-full bg-[#1a6b68] px-6 py-3.5 text-sm font-extrabold text-white transition hover:bg-[#125552] disabled:opacity-60">
               {securityLoading ? 'Mise à jour...' : 'Mettre à jour le mot de passe'}
             </button>
-          </form>
+            </form>
+          </div>}
+          {onDeactivateAccount && onDeleteAccount && <div className="mt-8 space-y-5">
+            <section className="border-t border-[#eee8e5] pt-6 dark:border-white/10">
+              <h3 className="text-sm font-extrabold text-[#92939d]">Authentification</h3>
+              <div className="mt-3 flex items-center gap-4 rounded-2xl border border-[#e7e8ee] p-4 dark:border-white/10">
+                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-violet-100 text-violet-600 dark:bg-violet-500/15 dark:text-violet-300"><Monitor size={20} /></span>
+                <span className="min-w-0 flex-1"><strong className="block text-sm text-[#292832] dark:text-white">Sessions actives</strong><span className="mt-1 block text-xs text-[#858691] dark:text-white/55">Appareils récemment connectés à votre compte</span></span>
+                <span aria-live="polite" className="shrink-0 text-sm font-bold text-[#777985] dark:text-white/60">{activeSessionCount === null ? '…' : `${activeSessionCount} appareil${activeSessionCount > 1 ? 's' : ''}`}</span>
+              </div>
+            </section>
+            <section>
+              <h3 className="text-sm font-extrabold text-[#92939d]">Compte</h3>
+              <div className="mt-3 divide-y divide-[#eee8e5] rounded-2xl border border-[#e7e8ee] px-4 dark:divide-white/10 dark:border-white/10">
+                <button type="button" disabled={accountActionLoading !== null} onClick={onDeactivateAccount} className="flex min-h-[68px] w-full items-center gap-3 text-left text-sm font-bold text-[#292832] transition hover:text-[#ec3b78] disabled:opacity-50 dark:text-white"><UserRoundX size={19} className="text-[#ec3b78]"/><span className="flex-1">{accountActionLoading === 'deactivate' ? 'Désactivation…' : 'Désactiver temporairement'}</span><ChevronRight size={18} className="text-[#9b9ca6]"/></button>
+                <button type="button" disabled={accountActionLoading !== null} onClick={onDeleteAccount} className="flex min-h-[68px] w-full items-center gap-3 text-left text-sm font-bold text-[#292832] transition hover:text-red-600 disabled:opacity-50 dark:text-white"><Trash2 size={19} className="text-red-500"/><span className="flex-1">{accountActionLoading === 'delete' ? 'Suppression…' : 'Supprimer mon compte'}</span><ChevronRight size={18} className="text-[#9b9ca6]"/></button>
+              </div>
+              <p className="mt-3 text-xs leading-5 text-[#858691] dark:text-white/50">La désactivation masque votre profil et vous déconnecte. Une nouvelle connexion le réactive. La suppression est définitive.</p>
+              {accountActionError && <p role="alert" className="mt-3 text-sm font-semibold text-red-600">{accountActionError}</p>}
+            </section>
+          </div>}
         </div>
       )}
 
@@ -371,6 +404,9 @@ export default function EspacePage() {
   const [profileEditOpen, setProfileEditOpen] = useState(false);
   const [profileSettingsOpen, setProfileSettingsOpen] = useState(false);
   const [isAdminAccount, setIsAdminAccount] = useState(false);
+  const [activeSessionCount, setActiveSessionCount] = useState<number | null>(null);
+  const [accountActionLoading, setAccountActionLoading] = useState<'deactivate' | 'delete' | null>(null);
+  const [accountActionError, setAccountActionError] = useState('');
   const likeRefreshVersion = useRef(0);
 
   const recordProfileVisit = useCallback(async (profileId: string) => {
@@ -1042,6 +1078,63 @@ export default function EspacePage() {
     setPrivacySaved(true);
     window.dispatchEvent(new CustomEvent('aras:privacy-preference-updated', { detail: { userId: user.id, key, value: nextValue } }));
     window.setTimeout(() => setPrivacySaved(false), 3000);
+  };
+
+  const loadActiveSessionCount = useCallback(async () => {
+    if (!user) return;
+    const activeSince = new Date(Date.now() - 150_000).toISOString();
+    const { count, error } = await supabase.from('account_sessions')
+      .select('session_key', { count: 'exact', head: true })
+      .eq('user_id', user.id)
+      .gte('last_seen_at', activeSince);
+    if (!error) setActiveSessionCount(count ?? 0);
+  }, [user]);
+
+  useEffect(() => {
+    if (!user || (profileSection !== 'security' && tab !== 'settings-security')) return;
+    void loadActiveSessionCount();
+    const refresh = window.setInterval(() => void loadActiveSessionCount(), 30_000);
+    return () => window.clearInterval(refresh);
+  }, [user, profileSection, tab, loadActiveSessionCount]);
+
+  const deactivateAccount = async () => {
+    if (!user || accountActionLoading) return;
+    const confirmed = window.confirm('Désactiver temporairement votre compte ? Votre profil ne sera plus proposé. Vous pourrez le réactiver en vous reconnectant.');
+    if (!confirmed) return;
+    setAccountActionLoading('deactivate');
+    setAccountActionError('');
+    const { data } = await supabase.auth.getSession();
+    const response = data.session?.access_token ? await fetch('/api/auth/deactivate-account', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${data.session.access_token}` },
+    }).catch(() => null) : null;
+    if (!response?.ok) {
+      const result = await response?.json().catch(() => null) as { error?: string } | null;
+      setAccountActionError(result?.error || 'Impossible de désactiver le compte. Réessayez.');
+      setAccountActionLoading(null);
+      return;
+    }
+    await signOut();
+    router.replace(`/connexion?error=${encodeURIComponent('Votre compte est désactivé. Connectez-vous pour le réactiver.')}`);
+  };
+
+  const deleteAccount = async () => {
+    if (!user || accountActionLoading) return;
+    const confirmed = window.confirm('La suppression de votre compte est définitive. Votre profil et vos données associées seront supprimés de la base de données. Continuer ?');
+    if (!confirmed) return;
+    const confirmation = window.prompt('Pour confirmer la suppression définitive, saisissez SUPPRIMER.');
+    if (confirmation !== 'SUPPRIMER') return;
+    setAccountActionLoading('delete');
+    setAccountActionError('');
+    const { error } = await supabase.rpc('delete_my_account');
+    if (error) {
+      setAccountActionError('La suppression a échoué. Réessayez ou contactez le support.');
+      setAccountActionLoading(null);
+      return;
+    }
+    await signOut();
+    router.replace('/');
+    router.refresh();
   };
 
   const changePassword = async (e: FormEvent<HTMLFormElement>) => {
@@ -2079,7 +2172,7 @@ export default function EspacePage() {
                 <div className="mt-5 flex items-start gap-3 rounded-2xl bg-[#f8f9fd] p-4 text-sm text-[#777985] dark:bg-white/5 dark:text-white/55"><Flag size={17} className="mt-0.5 shrink-0 text-[#ec3b78]"/><p>Pour signaler une personne, ouvrez sa conversation, puis le menu ⋮ en haut à droite.</p></div>
               </section>}
               {profileSection === 'privacy' && <SettingsPanels tab="settings-privacy" profile={profile} privacySettings={privacySettings} onPrivacyToggle={togglePrivacySetting} privacySaved={privacySaved} privacySaveError={privacySaveError} securityForm={securityForm} setSecurityForm={setSecurityForm} changePassword={changePassword} securityMessage={securityMessage} securityLoading={securityLoading} showNewPw={showNewPw} setShowNewPw={setShowNewPw} onGoToProfileTab={() => setProfileSection('profile')} onChangeTab={() => {}} subscriptionPlan={subscriptionPlan} showTabs={false} />}
-              {profileSection === 'security' && <SettingsPanels tab="settings-security" profile={profile} privacySettings={privacySettings} onPrivacyToggle={togglePrivacySetting} privacySaved={privacySaved} privacySaveError={privacySaveError} securityForm={securityForm} setSecurityForm={setSecurityForm} changePassword={changePassword} securityMessage={securityMessage} securityLoading={securityLoading} showNewPw={showNewPw} setShowNewPw={setShowNewPw} onGoToProfileTab={() => setProfileSection('profile')} onChangeTab={() => {}} subscriptionPlan={subscriptionPlan} showTabs={false} />}
+              {profileSection === 'security' && <SettingsPanels tab="settings-security" profile={profile} privacySettings={privacySettings} onPrivacyToggle={togglePrivacySetting} privacySaved={privacySaved} privacySaveError={privacySaveError} securityForm={securityForm} setSecurityForm={setSecurityForm} changePassword={changePassword} securityMessage={securityMessage} securityLoading={securityLoading} showNewPw={showNewPw} setShowNewPw={setShowNewPw} onGoToProfileTab={() => setProfileSection('profile')} onChangeTab={() => {}} subscriptionPlan={subscriptionPlan} showTabs={false} activeSessionCount={activeSessionCount} accountActionLoading={accountActionLoading} accountActionError={accountActionError} onDeactivateAccount={() => void deactivateAccount()} onDeleteAccount={() => void deleteAccount()} />}
               {profileSection === 'subscription' && <SettingsPanels tab="settings-subscription" profile={profile} privacySettings={privacySettings} onPrivacyToggle={togglePrivacySetting} privacySaved={privacySaved} privacySaveError={privacySaveError} securityForm={securityForm} setSecurityForm={setSecurityForm} changePassword={changePassword} securityMessage={securityMessage} securityLoading={securityLoading} showNewPw={showNewPw} setShowNewPw={setShowNewPw} onGoToProfileTab={() => setProfileSection('profile')} onChangeTab={() => {}} subscriptionPlan={subscriptionPlan} showTabs={false} />}
               {profileSection === 'help' && <SettingsPanels tab="settings-help" profile={profile} privacySettings={privacySettings} onPrivacyToggle={togglePrivacySetting} privacySaved={privacySaved} privacySaveError={privacySaveError} securityForm={securityForm} setSecurityForm={setSecurityForm} changePassword={changePassword} securityMessage={securityMessage} securityLoading={securityLoading} showNewPw={showNewPw} setShowNewPw={setShowNewPw} onGoToProfileTab={() => setProfileSection('profile')} onChangeTab={() => {}} subscriptionPlan={subscriptionPlan} showTabs={false} />}
               {profileSection === 'profile' && profileEditOpen && <div className="grid gap-6">
@@ -2560,6 +2653,11 @@ export default function EspacePage() {
               onGoToProfileTab={() => setTab('profile')}
               onChangeTab={setTab}
               subscriptionPlan={subscriptionPlan}
+              activeSessionCount={activeSessionCount}
+              accountActionLoading={accountActionLoading}
+              accountActionError={accountActionError}
+              onDeactivateAccount={() => void deactivateAccount()}
+              onDeleteAccount={() => void deleteAccount()}
             />
           )}
         </div>
