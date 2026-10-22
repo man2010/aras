@@ -9,22 +9,13 @@ export async function POST(request: Request) {
     const fields = ['name', 'gender', 'birthdate', 'location', 'maritalStatus', 'religion', 'ageRange', 'preferredLocation', 'expectations', 'contact', 'preferredContact'] as const;
     const values = Object.fromEntries(fields.map((field) => [field, String(body[field] ?? '').trim()]));
 
-    if (fields.some((field) => field !== 'religion' && !values[field])
-      || !body.privacyConsent || !body.paymentConsent
+    if (fields.some((field) => !['religion', 'ageRange', 'preferredLocation', 'expectations'].includes(field) && !values[field])
+      || !body.privacyConsent
       || !['Femme', 'Homme'].includes(values.gender)
       || !ALLOWED_CONTACT_METHODS.has(values.preferredContact)
       || values.expectations.length > 2000
       || values.contact.length > 160) {
       return NextResponse.json({ error: 'Vérifiez les champs obligatoires et les deux consentements.' }, { status: 400 });
-    }
-
-    const waveUrl = process.env.WAVE_GOLDEN_PAYMENT_URL;
-    if (!waveUrl) {
-      return NextResponse.json({ error: 'Le paiement Wave Golden n’est pas encore configuré. Contactez ARAS pour finaliser votre demande.' }, { status: 503 });
-    }
-    const parsedWaveUrl = new URL(waveUrl);
-    if (parsedWaveUrl.protocol !== 'https:' || parsedWaveUrl.hostname !== 'pay.wave.com') {
-      return NextResponse.json({ error: 'Le lien de paiement Wave configuré est invalide.' }, { status: 503 });
     }
 
     if (!process.env.GMAIL_EMAIL || !process.env.GMAIL_APP_PASSWORD || !supportEmail) {
@@ -37,7 +28,7 @@ export async function POST(request: Request) {
       auth: { user: process.env.GMAIL_EMAIL, pass: process.env.GMAIL_APP_PASSWORD },
     });
     const message = [
-      'Nouvelle demande membre Golden (paiement à vérifier manuellement)',
+      'Nouvelle demande membre Golden (offre actuellement gratuite)',
       `Prénom ou pseudo : ${values.name}`,
       `Genre : ${values.gender}`,
       `Date de naissance : ${values.birthdate}`,
@@ -50,7 +41,6 @@ export async function POST(request: Request) {
       `Contact : ${values.contact}`,
       `Moyen préféré : ${values.preferredContact}`,
       'Consentement confidentialité : accepté',
-      'Consentement paiement non remboursable : accepté',
     ].join('\n');
 
     await transporter.sendMail({
@@ -60,7 +50,7 @@ export async function POST(request: Request) {
       text: message,
     });
 
-    return NextResponse.json({ checkoutUrl: parsedWaveUrl.toString() });
+    return NextResponse.json({ ok: true });
   } catch {
     return NextResponse.json({ error: 'Impossible de préparer votre demande. Réessayez plus tard.' }, { status: 500 });
   }

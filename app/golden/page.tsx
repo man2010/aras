@@ -10,6 +10,7 @@ const labelClass = 'block text-sm font-semibold text-[#625852]';
 export default function GoldenPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const [sent, setSent] = useState(false);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -24,9 +25,10 @@ export default function GoldenPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
       });
-      const result = await response.json() as { checkoutUrl?: string; error?: string };
-      if (!response.ok || !result.checkoutUrl) throw new Error(result.error || 'Impossible de préparer le paiement.');
-      window.location.assign(result.checkoutUrl);
+      const result = await response.json() as { error?: string };
+      if (!response.ok) throw new Error(result.error || 'Impossible d’envoyer votre demande.');
+      setSent(true);
+      form.reset();
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : 'Une erreur est survenue. Réessayez.');
       setSubmitting(false);
@@ -75,18 +77,18 @@ export default function GoldenPage() {
 
           <div className="flex flex-col gap-3 rounded-2xl border border-[#e2c98f] bg-gradient-to-r from-[#fcf2e5] to-[#f5e0c6] px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
             <div><p className="font-bold text-[#24171b]">Adhésion membre Golden</p><p className="mt-1 text-sm text-[#756960]">Accès aux événements privés organisés par ARAS</p></div>
-            <p className="whitespace-nowrap font-display text-2xl font-bold text-[#c88a27] sm:text-3xl">29 500 FCFA</p>
+            <p className="whitespace-nowrap text-right"><span className="block text-sm font-semibold text-[#9a8b82] line-through">29 500 FCFA</span><span className="font-display text-2xl font-bold text-[#c88a27] sm:text-3xl">Gratuit actuellement</span></p>
           </div>
 
           <div className="space-y-3 text-sm leading-5 text-[#625852]">
             <label className="flex cursor-pointer items-start gap-3"><input name="privacyConsent" required type="checkbox" value="yes" className="mt-1 h-5 w-5 shrink-0 accent-[#c88a27]" /><span>J'accepte que mes données soient traitées confidentiellement par ARAS pour cette demande, conformément à la <Link href="/politique-confidentialite" className="font-bold text-[#a87320] underline">Politique de Confidentialité</Link>.</span></label>
-            <label className="flex cursor-pointer items-start gap-3"><input name="paymentConsent" required type="checkbox" value="yes" className="mt-1 h-5 w-5 shrink-0 accent-[#c88a27]" /><span>Je comprends que le paiement s'effectue à l'envoi du formulaire et qu'il n'est pas remboursable.</span></label>
           </div>
 
           {error && <p role="alert" className="rounded-xl bg-[#fff0f0] px-4 py-3 text-sm font-semibold text-[#a52b42]">{error}</p>}
-          <button type="submit" disabled={submitting} className="min-h-14 w-full rounded-full bg-[#c88a27] px-5 py-4 text-sm font-extrabold text-white shadow-[0_10px_25px_rgba(200,138,39,.25)] transition hover:bg-[#b57a21] disabled:cursor-wait disabled:opacity-60">{submitting ? 'Préparation du paiement…' : 'Payer 29 500 FCFA et envoyer ma demande'}</button>
-          <p className="flex items-center justify-center gap-2 text-center text-xs text-[#9a8b82]"><ShieldCheck size={15} /> Paiement sécurisé · Wave</p>
-          <p className="sr-only" aria-live="polite">{submitting ? 'Préparation du paiement Wave.' : ''}</p>
+          {sent && <p role="status" className="rounded-xl bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800">Votre demande Golden a bien été envoyée. L’offre est gratuite actuellement.</p>}
+          <button type="submit" disabled={submitting} className="min-h-14 w-full rounded-full bg-[#c88a27] px-5 py-4 text-sm font-extrabold text-white shadow-[0_10px_25px_rgba(200,138,39,.25)] transition hover:bg-[#b57a21] disabled:cursor-wait disabled:opacity-60">{submitting ? 'Envoi en cours…' : 'Envoyer ma demande Golden'}</button>
+          <p className="flex items-center justify-center gap-2 text-center text-xs text-[#9a8b82]"><ShieldCheck size={15} /> Demande confidentielle · Gratuit actuellement</p>
+          <p className="sr-only" aria-live="polite">{submitting ? 'Envoi de votre demande Golden.' : ''}</p>
         </form>
       </div>
     </main>
