@@ -425,25 +425,33 @@ export default function Home() {
           </Reveal>
           <div className="mt-14 grid items-center gap-6 md:grid-cols-3">
             {[
-              { name: 'Découverte', price: 'Gratuit', features: ['Création du profil', 'Voir les profils', '1 like par jour', 'Participation aux événements'], bg: '#f8f9fd', accent: '#1a6b68', cta: 'Commencer', href: '/inscription' },
-              { name: 'Premium', price: '5 000 FCFA', period: '/ mois', features: ['Likes illimités', 'Voir qui vous a liké', 'Messagerie illimitée', 'Filtres avancés', 'Priorité aux événements'], bg: '#ec3b78', accent: '#fff', cta: 'Passer Premium', href: '/tarifs', featured: true },
-              { name: 'Élite', price: '15 000 FCFA', period: '/ mois', features: ['Tout Premium', 'Conciergerie personnelle', 'Accès événements privés', 'Profil mis en avant', 'Coaching rencontre'], bg: '#241c18', accent: '#f4c27a', cta: 'Rejoindre l\'Élite', href: '/tarifs' },
+              { name: 'Gratuit', price: '0', period: 'FCFA', features: ['Création du profil', 'Découverte des profils', 'Nombre illimité de likes', 'Participation aux événements (accès standard)', 'Badge profil vérifié', 'AI Chatbot (SARA)', 'Support 24h/7'], bg: '#f8f9fd', accent: '#1a6b68', cta: 'Commencer', href: '/inscription' },
+              { name: 'Premium', price: '4 500', period: 'FCFA / mois', features: ['Création du profil', 'Découverte des profils', 'Nombre illimité de likes', 'Voir les visites de votre profil', 'Voir qui vous a liké', 'Filtres standards', 'Support prioritaire 24h/7'], bg: '#ec3b78', accent: '#fff', cta: 'Passer Premium', href: '/tarifs', featured: true },
+              { name: 'Elite', price: '14 500', period: 'FCFA / mois', features: ['Tous les avantages Premium', 'Accès prioritaire aux événements VIP', 'Badge membre Elite', 'Voir qui est connecté', 'Filtres avancés', 'Mode incognito', 'Accompagnement personnalisé'], bg: '#241c18', accent: '#f4c27a', cta: 'Rejoindre l\'Elite', href: '/tarifs' },
             ].map((plan, index) => (
               <Reveal key={plan.name} delay={index * 150}>
-                <div className={`relative overflow-hidden rounded-[28px] p-8 transition duration-300 hover:-translate-y-2 hover:shadow-2xl ${plan.featured ? 'text-white shadow-[0_24px_60px_rgba(233,81,95,.32)] md:py-12' : plan.name === 'Élite' ? 'text-white shadow-[0_20px_50px_rgba(36,28,24,.25)]' : 'text-[#241c18] shadow-[0_10px_30px_rgba(83,46,32,.08)]'}`} style={{ background: isDark && !plan.featured && plan.name !== 'Élite' ? '#252525' : plan.bg, color: isDark && !plan.featured && plan.name !== 'Élite' ? '#fff' : undefined }}>
+                <div className={`relative overflow-hidden rounded-[28px] p-8 transition duration-300 hover:-translate-y-2 hover:shadow-2xl ${plan.featured ? 'text-white shadow-[0_24px_60px_rgba(233,81,95,.32)] md:py-12' : plan.name === 'Elite' ? 'text-white shadow-[0_20px_50px_rgba(36,28,24,.25)]' : 'text-[#241c18] shadow-[0_10px_30px_rgba(83,46,32,.08)]'}`} style={{ background: isDark && !plan.featured && plan.name !== 'Elite' ? '#252525' : plan.bg, color: isDark && !plan.featured && plan.name !== 'Elite' ? '#fff' : undefined }}>
                   {plan.featured && <div aria-hidden className="pointer-events-none absolute -right-10 -top-10 h-40 w-40 rounded-full bg-white/15 blur-2xl" />}
                   {plan.featured && <span className="aras-shine relative mb-4 inline-block rounded-full bg-white/20 px-3 py-1 text-[10px] font-extrabold uppercase tracking-wider">Le plus choisi</span>}
                   <h3 className="relative font-display text-2xl">{plan.name}</h3>
-                  <p className="relative mt-3">{plan.name !== 'Découverte' && <span className="mr-2 align-middle text-sm line-through opacity-60">{plan.price}</span>}<span className={`font-display text-4xl font-semibold ${plan.name !== 'Découverte' ? 'text-3xl' : ''}`}>{plan.name === 'Découverte' ? plan.price : 'Gratuit'}</span><span className="ml-1 text-sm opacity-70">{plan.name === 'Découverte' ? plan.period : 'actuellement'}</span></p>
+                  <p className="relative mt-3">{plan.name !== 'Gratuit' && <span className="mr-2 align-middle text-sm line-through opacity-60">{plan.price} {plan.period}</span>}<span className="font-display text-4xl font-semibold">Gratuit</span><span className="ml-1 text-sm opacity-70">actuellement</span></p>
                   <ul className="relative mt-7 space-y-3">
                     {plan.features.map((f) => (
                       <li key={f} className="flex items-center gap-2 text-sm"><Check size={16} style={{ color: plan.accent }} /> {f}</li>
                     ))}
                   </ul>
-                  <Link href={plan.href} className={`relative mt-8 block rounded-full py-3.5 text-center text-sm font-extrabold transition duration-300 hover:-translate-y-0.5 hover:shadow-lg ${plan.featured ? 'bg-white text-[#ec3b78]' : plan.name === 'Élite' ? 'bg-[#f4c27a] text-[#241c18] hover:bg-[#e5b86a]' : 'bg-[#1a6b68] text-white hover:bg-[#125552]'}`}>{plan.cta}</Link>
+                  <Link href={`/tarifs#${plan.name.toLowerCase()}`} className={`relative mt-5 inline-flex items-center gap-1 text-sm font-bold underline underline-offset-4 transition hover:opacity-80 ${plan.featured || plan.name === 'Elite' ? 'text-white' : 'text-[#1a6b68]'}`}>
+                    … Voir plus <ArrowRight size={14} />
+                  </Link>
+                  <Link href={plan.href} className={`relative mt-8 block rounded-full py-3.5 text-center text-sm font-extrabold transition duration-300 hover:-translate-y-0.5 hover:shadow-lg ${plan.featured ? 'bg-white text-[#ec3b78]' : plan.name === 'Elite' ? 'bg-[#f4c27a] text-[#241c18] hover:bg-[#e5b86a]' : 'bg-[#1a6b68] text-white hover:bg-[#125552]'}`}>{plan.cta}</Link>
                 </div>
               </Reveal>
             ))}
+          </div>
+          <div className="mt-10 flex justify-center">
+            <Link href="/tarifs" className="group inline-flex items-center gap-2 rounded-full border border-[#241c18]/15 px-6 py-3 text-sm font-extrabold text-[#241c18] transition hover:-translate-y-0.5 hover:border-[#ec3b78] hover:text-[#ec3b78] dark:border-white/20 dark:text-white">
+              Voir plus sur les formules <ArrowRight size={16} className="transition group-hover:translate-x-1" />
+            </Link>
           </div>
         </div>
       </section>

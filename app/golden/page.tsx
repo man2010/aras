@@ -59,9 +59,9 @@ export default function GoldenPage() {
           <section>
             <h2 className="text-sm font-extrabold uppercase tracking-[.08em] text-[#625852]">Ce que vous recherchez</h2>
             <div className="mt-4 grid gap-4 sm:grid-cols-2">
-              <label className={labelClass}>Tranche d'âge souhaitée<input name="ageRange" required maxLength={60} placeholder="28 - 38 ans" className={fieldClass} /></label>
-              <label className={labelClass}>Ville / distance<input name="preferredLocation" required maxLength={120} placeholder="Dakar et environs" className={fieldClass} /></label>
-              <label className={`${labelClass} sm:col-span-2`}>Décrivez la personne ou la relation recherchée<textarea name="expectations" required maxLength={2000} rows={4} placeholder="Vos attentes, vos valeurs, le type de relation souhaitée..." className={`${fieldClass} resize-y`} /></label>
+              <label className={labelClass}>Tranche d'âge souhaitée (facultatif)<input name="ageRange" maxLength={60} placeholder="28 - 38 ans" className={fieldClass} /></label>
+              <label className={labelClass}>Ville / distance (facultatif)<input name="preferredLocation" maxLength={120} placeholder="Dakar et environs" className={fieldClass} /></label>
+              <label className={`${labelClass} sm:col-span-2`}>Décrivez la personne ou la relation recherchée (facultatif)<textarea name="expectations" maxLength={2000} rows={4} placeholder="Vos attentes, vos valeurs, le type de relation souhaitée..." className={`${fieldClass} resize-y`} /></label>
             </div>
           </section>
 
@@ -75,7 +75,7 @@ export default function GoldenPage() {
 
           <div className="flex flex-col gap-3 rounded-2xl border border-[#e2c98f] bg-gradient-to-r from-[#fcf2e5] to-[#f5e0c6] px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
             <div><p className="font-bold text-[#24171b]">Adhésion membre Golden</p><p className="mt-1 text-sm text-[#756960]">Accès aux événements privés organisés par ARAS</p></div>
-            <p className="whitespace-nowrap font-display text-2xl font-bold text-[#c88a27] sm:text-3xl">30 000 FCFA</p>
+            <p className="whitespace-nowrap font-display text-2xl font-bold text-[#c88a27] sm:text-3xl">29 500 FCFA</p>
           </div>
 
           <div className="space-y-3 text-sm leading-5 text-[#625852]">
@@ -84,7 +84,7 @@ export default function GoldenPage() {
           </div>
 
           {error && <p role="alert" className="rounded-xl bg-[#fff0f0] px-4 py-3 text-sm font-semibold text-[#a52b42]">{error}</p>}
-          <button type="submit" disabled={submitting} className="min-h-14 w-full rounded-full bg-[#c88a27] px-5 py-4 text-sm font-extrabold text-white shadow-[0_10px_25px_rgba(200,138,39,.25)] transition hover:bg-[#b57a21] disabled:cursor-wait disabled:opacity-60">{submitting ? 'Préparation du paiement…' : 'Payer 30 000 FCFA et envoyer ma demande'}</button>
+          <button type="submit" disabled={submitting} className="min-h-14 w-full rounded-full bg-[#c88a27] px-5 py-4 text-sm font-extrabold text-white shadow-[0_10px_25px_rgba(200,138,39,.25)] transition hover:bg-[#b57a21] disabled:cursor-wait disabled:opacity-60">{submitting ? 'Préparation du paiement…' : 'Payer 29 500 FCFA et envoyer ma demande'}</button>
           <p className="flex items-center justify-center gap-2 text-center text-xs text-[#9a8b82]"><ShieldCheck size={15} /> Paiement sécurisé · Wave</p>
           <p className="sr-only" aria-live="polite">{submitting ? 'Préparation du paiement Wave.' : ''}</p>
         </form>

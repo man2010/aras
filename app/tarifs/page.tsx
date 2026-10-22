@@ -28,7 +28,6 @@ export default function TarifsPage() {
         'Découverte des profils',
         'Nombre illimité de likes',
         'Participation aux événements (accès standard)',
-        '3 conversations par semaine',
         'Badge profil vérifié',
         'AI Chatbot(SARA)',
         'Support 24h/7',
@@ -36,7 +35,7 @@ export default function TarifsPage() {
     },
     {
       name: 'Premium',
-      price: '5 000',
+      price: '4 500',
       period: 'FCFA / mois',
       icon: Sparkles,
       bg: '#ec3b78',
@@ -49,7 +48,6 @@ export default function TarifsPage() {
         'Découverte des profils',
         'Nombre illimité de likes',
         'Participation aux événements (accès standard)',
-        '3 conversations par semaine',
         'Badge profil vérifié',
         'Nombre illimité de messages',
         'Voir les visites de votre profil',
@@ -63,7 +61,7 @@ export default function TarifsPage() {
     },
     {
       name: 'Elite',
-      price: '15 000',
+      price: '14 500',
       period: 'FCFA / mois',
       icon: Crown,
       bg: '#241c18',
@@ -75,7 +73,6 @@ export default function TarifsPage() {
         'Découverte des profils',
         'Nombre illimité de likes',
         'Accès prioritaire aux événements VIP',
-        '3 conversations par semaine',
         'Badge profil vérifié',
         'Badge membre Elite',
         'Nombre illimité de messages',
@@ -95,7 +92,7 @@ export default function TarifsPage() {
 
   const faqs = [
     { q: 'La formule gratuite suffit-elle pour commencer ?', r: 'Oui, la formule gratuite permet déjà de créer votre profil, découvrir les profils et tester la plateforme avec les bases essentielles.' },
-    { q: 'Le Premium est-il gratuit pour les femmes ?', r: 'Pendant le lancement, toutes les formules sont gratuites pendant au moins deux mois. Ensuite, Premium sera à 5 000 FCFA par mois et restera gratuit pour les femmes.' },
+    { q: 'Le Premium est-il gratuit pour les femmes ?', r: 'Pendant le lancement, toutes les formules sont gratuites pendant au moins deux mois. Ensuite, Premium sera à 4 500 FCFA par mois et restera gratuit pour les femmes.' },
     { q: 'Qu\'est-ce que la formule Elite ?', r: 'La formule Elite donne accès aux avantages les plus complets, dont les événements VIP, l’incognito et le support prioritaire.' },
     { q: 'Mes données sont-elles protégées ?', r: 'Absolument. Vos informations personnelles restent confidentielles et ne sont jamais partagées sans votre accord.' },
   ];
@@ -116,7 +113,7 @@ export default function TarifsPage() {
 
         <div className="mt-12 grid gap-6 md:grid-cols-3">
           {plans.map((plan) => (
-            <div key={plan.name} className={`rounded-[28px] p-8 ${plan.featured ? 'text-white shadow-[0_20px_50px_rgba(233,81,95,.25)] lg:-translate-y-4' : plan.name === 'Elite' ? 'text-white shadow-[0_20px_50px_rgba(36,28,24,.25)] lg:-translate-y-4' : 'text-[#241c18] shadow-[0_10px_30px_rgba(83,46,32,.06)]'}`} style={{ background: isDark && !plan.featured && plan.name !== 'Elite' ? '#252525' : plan.bg }}>
+            <div id={plan.name.toLowerCase()} key={plan.name} className={`rounded-[28px] p-8 ${plan.featured ? 'text-white shadow-[0_20px_50px_rgba(233,81,95,.25)] lg:-translate-y-4' : plan.name === 'Elite' ? 'text-white shadow-[0_20px_50px_rgba(36,28,24,.25)] lg:-translate-y-4' : 'text-[#241c18] shadow-[0_10px_30px_rgba(83,46,32,.06)]'}`} style={{ background: isDark && !plan.featured && plan.name !== 'Elite' ? '#252525' : plan.bg }}>
               {plan.featured && <span className="mb-4 inline-block rounded-full bg-white/20 px-3 py-1 text-[10px] font-extrabold uppercase tracking-wider">Le plus choisi</span>}
               <div className="flex h-12 w-12 items-center justify-center rounded-2xl" style={{ background: plan.featured ? 'rgba(255,255,255,.2)' : `${plan.accent}15`, color: plan.accent }}>
                 <plan.icon size={22} fill={plan.icon === Heart ? 'currentColor' : 'none'} />
@@ -133,7 +130,7 @@ export default function TarifsPage() {
           ))}
         </div>
 
-        <section className="mt-20 rounded-[28px] bg-[#f8f9fd] px-6 py-10 lg:px-10 lg:py-14">
+        <section id="golden" className="mt-20 rounded-[28px] bg-[#f8f9fd] px-6 py-10 lg:px-10 lg:py-14">
           <div className="mx-auto grid max-w-[1080px] gap-12 lg:grid-cols-[.9fr_1.1fr] lg:items-start lg:gap-16">
             <div className="text-center lg:text-left">
               <p className="text-[11px] font-extrabold uppercase tracking-[.28em] text-[#c88a27]">Je ne souhaite pas m&apos;inscrire sur le site</p>

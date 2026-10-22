@@ -299,7 +299,9 @@ export default function ConnexionPage() {
       <div className="w-full max-w-[460px]">
         <div className="rounded-[28px] bg-[#f8f9fd] p-8 shadow-[0_20px_60px_rgba(83,46,32,.08)] sm:p-10">
           <Link href="/" className="flex justify-center" aria-label="ARAS">
-            <Image src="/aras-logo.jpeg" alt="ARAS" width={180} height={72} className="h-14 w-auto object-contain sm:h-16" priority />
+            <span className="relative block h-[54px] w-[72px] overflow-hidden bg-[#f8f9fd]">
+              <Image src="/aras-logo.jpeg" alt="ARAS" width={72} height={72} className="absolute left-0 top-0 h-[72px] w-[72px] object-cover object-top mix-blend-multiply" priority />
+            </span>
           </Link>
           <h1 className="mt-8 font-display text-4xl tracking-[-.04em]">Content de vous revoir</h1>
           <p className="mt-2 text-sm leading-6 text-[#756960]">Connectez-vous avec votre email ou votre téléphone et votre mot de passe.</p>

@@ -28,7 +28,7 @@ function createEmailTemplate(name: string, email: string, subject: string, messa
         <p style="margin: 0 0 10px 0; color: #625852; font-size: 14px; font-weight: bold;">De :</p>
         <p style="margin: 0 0 20px 0; color: #241c18; font-size: 16px; font-weight: 600;">${name}</p>
         
-        <p style="margin: 0 0 10px 0; color: #625852; font-size: 14px; font-weight: bold;">Email :</p>
+        <p style="margin: 0 0 10px 0; color: #625852; font-size: 14px; font-weight: bold;">E-mail ou téléphone :</p>
         <p style="margin: 0 0 20px 0; color: #241c18; font-size: 16px;">${email}</p>
         
         <p style="margin: 0 0 10px 0; color: #625852; font-size: 14px; font-weight: bold;">Sujet :</p>
@@ -58,11 +58,11 @@ function createEmailTemplate(name: string, email: string, subject: string, messa
 export async function POST(request: Request) {
   const body = await request.json() as Record<string, unknown>;
   const name = String(body.name || '').trim();
-  const email = String(body.email || '').trim();
+  const contact = String(body.email || '').trim();
   const subject = String(body.subject || '').trim();
   const message = String(body.message || '').trim();
 
-  if (!name || !email || !subject || !message || message.length > 5000) {
+  if (!name || !contact || contact.length > 160 || !subject || !message || message.length > 5000) {
     return NextResponse.json({ error: 'Informations invalides.' }, { status: 400 });
   }
 
@@ -84,17 +84,18 @@ export async function POST(request: Request) {
     }
   });
 
-  const htmlContent = createEmailTemplate(name, email, subject, message);
+  const htmlContent = createEmailTemplate(name, contact, subject, message);
+  const replyTo = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contact) ? contact : undefined;
 
   try {
     console.log('Tentative d\'envoi d\'email...');
     await transporter.sendMail({
       from: { name: 'SupportAras', address: process.env.CONTACT_FROM_EMAIL?.trim() || process.env.GMAIL_EMAIL },
       to: supportEmail,
-      replyTo: email,
+      ...(replyTo ? { replyTo } : {}),
       subject: `[ARAS] ${subject}`,
       html: htmlContent,
-      text: `Message de ${name} (${email})\n\nSujet: ${subject}\n\n${message}`
+      text: `Message de ${name} (${contact})\n\nSujet: ${subject}\n\n${message}`
     });
     console.log('Email envoyé avec succès');
     return NextResponse.json({ ok: true });

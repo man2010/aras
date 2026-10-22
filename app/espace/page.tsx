@@ -406,6 +406,8 @@ export default function EspacePage() {
   const [activeSessionCount, setActiveSessionCount] = useState<number | null>(null);
   const [accountActionLoading, setAccountActionLoading] = useState<'deactivate' | 'delete' | null>(null);
   const [accountActionError, setAccountActionError] = useState('');
+  const [accountConfirmation, setAccountConfirmation] = useState<'deactivate' | 'delete' | null>(null);
+  const [deleteConfirmationText, setDeleteConfirmationText] = useState('');
   const likeRefreshVersion = useRef(0);
 
   const recordProfileVisit = useCallback(async (profileId: string) => {
@@ -1100,8 +1102,6 @@ export default function EspacePage() {
 
   const deactivateAccount = async () => {
     if (!user || accountActionLoading) return;
-    const confirmed = window.confirm('Désactiver temporairement votre compte ? Votre profil ne sera plus proposé. Vous pourrez le réactiver en vous reconnectant.');
-    if (!confirmed) return;
     setAccountActionLoading('deactivate');
     setAccountActionError('');
     const { data } = await supabase.auth.getSession();
@@ -1121,10 +1121,6 @@ export default function EspacePage() {
 
   const deleteAccount = async () => {
     if (!user || accountActionLoading) return;
-    const confirmed = window.confirm('La suppression de votre compte est définitive. Votre profil et vos données associées seront supprimés de la base de données. Continuer ?');
-    if (!confirmed) return;
-    const confirmation = window.prompt('Pour confirmer la suppression définitive, saisissez SUPPRIMER.');
-    if (confirmation !== 'SUPPRIMER') return;
     setAccountActionLoading('delete');
     setAccountActionError('');
     const { error } = await supabase.rpc('delete_my_account');
@@ -1849,7 +1845,7 @@ export default function EspacePage() {
           }}
         />
 
-        <div className={`min-w-0 flex-1 bg-[radial-gradient(ellipse_at_top_right,_rgba(236,59,120,0.08),_transparent_40%)] ${tab === 'decouverte' ? 'h-[calc(100dvh-60px)] overflow-hidden px-3 pb-[calc(76px+env(safe-area-inset-bottom))] pt-3 sm:px-6 sm:pt-4 lg:h-[calc(100dvh-60px)] lg:overflow-hidden lg:px-10 lg:pt-0 lg:pb-2' : 'px-3 pb-28 pt-5 sm:px-6 sm:pt-8 lg:px-10 lg:pt-10 lg:pb-12'}`}>
+        <div className={`min-w-0 flex-1 bg-[radial-gradient(ellipse_at_top_right,_rgba(236,59,120,0.08),_transparent_40%)] ${tab === 'decouverte' ? 'h-[calc(100dvh-60px)] overflow-hidden px-3 pb-[calc(76px+env(safe-area-inset-bottom))] pt-3 sm:px-6 sm:pt-4 lg:h-[calc(100dvh-108px)] lg:overflow-hidden lg:px-10 lg:pt-0 lg:pb-6' : 'px-3 pb-28 pt-5 sm:px-6 sm:pt-8 lg:px-10 lg:pt-10 lg:pb-12'}`}>
           {/* DISCOVERY TAB */}
           {tab === 'decouverte' && (
             <div className="h-full min-h-0 lg:space-y-6">
@@ -2185,7 +2181,7 @@ export default function EspacePage() {
                 <div className="mt-5 flex items-start gap-3 rounded-2xl bg-[#f8f9fd] p-4 text-sm text-[#777985] dark:bg-white/5 dark:text-white/55"><Flag size={17} className="mt-0.5 shrink-0 text-[#ec3b78]"/><p>Pour signaler une personne, ouvrez sa conversation, puis le menu ⋮ en haut à droite.</p></div>
               </section>}
               {profileSection === 'privacy' && <SettingsPanels tab="settings-privacy" profile={profile} privacySettings={privacySettings} onPrivacyToggle={togglePrivacySetting} privacySaved={privacySaved} privacySaveError={privacySaveError} securityForm={securityForm} setSecurityForm={setSecurityForm} changePassword={changePassword} securityMessage={securityMessage} securityLoading={securityLoading} showNewPw={showNewPw} setShowNewPw={setShowNewPw} onGoToProfileTab={() => setProfileSection('profile')} onChangeTab={() => {}} subscriptionPlan={subscriptionPlan} showTabs={false} />}
-              {profileSection === 'security' && <SettingsPanels tab="settings-security" profile={profile} privacySettings={privacySettings} onPrivacyToggle={togglePrivacySetting} privacySaved={privacySaved} privacySaveError={privacySaveError} securityForm={securityForm} setSecurityForm={setSecurityForm} changePassword={changePassword} securityMessage={securityMessage} securityLoading={securityLoading} showNewPw={showNewPw} setShowNewPw={setShowNewPw} onGoToProfileTab={() => setProfileSection('profile')} onChangeTab={() => {}} subscriptionPlan={subscriptionPlan} showTabs={false} activeSessionCount={activeSessionCount} accountActionLoading={accountActionLoading} accountActionError={accountActionError} onDeactivateAccount={() => void deactivateAccount()} onDeleteAccount={() => void deleteAccount()} />}
+              {profileSection === 'security' && <SettingsPanels tab="settings-security" profile={profile} privacySettings={privacySettings} onPrivacyToggle={togglePrivacySetting} privacySaved={privacySaved} privacySaveError={privacySaveError} securityForm={securityForm} setSecurityForm={setSecurityForm} changePassword={changePassword} securityMessage={securityMessage} securityLoading={securityLoading} showNewPw={showNewPw} setShowNewPw={setShowNewPw} onGoToProfileTab={() => setProfileSection('profile')} onChangeTab={() => {}} subscriptionPlan={subscriptionPlan} showTabs={false} activeSessionCount={activeSessionCount} accountActionLoading={accountActionLoading} accountActionError={accountActionError} onDeactivateAccount={() => { setAccountActionError(''); setAccountConfirmation('deactivate'); }} onDeleteAccount={() => { setAccountActionError(''); setDeleteConfirmationText(''); setAccountConfirmation('delete'); }} />}
               {profileSection === 'subscription' && <SettingsPanels tab="settings-subscription" profile={profile} privacySettings={privacySettings} onPrivacyToggle={togglePrivacySetting} privacySaved={privacySaved} privacySaveError={privacySaveError} securityForm={securityForm} setSecurityForm={setSecurityForm} changePassword={changePassword} securityMessage={securityMessage} securityLoading={securityLoading} showNewPw={showNewPw} setShowNewPw={setShowNewPw} onGoToProfileTab={() => setProfileSection('profile')} onChangeTab={() => {}} subscriptionPlan={subscriptionPlan} showTabs={false} />}
               {profileSection === 'help' && <SettingsPanels tab="settings-help" profile={profile} privacySettings={privacySettings} onPrivacyToggle={togglePrivacySetting} privacySaved={privacySaved} privacySaveError={privacySaveError} securityForm={securityForm} setSecurityForm={setSecurityForm} changePassword={changePassword} securityMessage={securityMessage} securityLoading={securityLoading} showNewPw={showNewPw} setShowNewPw={setShowNewPw} onGoToProfileTab={() => setProfileSection('profile')} onChangeTab={() => {}} subscriptionPlan={subscriptionPlan} showTabs={false} />}
               {profileSection === 'profile' && profileEditOpen && <div className="grid gap-6">
@@ -2669,8 +2665,8 @@ export default function EspacePage() {
               activeSessionCount={activeSessionCount}
               accountActionLoading={accountActionLoading}
               accountActionError={accountActionError}
-              onDeactivateAccount={() => void deactivateAccount()}
-              onDeleteAccount={() => void deleteAccount()}
+              onDeactivateAccount={() => { setAccountActionError(''); setAccountConfirmation('deactivate'); }}
+              onDeleteAccount={() => { setAccountActionError(''); setDeleteConfirmationText(''); setAccountConfirmation('delete'); }}
             />
           )}
         </div>
@@ -2691,6 +2687,23 @@ export default function EspacePage() {
             </label>
             <button type="submit" disabled={reportSubmitting} className="mt-5 min-h-12 w-full rounded-full bg-[#ec3b78] px-5 py-3 text-sm font-extrabold text-white disabled:opacity-60">{reportSubmitting ? 'Envoi…' : 'Envoyer le signalement'}</button>
           </form>
+        </div>
+      )}
+      {accountConfirmation && (
+        <div className="fixed inset-0 z-[140] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="account-confirmation-title" onClick={() => { if (!accountActionLoading) { setAccountConfirmation(null); setDeleteConfirmationText(''); } }}>
+          <section onClick={(event) => event.stopPropagation()} className="w-full max-w-md rounded-[28px] border border-[#eee7e7] bg-white p-6 shadow-[0_24px_80px_rgba(0,0,0,.3)] dark:border-white/10 dark:bg-[#1c1b21] sm:p-7">
+            <div className="flex items-start gap-4">
+              <span className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl ${accountConfirmation === 'delete' ? 'bg-red-100 text-red-600 dark:bg-red-500/15 dark:text-red-300' : 'bg-[#fce6ef] text-[#ec1689] dark:bg-[#ec1689]/15 dark:text-[#ff9fc2]'}`}>{accountConfirmation === 'delete' ? <Trash2 size={21} /> : <UserRoundX size={21} />}</span>
+              <div className="min-w-0 flex-1"><h2 id="account-confirmation-title" className="font-display text-2xl font-bold text-[#241c18] dark:text-white">{accountConfirmation === 'delete' ? 'Supprimer votre compte ?' : 'Désactiver temporairement ?'}</h2><p className="mt-2 text-sm leading-6 text-[#756960] dark:text-white/65">{accountConfirmation === 'delete' ? 'Cette action est définitive. Votre profil et les données associées seront supprimés.' : 'Votre profil ne sera plus proposé et vous serez déconnecté. Vous pourrez le réactiver en vous reconnectant.'}</p></div>
+              <button type="button" disabled={accountActionLoading !== null} onClick={() => { setAccountConfirmation(null); setDeleteConfirmationText(''); }} aria-label="Fermer la confirmation" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#f4f4f6] text-[#626779] disabled:opacity-40 dark:bg-white/10 dark:text-white"><X size={18} /></button>
+            </div>
+            {accountConfirmation === 'delete' && <label className="mt-5 block text-sm font-bold text-[#4c4650] dark:text-white/80">Saisissez SUPPRIMER pour confirmer<input autoFocus value={deleteConfirmationText} onChange={(event) => setDeleteConfirmationText(event.target.value)} className="mt-2 min-h-12 w-full rounded-xl border border-[#dfd2c6] bg-[#f8f9fd] px-4 text-sm outline-none focus:border-red-400 dark:border-white/15 dark:bg-white/5" /></label>}
+            {accountActionError && <p role="alert" className="mt-4 text-sm font-semibold text-red-600 dark:text-red-300">{accountActionError}</p>}
+            <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+              <button type="button" disabled={accountActionLoading !== null} onClick={() => { setAccountConfirmation(null); setDeleteConfirmationText(''); }} className="min-h-11 rounded-full border border-[#e5e1e8] px-5 text-sm font-bold text-[#514952] transition hover:bg-[#f8f9fd] disabled:opacity-50 dark:border-white/15 dark:text-white dark:hover:bg-white/5">Annuler</button>
+              <button type="button" disabled={accountActionLoading !== null || (accountConfirmation === 'delete' && deleteConfirmationText !== 'SUPPRIMER')} onClick={() => { if (accountConfirmation === 'deactivate') void deactivateAccount(); else void deleteAccount(); }} className={`min-h-11 rounded-full px-5 text-sm font-extrabold text-white transition disabled:cursor-not-allowed disabled:opacity-50 ${accountConfirmation === 'delete' ? 'bg-red-600 hover:bg-red-700' : 'bg-[#ec1689] hover:bg-[#d82e69]'}`}>{accountActionLoading ? accountActionLoading === 'delete' ? 'Suppression…' : 'Désactivation…' : accountConfirmation === 'delete' ? 'Supprimer définitivement' : 'Désactiver le compte'}</button>
+            </div>
+          </section>
         </div>
       )}
       {ownProfilePreviewOpen && profile && profile.id === user?.id && (

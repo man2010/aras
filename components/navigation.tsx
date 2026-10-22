@@ -389,7 +389,9 @@ export function Navbar() {
           </Link>
         ) : (
           <Link href="/" className="flex items-center" aria-label="ARAS">
-            <Image src="/aras-logo.jpeg" alt="ARAS" width={140} height={56} className="h-11 w-auto object-contain sm:h-12" priority />
+            <span className="relative block h-12 w-16 overflow-hidden bg-[#f8f9fd]">
+              <Image src="/aras-logo.jpeg" alt="ARAS" width={64} height={64} className="absolute left-0 top-0 h-16 w-16 object-cover object-top mix-blend-multiply" priority />
+            </span>
           </Link>
         )}
 
