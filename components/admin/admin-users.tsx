@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { Search, Ban, Mail, Phone, MapPin, Briefcase, CheckCircle, XCircle, Download, X } from 'lucide-react';
 import type { Profile } from '@/lib/types';
 
-type AdminProfile = Profile & { authContact?: string | null; authContactMethod?: 'email' | 'phone' | null };
+type AdminProfile = Profile & { adminLocation?: string | null; authContact?: string | null; authContactMethod?: 'email' | 'phone' | null };
 
 interface AdminUsersProps {
   profiles: AdminProfile[];
@@ -25,14 +25,14 @@ export function AdminUsers({ profiles, currentPage, totalPages, onPageChange, on
     const matchesSearch = p.display_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                         p.profession.toLowerCase().includes(searchTerm.toLowerCase()) ||
                         (p.authContact ?? '').toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesCity = !filterCity || p.city === filterCity;
+  const matchesCity = !filterCity || (p.adminLocation || p.city) === filterCity;
     const matchesVerified = filterVerified === 'all' ||
                          (filterVerified === 'verified' && p.is_verified) ||
                          (filterVerified === 'unverified' && !p.is_verified);
     return matchesSearch && matchesCity && matchesVerified;
   });
 
-  const cities = Array.from(new Set(profiles.map((p) => p.city)));
+  const cities = Array.from(new Set(profiles.map((p) => p.adminLocation || p.city)));
 
   const handleExport = () => {
     const csv = [
@@ -40,7 +40,7 @@ export function AdminUsers({ profiles, currentPage, totalPages, onPageChange, on
       ...filteredProfiles.map(p => [
         p.display_name,
         p.profession,
-        p.city,
+        p.adminLocation || p.city,
         p.age,
         p.authContact ?? '',
         p.is_verified ? 'Oui' : 'Non',
@@ -143,7 +143,7 @@ export function AdminUsers({ profiles, currentPage, totalPages, onPageChange, on
                       <div className="space-y-1">
                         <div className="flex items-center gap-2 text-sm text-[#756960]">
                           <MapPin size={14} />
-                          {p.city}
+                          {p.adminLocation || p.city}
                         </div>
                         <div className="flex items-center gap-2 text-sm text-[#756960]">
                           <Briefcase size={14} />
@@ -216,13 +216,13 @@ export function AdminUsers({ profiles, currentPage, totalPages, onPageChange, on
             <div className="flex items-start justify-between gap-4">
               <div className="flex items-center gap-4">
                 <img src={selectedProfile.photo_url} alt="" className="h-16 w-16 rounded-2xl object-cover" />
-                <div><h2 className="font-display text-2xl">{selectedProfile.display_name}</h2><p className="text-sm text-[#756960]">{selectedProfile.age} ans · {selectedProfile.city}</p></div>
+                <div><h2 className="font-display text-2xl">{selectedProfile.display_name}</h2><p className="text-sm text-[#756960]">{selectedProfile.age} ans · {selectedProfile.adminLocation || selectedProfile.city}</p></div>
               </div>
               <button onClick={() => setSelectedProfile(null)} aria-label="Fermer" className="rounded-full bg-[#f8f9fd] p-2"><X size={18} /></button>
             </div>
             <div className="mt-6 grid gap-3 sm:grid-cols-2">
               <div className="rounded-2xl bg-[#f8f9fd] p-4"><p className="text-[11px] font-extrabold uppercase text-[#9a8b82]">Profession</p><p className="mt-1 text-sm font-semibold">{selectedProfile.profession || 'Non renseignée'}</p></div>
-              <div className="rounded-2xl bg-[#f8f9fd] p-4"><p className="text-[11px] font-extrabold uppercase text-[#9a8b82]">Zone</p><p className="mt-1 text-sm font-semibold">{selectedProfile.zone || selectedProfile.city || 'Non renseignée'}</p></div>
+              <div className="rounded-2xl bg-[#f8f9fd] p-4"><p className="text-[11px] font-extrabold uppercase text-[#9a8b82]">Localisation</p><p className="mt-1 break-words text-sm font-semibold">{selectedProfile.adminLocation || selectedProfile.zone || 'Non renseignée'}</p></div>
               <div className="rounded-2xl bg-[#f8f9fd] p-4"><p className="text-[11px] font-extrabold uppercase text-[#9a8b82]">Genre</p><p className="mt-1 text-sm font-semibold">{selectedProfile.gender || 'Non renseigné'}</p></div>
               <div className="rounded-2xl bg-[#f8f9fd] p-4"><p className="text-[11px] font-extrabold uppercase text-[#9a8b82]">Statut</p><p className="mt-1 text-sm font-semibold">{selectedProfile.is_active === false ? 'Compte bloqué' : 'Compte actif'} · {selectedProfile.is_verified ? 'Vérifié' : 'Non vérifié'}{selectedProfile.is_premium ? ' · Premium' : ''}</p></div>
               <div className="rounded-2xl bg-[#f8f9fd] p-4 sm:col-span-2"><p className="text-[11px] font-extrabold uppercase text-[#9a8b82]">{selectedProfile.authContactMethod === 'phone' ? 'Téléphone de connexion' : 'E-mail de connexion'}</p><p className="mt-1 break-all text-sm font-semibold">{selectedProfile.authContact || 'Non disponible'}</p></div>

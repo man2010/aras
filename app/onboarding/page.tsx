@@ -54,14 +54,18 @@ function ChoiceGroup({ label, options, selected, onToggle }: { label: string; op
   );
 }
 
-async function reverseGeocode(lat: number, lng: number) {
+async function reverseGeocode(lat: number, lng: number): Promise<{ label: string; city: string }> {
   try {
     const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}`);
-    if (!response.ok) return '';
+    if (!response.ok) return { label: '', city: '' };
     const data = await response.json();
-    return data?.display_name || '';
+    const address = data?.address ?? {};
+    return {
+      label: data?.display_name || '',
+      city: address.city || address.town || address.village || address.municipality || address.county || address.state_district || address.state || '',
+    };
   } catch {
-    return '';
+    return { label: '', city: '' };
   }
 }
 
@@ -77,6 +81,7 @@ export default function OnboardingPage() {
   const [birthdate, setBirthdate] = useState('');
   const [age, setAge] = useState(0);
   const [locationLabel, setLocationLabel] = useState('');
+  const [cityName, setCityName] = useState('');
   const [lat, setLat] = useState<number | null>(null);
   const [lng, setLng] = useState<number | null>(null);
   const [primaryPhoto, setPrimaryPhoto] = useState('');
@@ -96,11 +101,11 @@ export default function OnboardingPage() {
 
   const stepReady = useMemo(() => {
     if (step === 0) return Boolean(name.trim() && gender && birthdate && isAdult);
-    if (step === 1) return true;
+    if (step === 1) return Boolean(locationLabel.trim() && cityName.trim() && lat !== null && lng !== null);
     if (step === 2) return Boolean(primaryPhoto);
     if (step === 3) return true;
     return true;
-  }, [step, name, gender, birthdate, isAdult, primaryPhoto]);
+  }, [step, name, gender, birthdate, isAdult, primaryPhoto, locationLabel, cityName, lat, lng]);
 
   useEffect(() => {
     if (!user) router.push('/connexion');
@@ -127,8 +132,17 @@ export default function OnboardingPage() {
         const longitude = position.coords.longitude;
         setLat(latitude);
         setLng(longitude);
-        const label = await reverseGeocode(latitude, longitude);
-        setLocationLabel(label || `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`);
+        const location = await reverseGeocode(latitude, longitude);
+        if (!location.label || !location.city) {
+          setLocationLabel('');
+          setCityName('');
+          setLat(null);
+          setLng(null);
+          setMessage('Nous n’avons pas pu déterminer ta ville. Autorise la localisation et réessaie.');
+          return;
+        }
+        setLocationLabel(location.label);
+        setCityName(location.city);
       },
       () => setMessage('Nous n’avons pas pu récupérer votre localisation.')
     );
@@ -191,7 +205,7 @@ export default function OnboardingPage() {
       full_name: name.trim(),
       gender,
       birthdate,
-      city: locationLabel.split(',')[0] || locationLabel,
+      city: cityName,
       zone: locationLabel,
       location_label: locationLabel,
       lat,
@@ -228,7 +242,9 @@ export default function OnboardingPage() {
     }
 
     if (!stepReady) {
-      setMessage('Veuillez compléter cette étape avant de continuer.');
+      setMessage(step === 1
+        ? 'La localisation est obligatoire. Active la géolocalisation pour continuer.'
+        : 'Veuillez compléter cette étape avant de continuer.');
       return;
     }
 
@@ -372,7 +388,7 @@ export default function OnboardingPage() {
                 <div className="min-w-0 rounded-2xl border border-dashed border-[#dfd2c6] bg-[#f8f9fd] p-4 dark:border-white/10 dark:bg-[#1d1f24]">
                   <p className="text-xs font-extrabold uppercase tracking-[0.18em] text-[#756960] dark:text-white/50">Localisation actuelle</p>
                   <p className="mt-3 break-words text-sm text-[#625852] dark:text-white/80">
-                    {locationLabel || 'Tu peux passer cette étape si tu préfères remplir ta ville plus tard.'}
+                    {locationLabel ? `${cityName} · ${locationLabel}` : 'La localisation est obligatoire pour terminer ton profil.'}
                   </p>
                 </div>
               </div>
@@ -523,7 +539,7 @@ export default function OnboardingPage() {
                   <div className="pointer-events-none absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-black/75 to-transparent" />
                   <div className="absolute inset-x-5 bottom-5 sm:inset-x-7 sm:bottom-7">
                     <h3 className="break-words font-display text-3xl font-bold tracking-[-0.04em] text-white sm:text-4xl">{name || 'Ton profil'}{birthdate ? `, ${age}` : ''}</h3>
-                    <p className="mt-2 flex items-center gap-1.5 text-sm text-white/80"><MapPin size={15} className="shrink-0" />{locationLabel.split(',')[0] || 'Localisation non renseignée'}</p>
+                    <p className="mt-2 flex items-center gap-1.5 text-sm text-white/80"><MapPin size={15} className="shrink-0" />{cityName || 'Localisation non renseignée'}</p>
                     {gender && <span className="mt-3 inline-flex rounded-full bg-white/15 px-3 py-1.5 text-xs font-bold text-white backdrop-blur">{gender}</span>}
                   </div>
                 </div>
