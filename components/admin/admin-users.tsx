@@ -1,11 +1,13 @@
 'use client';
 
 import { useState } from 'react';
-import { Search, Ban, Mail, MapPin, Briefcase, CheckCircle, XCircle, Download, X } from 'lucide-react';
+import { Search, Ban, Mail, Phone, MapPin, Briefcase, CheckCircle, XCircle, Download, X } from 'lucide-react';
 import type { Profile } from '@/lib/types';
 
+type AdminProfile = Profile & { authContact?: string | null; authContactMethod?: 'email' | 'phone' | null };
+
 interface AdminUsersProps {
-  profiles: Profile[];
+  profiles: AdminProfile[];
   currentPage: number;
   totalPages: number;
   onPageChange: (page: number) => void;
@@ -16,12 +18,13 @@ export function AdminUsers({ profiles, currentPage, totalPages, onPageChange, on
   const [searchTerm, setSearchTerm] = useState('');
   const [filterCity, setFilterCity] = useState('');
   const [filterVerified, setFilterVerified] = useState<'all' | 'verified' | 'unverified'>('all');
-  const [selectedProfile, setSelectedProfile] = useState<Profile | null>(null);
-  const [pendingBlockAction, setPendingBlockAction] = useState<{ profile: Profile; currentlyActive: boolean } | null>(null);
+  const [selectedProfile, setSelectedProfile] = useState<AdminProfile | null>(null);
+  const [pendingBlockAction, setPendingBlockAction] = useState<{ profile: AdminProfile; currentlyActive: boolean } | null>(null);
 
   const filteredProfiles = profiles.filter((p) => {
     const matchesSearch = p.display_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                        p.profession.toLowerCase().includes(searchTerm.toLowerCase());
+                        p.profession.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                        (p.authContact ?? '').toLowerCase().includes(searchTerm.toLowerCase());
     const matchesCity = !filterCity || p.city === filterCity;
     const matchesVerified = filterVerified === 'all' ||
                          (filterVerified === 'verified' && p.is_verified) ||
@@ -33,12 +36,13 @@ export function AdminUsers({ profiles, currentPage, totalPages, onPageChange, on
 
   const handleExport = () => {
     const csv = [
-      ['Nom', 'Profession', 'Ville', 'Âge', 'Vérifié', 'Premium'].join(','),
+      ['Nom', 'Profession', 'Ville', 'Âge', 'E-mail ou téléphone', 'Vérifié', 'Premium'].join(','),
       ...filteredProfiles.map(p => [
         p.display_name,
         p.profession,
         p.city,
         p.age,
+        p.authContact ?? '',
         p.is_verified ? 'Oui' : 'Non',
         p.is_premium ? 'Oui' : 'Non',
       ].join(','))
@@ -64,7 +68,7 @@ export function AdminUsers({ profiles, currentPage, totalPages, onPageChange, on
                 <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#9a8b82]" />
                 <input
                   type="text"
-                  placeholder="Rechercher par nom ou profession..."
+                  placeholder="Rechercher par nom, profession ou contact..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="w-full rounded-xl border border-[#dfd2c6] bg-[#f8f9fd] pl-10 pr-4 py-2.5 text-sm outline-none focus:border-[#ec3b78]"
@@ -131,8 +135,8 @@ export function AdminUsers({ profiles, currentPage, totalPages, onPageChange, on
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2 text-sm text-[#756960]">
-                        <Mail size={14} />
-                        {p.user_id ? '✓ Compte lié' : '⚠ Sans compte lié'}
+                        {p.authContactMethod === 'phone' ? <Phone size={14} /> : <Mail size={14} />}
+                        {p.authContact ? <span><span className="font-semibold">{p.authContactMethod === 'phone' ? 'Téléphone' : 'E-mail'} :</span> {p.authContact}</span> : (p.user_id ? 'Contact indisponible' : 'Sans compte lié')}
                       </div>
                     </td>
                     <td className="px-4 py-3">
@@ -221,6 +225,7 @@ export function AdminUsers({ profiles, currentPage, totalPages, onPageChange, on
               <div className="rounded-2xl bg-[#f8f9fd] p-4"><p className="text-[11px] font-extrabold uppercase text-[#9a8b82]">Zone</p><p className="mt-1 text-sm font-semibold">{selectedProfile.zone || selectedProfile.city || 'Non renseignée'}</p></div>
               <div className="rounded-2xl bg-[#f8f9fd] p-4"><p className="text-[11px] font-extrabold uppercase text-[#9a8b82]">Genre</p><p className="mt-1 text-sm font-semibold">{selectedProfile.gender || 'Non renseigné'}</p></div>
               <div className="rounded-2xl bg-[#f8f9fd] p-4"><p className="text-[11px] font-extrabold uppercase text-[#9a8b82]">Statut</p><p className="mt-1 text-sm font-semibold">{selectedProfile.is_active === false ? 'Compte bloqué' : 'Compte actif'} · {selectedProfile.is_verified ? 'Vérifié' : 'Non vérifié'}{selectedProfile.is_premium ? ' · Premium' : ''}</p></div>
+              <div className="rounded-2xl bg-[#f8f9fd] p-4 sm:col-span-2"><p className="text-[11px] font-extrabold uppercase text-[#9a8b82]">{selectedProfile.authContactMethod === 'phone' ? 'Téléphone de connexion' : 'E-mail de connexion'}</p><p className="mt-1 break-all text-sm font-semibold">{selectedProfile.authContact || 'Non disponible'}</p></div>
             </div>
             <div className="mt-3 rounded-2xl bg-[#f8f9fd] p-4"><p className="text-[11px] font-extrabold uppercase text-[#9a8b82]">À propos</p><p className="mt-1 whitespace-pre-wrap text-sm leading-6">{selectedProfile.bio || 'Aucune biographie renseignée.'}</p></div>
             {selectedProfile.interests?.length > 0 && <div className="mt-3 rounded-2xl bg-[#f8f9fd] p-4"><p className="text-[11px] font-extrabold uppercase text-[#9a8b82]">Centres d’intérêt</p><p className="mt-1 text-sm">{selectedProfile.interests.join(' · ')}</p></div>}

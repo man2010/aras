@@ -17,6 +17,7 @@ import { AdminSettings } from '@/components/admin/admin-settings';
 
 type AdminTab = 'dashboard' | 'users' | 'reports' | 'events' | 'messages'  | 'analytics' | 'settings';
 type AdminActivity = { id: string; category: 'new_message' | 'new_signup' | 'new_login' | 'new_match' | 'new_event'; type: string; description: string; created_at: string; details: Record<string, string> };
+type AdminProfile = Profile & { authContact?: string | null; authContactMethod?: 'email' | 'phone' | null };
 
 export default function AdminPage() {
   const { user, loading: authLoading } = useAuth();
@@ -37,7 +38,7 @@ export default function AdminPage() {
     views: 0,
   });
   
-  const [profiles, setProfiles] = useState<Profile[]>([]);
+  const [profiles, setProfiles] = useState<AdminProfile[]>([]);
   const [reports, setReports] = useState<any[]>([]);
   const [events, setEvents] = useState<any[]>([]);
   const [eventParticipants, setEventParticipants] = useState<Record<string, any[]>>({});
@@ -77,7 +78,26 @@ export default function AdminPage() {
 
   const loadProfiles = useCallback(async () => {
     const { data, count } = await supabase.from('profiles').select('*', { count: 'exact' }).order('created_at', { ascending: false }).range((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage - 1);
-    if (data) setProfiles((data as ProfileRow[]).map(toProfile));
+    if (data) {
+      const mappedProfiles = (data as ProfileRow[]).map(toProfile) as AdminProfile[];
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData.session?.access_token;
+      if (accessToken && mappedProfiles.length) {
+        const contactsResponse = await fetch('/api/admin/users/contacts', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
+          body: JSON.stringify({ userIds: mappedProfiles.map((profile) => profile.id) }),
+        }).catch(() => null);
+        if (contactsResponse?.ok) {
+          const { contacts } = await contactsResponse.json() as { contacts: Record<string, { value: string | null; method: 'email' | 'phone' | null }> };
+          for (const profile of mappedProfiles) {
+            profile.authContact = contacts[profile.id]?.value ?? null;
+            profile.authContactMethod = contacts[profile.id]?.method ?? null;
+          }
+        }
+      }
+      setProfiles(mappedProfiles);
+    }
     return count || 0;
   }, [currentPage, itemsPerPage]);
 
