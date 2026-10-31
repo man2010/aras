@@ -34,7 +34,7 @@ export async function POST(request: Request) {
   }
 
   const userIds = Array.isArray(body.userIds)
-    ? [...new Set(body.userIds.filter((id): id is string => typeof id === 'string' && uuidPattern.test(id)))]
+    ? Array.from(new Set(body.userIds.filter((id): id is string => typeof id === 'string' && uuidPattern.test(id))))
     : [];
   if (userIds.length === 0 || userIds.length > 50) {
     return NextResponse.json({ error: 'Liste de comptes invalide.' }, { status: 400 });
