@@ -103,12 +103,10 @@ export default function TarifsPage() {
         <div className="text-center">
           <p className="text-xs font-extrabold uppercase tracking-[.2em] text-[#ec3b78]">Choisissez votre formule</p>
           <h1 className="font-display mt-4 text-5xl tracking-[-.045em] sm:text-6xl">Des formules <span className="italic text-[#1a6b68]">simples</span></h1>
-          <p className="mx-auto mt-4 max-w-[480px] text-sm leading-6 text-[#756960]">Profitez de toutes les formules gratuitement pendant le lancement.</p>
         </div>
 
         <div className="mx-auto mt-8 max-w-[900px] rounded-2xl border border-[#ec3b78]/20 bg-[#fff2f7] px-5 py-4 text-center dark:border-[#ec3b78]/30 dark:bg-[#ec3b78]/10">
-          <p className="text-sm font-extrabold text-[#bd285f] dark:text-[#ff9abb]">Offre de lancement</p>
-          <p className="mt-1 text-sm leading-6 text-[#625852] dark:text-white/75">Toutes les formules sont gratuites pendant au moins les deux premiers mois.</p>
+          <p className="text-sm font-extrabold leading-6 text-[#bd285f] dark:text-[#ff9abb]">Explorez sans engagement et profitez de toutes les formules gratuitement</p>
         </div>
 
         <div className="mt-12 grid gap-6 md:grid-cols-3">

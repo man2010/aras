@@ -747,10 +747,13 @@ export default function EspacePage() {
       return;
     }
     void supabase.rpc('is_admin').then(({ data }) => {
-      if (!cancelled) setIsAdminAccount(Boolean(data));
+      if (!cancelled) {
+        setIsAdminAccount(Boolean(data));
+        if (data) router.replace('/admin');
+      }
     });
     return () => { cancelled = true; };
-  }, [user]);
+  }, [user, router]);
 
   useEffect(() => {
     window.dispatchEvent(new CustomEvent('aras:app-tab', { detail: tab }));
@@ -2008,7 +2011,6 @@ export default function EspacePage() {
                     )}
                     <div className="mt-3 flex items-center justify-between px-2 text-xs font-bold text-[#756960] dark:text-white/55 lg:hidden">
                       <button type="button" onClick={goBackMobileDiscovery} disabled={mobileDiscoveryIndex === 0} className="inline-flex items-center gap-1 disabled:opacity-30"><RotateCcw size={14} /> Retour</button>
-                      <span>{mobileDiscoveryIndex + 1} / {filteredDiscoveryProfiles.length}</span>
                       <span className="hidden lg:inline-flex rounded-full border border-[#dfd2c6] bg-white/80 px-3 py-1.5 dark:border-white/15 dark:bg-white/5">Filtres sur ordinateur</span>
                     </div>
                   </section>

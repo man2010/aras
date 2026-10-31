@@ -19,6 +19,9 @@ export async function GET(request: Request) {
 
   const admin = getSupabaseAdmin();
   if (!admin) return NextResponse.json({ error: 'Chargement des visites indisponible.' }, { status: 503 });
+  const { data: adminRole, error: roleError } = await admin.from('admin_roles').select('user_id').eq('user_id', user.id).maybeSingle();
+  if (roleError) return NextResponse.json({ error: 'Vérification du compte indisponible.' }, { status: 503 });
+  if (adminRole) return NextResponse.json({ error: 'Cette fonctionnalité est réservée aux comptes membres.' }, { status: 403 });
   const { data, error } = await admin.from('profile_visits')
     .select('visitor_id,last_viewed_at')
     .eq('profile_id', user.id)
@@ -47,6 +50,9 @@ export async function POST(request: Request) {
 
   const admin = getSupabaseAdmin();
   if (!admin) return NextResponse.json({ error: 'Enregistrement des visites indisponible.' }, { status: 503 });
+  const { data: adminRoles, error: roleError } = await admin.from('admin_roles').select('user_id').in('user_id', [user.id, body.profileId]);
+  if (roleError) return NextResponse.json({ error: 'Vérification du compte indisponible.' }, { status: 503 });
+  if (adminRoles?.length) return NextResponse.json({ recorded: false });
   const { error } = await admin.from('profile_visits').upsert(
     { visitor_id: user.id, profile_id: body.profileId, last_viewed_at: new Date().toISOString() },
     { onConflict: 'visitor_id,profile_id' },

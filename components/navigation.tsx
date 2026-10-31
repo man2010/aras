@@ -32,9 +32,9 @@ type MiniProfile = {
 
 const fallbackAvatar = '/images/default-avatar.svg';
 
-export function Navbar() {
+export function Navbar({ isAdminMode = false }: { isAdminMode?: boolean }) {
   const [open, setOpen] = useState(false);
-  const [isAdmin, setIsAdmin] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(isAdminMode);
   const [mounted, setMounted] = useState(false);
   const [notificationOpen, setNotificationOpen] = useState(false);
   const [notificationPreferences, setNotificationPreferences] = useState({ notif_messages: true, notif_likes: true, notif_matches: true, notif_events: true });
@@ -67,8 +67,8 @@ export function Navbar() {
     let cancelled = false;
 
     const checkAdmin = async () => {
-      if (!user) {
-        setIsAdmin(false);
+      if (isAdminMode || !user) {
+        setIsAdmin(isAdminMode);
         return;
       }
 
@@ -81,10 +81,10 @@ export function Navbar() {
     return () => {
       cancelled = true;
     };
-  }, [user]);
+  }, [user, isAdminMode]);
 
   useEffect(() => {
-    if (!user) {
+    if (!user || isAdmin) {
       setMiniProfile(null);
       return;
     }
@@ -132,10 +132,10 @@ export function Navbar() {
       window.removeEventListener('aras:privacy-preference-updated', onPrivacyPreferenceUpdated);
       void supabase.removeChannel(channel);
     };
-  }, [user]);
+  }, [user, isAdmin]);
 
   useEffect(() => {
-    if (!user) {
+    if (!user || isAdmin) {
       setNotificationPreferences({ notif_messages: true, notif_likes: true, notif_matches: true, notif_events: true });
       return;
     }
@@ -166,10 +166,10 @@ export function Navbar() {
       window.removeEventListener('aras:privacy-preference-updated', onPrivacyPreferenceUpdated);
       void supabase.removeChannel(channel);
     };
-  }, [user]);
+  }, [user, isAdmin]);
 
   useEffect(() => {
-    if (!user) {
+    if (!user || isAdmin) {
       setNotifications([]);
       setUnreadEventCount(0);
       return;
@@ -291,7 +291,7 @@ export function Navbar() {
       window.removeEventListener('aras:notifications-refresh', loadNotifications);
       void supabase.removeChannel(channel);
     };
-  }, [user, notificationPreferences]);
+  }, [user, isAdmin, notificationPreferences]);
 
   const handleNotificationClick = async (notification: NotificationPreview) => {
     if (notification.type === 'message') {
@@ -375,7 +375,12 @@ export function Navbar() {
   return (
     <nav className="fixed left-0 right-0 top-0 z-40 border-b border-black/5 bg-[#f8f9fd]/90 backdrop-blur-xl">
       <div className="mx-auto flex h-[60px] max-w-[1240px] items-center justify-between px-5 lg:px-8">
-        {isConnected ? (
+        {isConnected ? isAdmin ? (
+          <Link href="/admin" className="flex items-center gap-2 text-sm font-extrabold text-[#241c18]" aria-label="Administration ARAS">
+            <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#ec3b78]/10 text-[#ec3b78]"><LayoutDashboard size={18} /></span>
+            <span className="hidden sm:inline">Administration ARAS</span>
+          </Link>
+        ) : (
           <Link
             href="/espace?tab=profile"
             onClick={() => {
@@ -423,7 +428,9 @@ export function Navbar() {
           <button onClick={() => setTheme(isDark ? 'light' : 'dark')} aria-label={isDark ? 'Activer le mode clair' : 'Activer le mode sombre'} className="rounded-full border border-[#dfd2c6] p-2.5 text-[#625852] transition hover:border-[#ec3b78] hover:text-[#ec3b78]">
             {isDark ? <Sun size={16} /> : <Moon size={16} />}
           </button>
-          {isConnected ? (
+          {isConnected && isAdmin ? (
+            <button onClick={handleSignOut} className="rounded-full bg-[#ec3b78] px-5 py-2.5 text-[13px] font-bold text-white transition hover:bg-[#c92e63]">Déconnexion</button>
+          ) : isConnected ? (
             <>
                 <div className="relative">
                   <button
@@ -477,7 +484,7 @@ export function Navbar() {
 
         <div className="flex items-center gap-1 md:hidden">
           {isConnected && appTab === 'decouverte' && <button type="button" aria-label="Filtres de recherche" onClick={() => window.dispatchEvent(new Event('aras:open-discovery-filters'))} className="rounded-full border border-[#dfd2c6] p-2.5 text-[#625852] transition hover:border-[#ec3b78] hover:text-[#ec3b78]"><SlidersHorizontal size={18} /></button>}
-          {isConnected && (
+          {isConnected && !isAdmin && (
             <div className="relative">
               <button
                 type="button"
@@ -497,7 +504,10 @@ export function Navbar() {
               )}
             </div>
           )}
-          {isConnected ? <>
+          {isConnected && isAdmin ? <>
+            <button type="button" onClick={() => setTheme(isDark ? 'light' : 'dark')} aria-label={isDark ? 'Activer le mode clair' : 'Activer le mode sombre'} className="rounded-full border border-[#dfd2c6] p-2.5 text-[#625852]"><Sun size={18} className={isDark ? '' : 'hidden'} /><Moon size={18} className={isDark ? 'hidden' : ''} /></button>
+            <button onClick={handleSignOut} aria-label="Déconnexion" className="rounded-full border border-[#dfd2c6] px-3 py-2 text-xs font-bold text-[#625852]">Sortir</button>
+          </> : isConnected ? <>
             <button type="button" onClick={() => setTheme(isDark ? 'light' : 'dark')} aria-label={isDark ? 'Activer le mode clair' : 'Activer le mode sombre'} className="rounded-full border border-[#dfd2c6] p-2.5 text-[#625852]"><Sun size={18} className={isDark ? '' : 'hidden'} /><Moon size={18} className={isDark ? 'hidden' : ''} /></button>
           </> : !user ? <button aria-label="Menu" aria-expanded={open} onClick={() => setOpen(!open)} className="rounded-full p-2 text-[#1e1916] md:hidden">{open ? <X size={22} /> : <Menu size={22} />}</button> : null}
         </div>

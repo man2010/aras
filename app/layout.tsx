@@ -2,8 +2,7 @@ import './globals.css';
 import type { Metadata } from 'next';
 import { Manrope, Playfair_Display } from 'next/font/google';
 import { AuthProvider } from '@/lib/auth-context';
-import { Navbar, Footer } from '@/components/navigation';
-import { SarahAssistant } from '@/components/sarah-assistant';
+import { AppAccessBoundary } from '@/components/auth/app-access-boundary';
 import { ThemeProvider } from '@/components/theme-provider';
 
 const manrope = Manrope({ subsets: ['latin'], variable: '--font-manrope' });
@@ -30,10 +29,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className={`${manrope.variable} ${playfair.variable}`}>
         <ThemeProvider>
           <AuthProvider>
-            <Navbar />
-            {children}
-            <Footer />
-            <SarahAssistant />
+            <AppAccessBoundary>{children}</AppAccessBoundary>
           </AuthProvider>
         </ThemeProvider>
       </body>

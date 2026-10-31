@@ -116,7 +116,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!cancelled) setUnreadCount(count ?? 0);
     };
 
+    let isAdminAccount: boolean | null = null;
     const updatePresence = async (online: boolean) => {
+      if (isAdminAccount === null) {
+        const { data, error } = await supabase.rpc('is_admin');
+        isAdminAccount = error ? true : Boolean(data);
+      }
+      if (isAdminAccount) return;
       await supabase
         .from('profiles')
         .update({ is_online: online, last_seen_at: new Date().toISOString() })
