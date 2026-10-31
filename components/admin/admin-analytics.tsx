@@ -20,7 +20,7 @@ export function AdminAnalytics({ analytics }: AdminAnalyticsProps) {
   const dailyMessages = analytics.dailyMessages.slice(-days);
   const dailyMatches = analytics.dailyMatches.slice(-days);
   const total = (items: { count: number }[]) => items.reduce((sum, item) => sum + item.count, 0);
-  const barHeight = (count: number, items: { count: number }[]) => count === 0 ? '0%' : `${Math.max(8, (count / Math.max(1, ...items.map((item) => item.count))) * 100)}%`;
+  const barHeight = (count: number, items: { count: number }[]) => count === 0 ? 0 : Math.max(8, (count / Math.max(1, ...items.map((item) => item.count))) * 100);
 
   const handleExport = () => {
     const csv = [
@@ -81,11 +81,14 @@ export function AdminAnalytics({ analytics }: AdminAnalyticsProps) {
           </div>
           <div className="h-64 flex items-end gap-2">
             {dailySignups.slice(-Math.min(days, 14)).map((item, index) => (
-              <div key={index} className="flex-1 flex flex-col items-center gap-2">
-                <div
-                  className="w-full rounded-t-lg bg-[#ec3b78] transition hover:bg-[#c92e63]"
-                  style={{ height: barHeight(item.count, dailySignups) }}
-                />
+              <div key={index} className="flex h-full flex-1 flex-col items-center justify-end gap-2">
+                <div className="flex h-[220px] w-full items-end">
+                  <div
+                    className="w-full rounded-t-lg bg-[#ec3b78] transition hover:bg-[#c92e63]"
+                    style={{ height: `${(barHeight(item.count, dailySignups) / 100) * 220}px` }}
+                    title={`${item.count} inscription${item.count === 1 ? '' : 's'}`}
+                  />
+                </div>
                 <p className="text-[10px] text-[#9a8b82]">{new Date(item.date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}</p>
               </div>
             ))}
@@ -100,11 +103,14 @@ export function AdminAnalytics({ analytics }: AdminAnalyticsProps) {
           </div>
           <div className="h-64 flex items-end gap-2">
             {dailyMessages.slice(-Math.min(days, 14)).map((item, index) => (
-              <div key={index} className="flex-1 flex flex-col items-center gap-2">
-                <div
-                  className="w-full rounded-t-lg bg-[#1a6b68] transition hover:bg-[#125552]"
-                  style={{ height: barHeight(item.count, dailyMessages) }}
-                />
+              <div key={index} className="flex h-full flex-1 flex-col items-center justify-end gap-2">
+                <div className="flex h-[220px] w-full items-end">
+                  <div
+                    className="w-full rounded-t-lg bg-[#1a6b68] transition hover:bg-[#125552]"
+                    style={{ height: `${(barHeight(item.count, dailyMessages) / 100) * 220}px` }}
+                    title={`${item.count} message${item.count === 1 ? '' : 's'}`}
+                  />
+                </div>
                 <p className="text-[10px] text-[#9a8b82]">{new Date(item.date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}</p>
               </div>
             ))}
@@ -119,11 +125,14 @@ export function AdminAnalytics({ analytics }: AdminAnalyticsProps) {
           </div>
           <div className="h-64 flex items-end gap-2">
             {dailyMatches.slice(-Math.min(days, 14)).map((item, index) => (
-              <div key={index} className="flex-1 flex flex-col items-center gap-2">
-                <div
-                  className="w-full rounded-t-lg bg-[#d89b52] transition hover:bg-[#c08040]"
-                  style={{ height: barHeight(item.count, dailyMatches) }}
-                />
+              <div key={index} className="flex h-full flex-1 flex-col items-center justify-end gap-2">
+                <div className="flex h-[220px] w-full items-end">
+                  <div
+                    className="w-full rounded-t-lg bg-[#d89b52] transition hover:bg-[#c08040]"
+                    style={{ height: `${(barHeight(item.count, dailyMatches) / 100) * 220}px` }}
+                    title={`${item.count} match${item.count === 1 ? '' : 'es'}`}
+                  />
+                </div>
                 <p className="text-[10px] text-[#9a8b82]">{new Date(item.date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}</p>
               </div>
             ))}
