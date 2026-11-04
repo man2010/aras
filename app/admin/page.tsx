@@ -47,6 +47,19 @@ export default function AdminPage() {
   const [eventLoadError, setEventLoadError] = useState('');
   const [messages, setMessages] = useState<any[]>([]);
   const [conversationProfiles, setConversationProfiles] = useState<Record<string, any>>({});
+  const [messagePage, setMessagePage] = useState(1);
+  const [messageCount, setMessageCount] = useState(0);
+  const [readMessageCount, setReadMessageCount] = useState(0);
+  const [conversationCount, setConversationCount] = useState(0);
+  const [messageSearch, setMessageSearch] = useState('');
+  const [messageConversation, setMessageConversation] = useState('');
+  const [conversationIds, setConversationIds] = useState<string[]>([]);
+
+  const handleMessageFiltersChange = useCallback((search: string, conversationId: string) => {
+    setMessageSearch(search);
+    setMessageConversation(conversationId);
+    setMessagePage(1);
+  }, []);
   const [analytics, setAnalytics] = useState({
     dailySignups: [] as { date: string; count: number }[],
     dailyMessages: [] as { date: string; count: number }[],
@@ -119,7 +132,6 @@ export default function AdminPage() {
       }
       if (tab === 'reports') loadReports();
       if (tab === 'events') loadEvents();
-      if (tab === 'messages') loadMessages();
       if (tab === 'analytics') {
         loadAnalytics().then((data) => setAnalytics(data));
       }
@@ -128,6 +140,10 @@ export default function AdminPage() {
       }
     }
   }, [isAdmin, tab, currentPage]);
+
+  useEffect(() => {
+    if (isAdmin && tab === 'messages') void loadMessages();
+  }, [isAdmin, tab, messagePage, messageSearch, messageConversation]);
 
   useEffect(() => {
     if (!isAdmin) return;
@@ -246,9 +262,26 @@ export default function AdminPage() {
     setEventParticipants(grouped);
   };
 
+  const messagesPerPage = 50;
   const loadMessages = async () => {
-    const { data } = await supabase.from('messages').select('*').order('created_at', { ascending: false }).limit(100);
-    if (data) setMessages(data || []);
+    let query = supabase.from('messages').select('*', { count: 'exact' }).order('created_at', { ascending: false });
+    let readQuery = supabase.from('messages').select('id', { count: 'exact', head: true }).eq('is_read', true);
+    if (messageSearch.trim()) query = query.ilike('content', `%${messageSearch.trim()}%`);
+    if (messageSearch.trim()) readQuery = readQuery.ilike('content', `%${messageSearch.trim()}%`);
+    if (messageConversation) query = query.eq('match_id', messageConversation);
+    if (messageConversation) readQuery = readQuery.eq('match_id', messageConversation);
+    const [{ data, count }, readResult, matchesResult] = await Promise.all([
+      query.range((messagePage - 1) * messagesPerPage, messagePage * messagesPerPage - 1),
+      readQuery,
+      supabase.from('matches').select('id', { count: 'exact', head: true }).eq('is_match', true),
+    ]);
+    setMessages(data ?? []);
+    setMessageCount(count ?? 0);
+    setReadMessageCount(readResult.count ?? 0);
+    setConversationCount(matchesResult.count ?? 0);
+
+    const { data: matchRows } = await supabase.from('matches').select('id').eq('is_match', true).order('created_at', { ascending: false }).limit(1000);
+    setConversationIds((matchRows ?? []).map((row) => row.id));
     
     // Charger les profils des expéditeurs
     const senderIds = data?.map((m: any) => m.sender_id) || [];
@@ -449,6 +482,14 @@ export default function AdminPage() {
         <AdminMessages
           messages={messages}
           profiles={conversationProfiles}
+          totalMessages={messageCount}
+          readMessages={readMessageCount}
+          conversationCount={conversationCount}
+          currentPage={messagePage}
+          totalPages={Math.max(1, Math.ceil(messageCount / messagesPerPage))}
+          conversations={conversationIds}
+          onPageChange={setMessagePage}
+          onFiltersChange={handleMessageFiltersChange}
           onDeleteMessage={(id) => {
             if (!confirm('Supprimer ce message ?')) return;
             supabase.from('messages').delete().eq('id', id).then(() => loadMessages());
