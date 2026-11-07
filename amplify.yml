@@ -1,0 +1,21 @@
+version: 1
+frontend:
+  phases:
+    preBuild:
+      commands:
+        - npm ci
+    build:
+      commands:
+        # Make Amplify variables available to the Next.js SSR runtime.
+        # Values are configured in Amplify, never stored in this file.
+        - ': > .env.production'
+        - "env | grep -E '^(NEXT_PUBLIC_[A-Z0-9_]+|SUPABASE_URL|SUPABASE_ANON_KEY|SUPABASE_SERVICE_ROLE_KEY|TURNSTILE_SECRET_KEY|HUMAN_PROOF_SECRET|RESEND_API_KEY|CONTACT_FROM_EMAIL|CONTACT_TO_EMAIL|EVENTS_FROM_EMAIL|GMAIL_EMAIL|GMAIL_APP_PASSWORD|OLLAMA_API_KEY|OLLAMA_BASE_URL|OLLAMA_MODEL|TWILIO_ACCOUNT_SID|TWILIO_AUTH_TOKEN|TWILIO_FROM_NUMBER|TWILIO_MESSAGING_SERVICE_SID)=' >> .env.production || true"
+        - npm run build
+  artifacts:
+    baseDirectory: .next
+    files:
+      - '**/*'
+  cache:
+    paths:
+      - node_modules/**/*
+      - .next/cache/**/*
