@@ -1,9 +1,10 @@
 import { NextResponse } from 'next/server';
 import nodemailer from 'nodemailer';
+import { getApplicationUrl } from '@/lib/application-url';
 
 const supportEmail = process.env.CONTACT_TO_EMAIL?.trim() || process.env.GMAIL_EMAIL?.trim();
 
-function createEmailTemplate(name: string, email: string, subject: string, message: string): string {
+function createEmailTemplate(name: string, email: string, subject: string, message: string, applicationUrl: string): string {
   return `
 <!DOCTYPE html>
 <html lang="fr">
@@ -16,7 +17,7 @@ function createEmailTemplate(name: string, email: string, subject: string, messa
   <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
     <!-- Header -->
     <div style="background: linear-gradient(135deg, #ec3b78 0%, #c92e63 100%); padding: 30px; text-align: center;">
-      <img src="https://aras.sn/aras-logo.jpeg" alt="ARAS Logo" style="width: 80px; height: 80px; object-fit: contain; margin-bottom: 10px;" />
+      <img src="${applicationUrl}/aras-logo.jpeg" alt="ARAS Logo" style="width: 80px; height: 80px; object-fit: contain; margin-bottom: 10px;" />
       <h1 style="margin: 0; color: #ffffff; font-size: 32px; font-weight: bold; letter-spacing: 2px;">ARAS</h1>
     </div>
 
@@ -46,7 +47,7 @@ function createEmailTemplate(name: string, email: string, subject: string, messa
       <p style="margin: 0 0 10px 0; color: #ffffff; font-size: 14px; font-weight: bold;">ARAS</p>
       <p style="margin: 0; color: #d8d5d2; font-size: 12px;">© 2026 ARAS. Tous droits réservés.</p>
       <div style="margin-top: 15px;">
-        <a href="https://aras.sn" style="color: #ec3b78; text-decoration: none; font-size: 14px; font-weight: 600;">Visiter notre site</a>
+        <a href="${applicationUrl}" style="color: #ec3b78; text-decoration: none; font-size: 14px; font-weight: 600;">Visiter notre site</a>
       </div>
     </div>
   </div>
@@ -84,7 +85,8 @@ export async function POST(request: Request) {
     }
   });
 
-  const htmlContent = createEmailTemplate(name, contact, subject, message);
+  const applicationUrl = getApplicationUrl(new URL(request.url).origin);
+  const htmlContent = createEmailTemplate(name, contact, subject, message, applicationUrl);
   const replyTo = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contact) ? contact : undefined;
 
   try {

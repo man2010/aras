@@ -1,13 +1,14 @@
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
+import { getApplicationUrl } from '@/lib/application-url';
 
 export async function GET(request: Request) {
   const requestUrl = new URL(request.url);
   const { searchParams, origin } = requestUrl;
   const code = searchParams.get('code');
   const flow = searchParams.get('flow') === 'signup' ? 'signup' : 'signin';
-  const siteOrigin = (process.env.NEXT_PUBLIC_SITE_URL ?? origin).replace(/\/$/, '');
+  const siteOrigin = getApplicationUrl(origin);
   const requestedNext = searchParams.get('next') ?? '/espace';
   const next = requestedNext.startsWith('/') && !requestedNext.startsWith('//')
     ? requestedNext

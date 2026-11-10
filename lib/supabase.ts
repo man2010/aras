@@ -1,6 +1,7 @@
 'use client';
 
 import { createBrowserClient } from '@supabase/ssr';
+import { getApplicationUrl } from '@/lib/application-url';
 
 export const supabase = createBrowserClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -9,7 +10,6 @@ export const supabase = createBrowserClient(
 
 /** Canonical public origin used in OAuth redirects (set per deployment). */
 export function getAuthRedirectOrigin() {
-  const configuredOrigin = process.env.NEXT_PUBLIC_SITE_URL?.trim();
-  if (configuredOrigin) return configuredOrigin.replace(/\/$/, '');
-  return typeof window !== 'undefined' ? window.location.origin : '';
+  const currentOrigin = typeof window !== 'undefined' ? window.location.origin : '';
+  return getApplicationUrl(currentOrigin);
 }
