@@ -467,7 +467,7 @@ export default function OnboardingPage() {
                 </div>
               </div>
 
-              <p className="text-sm text-[#756960] dark:text-white/65">Choisis la méthode qui te convient. Tu peux saisir ta localisation sans autoriser le navigateur à accéder à ta position.</p>
+              <p className="text-sm text-[#756960] dark:text-white/65">Choisis la méthode qui te convient.</p>
               <div className="grid gap-4 lg:grid-cols-2">
                 <button
                   type="button"
@@ -543,9 +543,8 @@ export default function OnboardingPage() {
                         ))}
                       </ul>
                     )}
-                    {manualSelectedLabel && <p className="mt-2 text-xs font-semibold text-[#1d857a] dark:text-[#7fe4cb]">Position sélectionnée : les distances pourront être calculées.</p>}
+                    {manualSelectedLabel && <p className="sr-only">Position sélectionnée, coordonnées enregistrées.</p>}
                   </div>
-                  <p className="text-xs text-[#9a8b82] dark:text-white/45 lg:col-span-2">Suggestions de lieux par Photon et OpenStreetMap. Choisis-en une pour enregistrer les coordonnées et calculer les distances. Tu peux aussi continuer avec la ville seule ; dans ce cas, la distance précise ne sera pas disponible pour ce profil.</p>
                 </div>
               ) : (
                 <div className="min-w-0 rounded-2xl border border-dashed border-[#dfd2c6] bg-[#f8f9fd] p-4 dark:border-white/10 dark:bg-[#1d1f24]">
