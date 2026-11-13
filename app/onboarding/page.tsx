@@ -8,7 +8,9 @@ import { useAuth } from '@/lib/auth-context';
 
 type Gender = 'Homme' | 'Femme';
 type Step = 0 | 1 | 2 | 3 | 4 | 5;
+type LocationMode = 'manual' | 'automatic';
 type MaritalStatus = { label: string; value: string };
+type LocationSuggestion = { label: string; city: string; lat: number; lng: number };
 
 const INTEREST_OPTIONS = ['Musique', 'Voyages', 'Cuisine', 'Sport', 'Lecture', 'Cinéma', 'Danse', 'Art', 'Photographie', 'Mode', 'Tech', 'Nature', 'Yoga', 'Gaming', 'Animaux'];
 const LANGUAGE_OPTIONS = ['Français', 'Wolof', 'Pulaar', 'Sérère', 'Diola', 'Mandingue', 'Soninké', 'Manjak', 'Mancagne', 'Préfère ne rien dire', 'Anglais', 'Arabe'];
@@ -19,6 +21,7 @@ const MARITAL_OPTIONS: MaritalStatus[] = [
   { label: 'Divorcé(e)', value: 'divorced' }, { label: 'Veuf/Veuve', value: 'widowed' },
 ];
 const SMOKING_OPTIONS = ['Non fumeur', 'Fumeur'];
+const PHOTON_API_URL = 'https://photon.komoot.io/api/';
 
 function ageFromBirthdate(value: string) {
   const birth = new Date(value);
@@ -82,6 +85,12 @@ export default function OnboardingPage() {
   const [age, setAge] = useState(0);
   const [locationLabel, setLocationLabel] = useState('');
   const [cityName, setCityName] = useState('');
+  const [locationMode, setLocationMode] = useState<LocationMode>('manual');
+  const [manualCity, setManualCity] = useState('');
+  const [manualAddress, setManualAddress] = useState('');
+  const [manualSelectedLabel, setManualSelectedLabel] = useState('');
+  const [locationSuggestions, setLocationSuggestions] = useState<LocationSuggestion[]>([]);
+  const [locationSearchLoading, setLocationSearchLoading] = useState(false);
   const [lat, setLat] = useState<number | null>(null);
   const [lng, setLng] = useState<number | null>(null);
   const [primaryPhoto, setPrimaryPhoto] = useState('');
@@ -101,11 +110,15 @@ export default function OnboardingPage() {
 
   const stepReady = useMemo(() => {
     if (step === 0) return Boolean(name.trim() && gender && birthdate && isAdult);
-    if (step === 1) return Boolean(locationLabel.trim() && cityName.trim() && lat !== null && lng !== null);
+    if (step === 1) {
+      return locationMode === 'automatic'
+        ? Boolean(locationLabel.trim() && cityName.trim() && lat !== null && lng !== null)
+        : Boolean(manualCity.trim());
+    }
     if (step === 2) return Boolean(primaryPhoto);
     if (step === 3) return true;
     return true;
-  }, [step, name, gender, birthdate, isAdult, primaryPhoto, locationLabel, cityName, lat, lng]);
+  }, [step, name, gender, birthdate, isAdult, primaryPhoto, locationLabel, cityName, lat, lng, locationMode, manualCity]);
 
   useEffect(() => {
     if (!user) router.push('/connexion');
@@ -119,10 +132,64 @@ export default function OnboardingPage() {
     setAge(ageFromBirthdate(birthdate));
   }, [birthdate]);
 
+  useEffect(() => {
+    const query = [manualAddress.trim(), manualCity.trim()].filter(Boolean).join(' ');
+    if (locationMode !== 'manual' || query.length < 3 || (manualSelectedLabel && manualAddress === manualSelectedLabel)) {
+      setLocationSuggestions([]);
+      setLocationSearchLoading(false);
+      return;
+    }
+
+    const controller = new AbortController();
+    const timeout = window.setTimeout(async () => {
+      setLocationSearchLoading(true);
+      try {
+        const params = new URLSearchParams({ q: query, lang: 'fr', limit: '5' });
+        const response = await fetch(`${PHOTON_API_URL}?${params.toString()}`, { signal: controller.signal });
+        if (!response.ok) throw new Error('Location search failed');
+        const data = await response.json();
+        const suggestions = (data?.features ?? []).flatMap((feature: {
+          properties?: Record<string, string | undefined>;
+          geometry?: { coordinates?: [number, number] };
+        }) => {
+          const properties = feature.properties ?? {};
+          const coordinates = feature.geometry?.coordinates;
+          if (!coordinates || !Number.isFinite(coordinates[0]) || !Number.isFinite(coordinates[1])) return [];
+          const city = properties.city || properties.town || properties.village || properties.municipality || properties.district || properties.county || properties.state || properties.name || '';
+          const label = [
+            properties.name,
+            properties.housenumber && properties.street ? `${properties.housenumber} ${properties.street}` : properties.street,
+            properties.postcode,
+            properties.city || properties.town || properties.village || properties.municipality || properties.district,
+            properties.state,
+            properties.country,
+          ].filter((part, index, parts) => Boolean(part) && parts.indexOf(part) === index).join(', ');
+          if (!label || !city) return [];
+          return [{ label, city, lng: coordinates[0], lat: coordinates[1] }];
+        });
+        setLocationSuggestions(suggestions);
+      } catch (error) {
+        if (!(error instanceof DOMException && error.name === 'AbortError')) setLocationSuggestions([]);
+      } finally {
+        if (!controller.signal.aborted) setLocationSearchLoading(false);
+      }
+    }, 350);
+
+    return () => {
+      window.clearTimeout(timeout);
+      controller.abort();
+    };
+  }, [manualAddress, manualCity, manualSelectedLabel, locationMode]);
+
   const detectLocation = async () => {
     setMessage('');
+    setLocationMode('automatic');
+    setLat(null);
+    setLng(null);
+    setLocationLabel('');
+    setCityName('');
     if (!navigator.geolocation) {
-      setMessage('La géolocalisation n’est pas disponible sur cet appareil.');
+      setMessage('La géolocalisation n’est pas disponible sur cet appareil. Tu peux saisir ta ville manuellement.');
       return;
     }
 
@@ -144,8 +211,29 @@ export default function OnboardingPage() {
         setLocationLabel(location.label);
         setCityName(location.city);
       },
-      () => setMessage('Nous n’avons pas pu récupérer votre localisation.')
+      (error) => setMessage(error.code === error.PERMISSION_DENIED
+        ? 'Accès à la localisation refusé. Saisis ta ville manuellement ou autorise la localisation dans les réglages du navigateur.'
+        : 'Nous n’avons pas pu récupérer ta localisation. Tu peux saisir ta ville manuellement.'),
+      { enableHighAccuracy: false, timeout: 12000, maximumAge: 300000 }
     );
+  };
+
+  const useManualLocation = () => {
+    setLocationMode('manual');
+    setMessage('');
+    setLat(null);
+    setLng(null);
+    setManualSelectedLabel('');
+  };
+
+  const selectManualLocation = (suggestion: LocationSuggestion) => {
+    setManualCity(suggestion.city);
+    setManualAddress(suggestion.label);
+    setManualSelectedLabel(suggestion.label);
+    setLat(suggestion.lat);
+    setLng(suggestion.lng);
+    setLocationSuggestions([]);
+    setMessage('');
   };
 
   const uploadPhoto = async (file: File) => {
@@ -201,13 +289,17 @@ export default function OnboardingPage() {
     setMessage('');
 
     const photos = [primaryPhoto, ...extraPhotos.filter(Boolean)] as string[];
+    const savedCity = locationMode === 'manual' ? manualCity.trim() : cityName.trim();
+    const savedLocationLabel = locationMode === 'manual'
+      ? manualSelectedLabel || [manualAddress.trim(), manualCity.trim()].filter(Boolean).join(', ')
+      : locationLabel.trim();
     const payload = {
       full_name: name.trim(),
       gender,
       birthdate,
-      city: cityName,
-      zone: locationLabel,
-      location_label: locationLabel,
+      city: savedCity,
+      zone: savedLocationLabel,
+      location_label: savedLocationLabel,
       lat,
       lng,
       profession: profession.trim() || null,
@@ -243,7 +335,7 @@ export default function OnboardingPage() {
 
     if (!stepReady) {
       setMessage(step === 1
-        ? 'La localisation est obligatoire. Active la géolocalisation pour continuer.'
+        ? 'Indique ta ville ou récupère ta position automatiquement pour continuer.'
         : 'Veuillez compléter cette étape avant de continuer.');
       return;
     }
@@ -375,23 +467,94 @@ export default function OnboardingPage() {
                 </div>
               </div>
 
+              <p className="text-sm text-[#756960] dark:text-white/65">Choisis la méthode qui te convient. Tu peux saisir ta localisation sans autoriser le navigateur à accéder à ta position.</p>
               <div className="grid gap-4 lg:grid-cols-2">
                 <button
                   type="button"
-                  onClick={detectLocation}
-                  className="flex min-w-0 items-center justify-center gap-3 rounded-2xl border border-[#dfd2c6] bg-[#f8f9fd] px-4 py-4 text-center text-sm font-bold text-[#241c18] transition hover:border-[#1d857a] dark:border-white/10 dark:bg-[#1d1f24] dark:text-white dark:hover:border-[#7fe4cb]"
+                  aria-pressed={locationMode === 'manual'}
+                  onClick={useManualLocation}
+                  className={`flex min-w-0 items-center justify-center gap-3 rounded-2xl border px-4 py-4 text-center text-sm font-bold transition ${locationMode === 'manual' ? 'border-[#1d857a] bg-[#eaf7f4] text-[#176b63] dark:border-[#7fe4cb] dark:bg-[#17302d] dark:text-[#b8f2e5]' : 'border-[#dfd2c6] bg-[#f8f9fd] text-[#241c18] hover:border-[#1d857a] dark:border-white/10 dark:bg-[#1d1f24] dark:text-white dark:hover:border-[#7fe4cb]'}`}
                 >
-                  <MapPin size={16} className="text-[#7fe4cb]" />
-                  Activer la géolocalisation
+                  <MapPin size={16} />
+                  Saisir ma localisation
                 </button>
+                <button
+                  type="button"
+                  aria-pressed={locationMode === 'automatic'}
+                  onClick={detectLocation}
+                  className={`flex min-w-0 items-center justify-center gap-3 rounded-2xl border px-4 py-4 text-center text-sm font-bold transition ${locationMode === 'automatic' ? 'border-[#1d857a] bg-[#eaf7f4] text-[#176b63] dark:border-[#7fe4cb] dark:bg-[#17302d] dark:text-[#b8f2e5]' : 'border-[#dfd2c6] bg-[#f8f9fd] text-[#241c18] hover:border-[#1d857a] dark:border-white/10 dark:bg-[#1d1f24] dark:text-white dark:hover:border-[#7fe4cb]'}`}
+                >
+                  <MapPin size={16} className="text-[#1d857a] dark:text-[#7fe4cb]" />
+                  Utiliser ma position actuelle
+                </button>
+              </div>
 
+              {locationMode === 'manual' ? (
+                <div className="grid gap-4 lg:grid-cols-2">
+                  <label className="block text-sm font-bold text-[#625852] dark:text-white/80">
+                    Ville
+                    <input
+                      value={manualCity}
+                      onChange={(event) => {
+                        setManualCity(event.target.value);
+                        if (manualSelectedLabel) setManualAddress('');
+                        setManualSelectedLabel('');
+                        setLat(null);
+                        setLng(null);
+                      }}
+                      maxLength={100}
+                      autoComplete="address-level2"
+                      placeholder="Ex. Dakar, Thiès, Paris"
+                      className="mt-2 w-full min-w-0 rounded-2xl border border-[#dfd2c6] bg-[#f8f9fd] px-4 py-3.5 text-base font-normal text-[#241c18] outline-none transition placeholder:text-[#9a8b82] focus:border-[#ec3b78] dark:border-white/10 dark:bg-[#1d1f24] dark:text-white dark:placeholder:text-white/35 dark:focus:border-[#ff7ab3]"
+                    />
+                  </label>
+                  <div className="relative min-w-0">
+                    <label className="block text-sm font-bold text-[#625852] dark:text-white/80" htmlFor="onboarding-location-search">
+                      Adresse ou quartier <span className="font-normal text-[#9a8b82]">(facultatif)</span>
+                    </label>
+                    <input
+                      id="onboarding-location-search"
+                      value={manualAddress}
+                      onChange={(event) => {
+                        setManualAddress(event.target.value);
+                        setManualSelectedLabel('');
+                        setLat(null);
+                        setLng(null);
+                      }}
+                      maxLength={150}
+                      autoComplete="street-address"
+                      role="combobox"
+                      aria-autocomplete="list"
+                      aria-expanded={locationSuggestions.length > 0}
+                      aria-controls="onboarding-location-suggestions"
+                      placeholder="Saisis une adresse ou un quartier"
+                      className="mt-2 w-full min-w-0 rounded-2xl border border-[#dfd2c6] bg-[#f8f9fd] px-4 py-3.5 text-base font-normal text-[#241c18] outline-none transition placeholder:text-[#9a8b82] focus:border-[#ec3b78] dark:border-white/10 dark:bg-[#1d1f24] dark:text-white dark:placeholder:text-white/35 dark:focus:border-[#ff7ab3]"
+                    />
+                    {locationSearchLoading && <p className="mt-2 text-xs text-[#9a8b82]" role="status">Recherche des adresses…</p>}
+                    {locationSuggestions.length > 0 && (
+                      <ul id="onboarding-location-suggestions" role="listbox" className="absolute z-20 mt-2 max-h-60 w-full overflow-auto rounded-2xl border border-[#eadfd5] bg-white p-2 shadow-xl dark:border-white/10 dark:bg-[#202126]">
+                        {locationSuggestions.map((suggestion) => (
+                          <li key={`${suggestion.lat}:${suggestion.lng}`} role="option" aria-selected="false">
+                            <button type="button" onClick={() => selectManualLocation(suggestion)} className="w-full rounded-xl px-3 py-2.5 text-left text-sm text-[#625852] transition hover:bg-[#ffedf4] hover:text-[#d63373] dark:text-white/80 dark:hover:bg-white/10 dark:hover:text-[#ffb4d0]">
+                              <span className="block font-semibold">{suggestion.label}</span>
+                              <span className="mt-0.5 block text-xs text-[#9a8b82] dark:text-white/45">{suggestion.city}</span>
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                    {manualSelectedLabel && <p className="mt-2 text-xs font-semibold text-[#1d857a] dark:text-[#7fe4cb]">Position sélectionnée : les distances pourront être calculées.</p>}
+                  </div>
+                  <p className="text-xs text-[#9a8b82] dark:text-white/45 lg:col-span-2">Suggestions de lieux par Photon et OpenStreetMap. Choisis-en une pour enregistrer les coordonnées et calculer les distances. Tu peux aussi continuer avec la ville seule ; dans ce cas, la distance précise ne sera pas disponible pour ce profil.</p>
+                </div>
+              ) : (
                 <div className="min-w-0 rounded-2xl border border-dashed border-[#dfd2c6] bg-[#f8f9fd] p-4 dark:border-white/10 dark:bg-[#1d1f24]">
-                  <p className="text-xs font-extrabold uppercase tracking-[0.18em] text-[#756960] dark:text-white/50">Localisation actuelle</p>
+                  <p className="text-xs font-extrabold uppercase tracking-[0.18em] text-[#756960] dark:text-white/50">Localisation récupérée</p>
                   <p className="mt-3 break-words text-sm text-[#625852] dark:text-white/80">
-                    {locationLabel ? `${cityName} · ${locationLabel}` : 'La localisation est obligatoire pour terminer ton profil.'}
+                    {locationLabel ? `${cityName} · ${locationLabel}` : 'Autorise l’accès à ta position pour la récupérer. Si cela ne fonctionne pas, tu peux saisir ta ville manuellement.'}
                   </p>
                 </div>
-              </div>
+              )}
             </div>
           )}
 
