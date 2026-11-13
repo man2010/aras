@@ -11,6 +11,10 @@ type Step = 0 | 1 | 2 | 3 | 4 | 5;
 type LocationMode = 'manual' | 'automatic';
 type MaritalStatus = { label: string; value: string };
 type LocationSuggestion = { label: string; city: string; lat: number; lng: number };
+type PhotonFeature = {
+  properties?: Record<string, string | undefined>;
+  geometry?: { coordinates?: [number, number] };
+};
 
 const INTEREST_OPTIONS = ['Musique', 'Voyages', 'Cuisine', 'Sport', 'Lecture', 'Cinéma', 'Danse', 'Art', 'Photographie', 'Mode', 'Tech', 'Nature', 'Yoga', 'Gaming', 'Animaux'];
 const LANGUAGE_OPTIONS = ['Français', 'Wolof', 'Pulaar', 'Sérère', 'Diola', 'Mandingue', 'Soninké', 'Manjak', 'Mancagne', 'Préfère ne rien dire', 'Anglais', 'Arabe'];
@@ -72,6 +76,25 @@ async function reverseGeocode(lat: number, lng: number): Promise<{ label: string
   }
 }
 
+function parseLocationSuggestions(features: PhotonFeature[]): LocationSuggestion[] {
+  return features.flatMap((feature) => {
+    const properties = feature.properties ?? {};
+    const coordinates = feature.geometry?.coordinates;
+    if (!coordinates || !Number.isFinite(coordinates[0]) || !Number.isFinite(coordinates[1])) return [];
+    const city = properties.city || properties.town || properties.village || properties.municipality || properties.district || properties.county || properties.state || properties.name || '';
+    const label = [
+      properties.name,
+      properties.housenumber && properties.street ? `${properties.housenumber} ${properties.street}` : properties.street,
+      properties.postcode,
+      properties.city || properties.town || properties.village || properties.municipality || properties.district,
+      properties.state,
+      properties.country,
+    ].filter((part, index, parts) => Boolean(part) && parts.indexOf(part) === index).join(', ');
+    if (!label || !city) return [];
+    return [{ label, city, lng: coordinates[0], lat: coordinates[1] }];
+  });
+}
+
 export default function OnboardingPage() {
   const router = useRouter();
   const { user } = useAuth();
@@ -89,8 +112,11 @@ export default function OnboardingPage() {
   const [manualCity, setManualCity] = useState('');
   const [manualAddress, setManualAddress] = useState('');
   const [manualSelectedLabel, setManualSelectedLabel] = useState('');
-  const [locationSuggestions, setLocationSuggestions] = useState<LocationSuggestion[]>([]);
-  const [locationSearchLoading, setLocationSearchLoading] = useState(false);
+  const [resolvedCity, setResolvedCity] = useState('');
+  const [citySuggestions, setCitySuggestions] = useState<LocationSuggestion[]>([]);
+  const [addressSuggestions, setAddressSuggestions] = useState<LocationSuggestion[]>([]);
+  const [citySearchLoading, setCitySearchLoading] = useState(false);
+  const [addressSearchLoading, setAddressSearchLoading] = useState(false);
   const [lat, setLat] = useState<number | null>(null);
   const [lng, setLng] = useState<number | null>(null);
   const [primaryPhoto, setPrimaryPhoto] = useState('');
@@ -133,47 +159,62 @@ export default function OnboardingPage() {
   }, [birthdate]);
 
   useEffect(() => {
-    const query = [manualAddress.trim(), manualCity.trim()].filter(Boolean).join(' ');
-    if (locationMode !== 'manual' || query.length < 3 || (manualSelectedLabel && manualAddress === manualSelectedLabel)) {
-      setLocationSuggestions([]);
-      setLocationSearchLoading(false);
+    const query = manualCity.trim();
+    if (locationMode !== 'manual' || manualAddress.trim().length >= 3 || query.length < 2 || query === resolvedCity) {
+      setCitySuggestions([]);
+      setCitySearchLoading(false);
       return;
     }
 
     const controller = new AbortController();
     const timeout = window.setTimeout(async () => {
-      setLocationSearchLoading(true);
+      setCitySearchLoading(true);
       try {
-        const params = new URLSearchParams({ q: query, lang: 'fr', limit: '5' });
+        const params = new URLSearchParams({ q: query, lang: 'fr', limit: '6', layer: 'city' });
+        params.append('layer', 'locality');
         const response = await fetch(`${PHOTON_API_URL}?${params.toString()}`, { signal: controller.signal });
         if (!response.ok) throw new Error('Location search failed');
         const data = await response.json();
-        const suggestions = (data?.features ?? []).flatMap((feature: {
-          properties?: Record<string, string | undefined>;
-          geometry?: { coordinates?: [number, number] };
-        }) => {
-          const properties = feature.properties ?? {};
-          const coordinates = feature.geometry?.coordinates;
-          if (!coordinates || !Number.isFinite(coordinates[0]) || !Number.isFinite(coordinates[1])) return [];
-          const city = properties.city || properties.town || properties.village || properties.municipality || properties.district || properties.county || properties.state || properties.name || '';
-          const label = [
-            properties.name,
-            properties.housenumber && properties.street ? `${properties.housenumber} ${properties.street}` : properties.street,
-            properties.postcode,
-            properties.city || properties.town || properties.village || properties.municipality || properties.district,
-            properties.state,
-            properties.country,
-          ].filter((part, index, parts) => Boolean(part) && parts.indexOf(part) === index).join(', ');
-          if (!label || !city) return [];
-          return [{ label, city, lng: coordinates[0], lat: coordinates[1] }];
-        });
-        setLocationSuggestions(suggestions);
+        setCitySuggestions(parseLocationSuggestions(data?.features ?? []));
       } catch (error) {
-        if (!(error instanceof DOMException && error.name === 'AbortError')) setLocationSuggestions([]);
+        if (!(error instanceof DOMException && error.name === 'AbortError')) setCitySuggestions([]);
       } finally {
-        if (!controller.signal.aborted) setLocationSearchLoading(false);
+        if (!controller.signal.aborted) setCitySearchLoading(false);
       }
-    }, 350);
+    }, 300);
+
+    return () => {
+      window.clearTimeout(timeout);
+      controller.abort();
+    };
+  }, [manualCity, manualAddress, resolvedCity, locationMode]);
+
+  useEffect(() => {
+    const query = manualAddress.trim();
+    if (locationMode !== 'manual' || query.length < 3 || query === manualSelectedLabel) {
+      setAddressSuggestions([]);
+      setAddressSearchLoading(false);
+      return;
+    }
+
+    const controller = new AbortController();
+    const timeout = window.setTimeout(async () => {
+      setAddressSearchLoading(true);
+      try {
+        const params = new URLSearchParams({ q: [query, manualCity.trim()].filter(Boolean).join(' '), lang: 'fr', limit: '6', layer: 'house' });
+        params.append('layer', 'street');
+        params.append('layer', 'district');
+        params.append('layer', 'locality');
+        const response = await fetch(`${PHOTON_API_URL}?${params.toString()}`, { signal: controller.signal });
+        if (!response.ok) throw new Error('Address search failed');
+        const data = await response.json();
+        setAddressSuggestions(parseLocationSuggestions(data?.features ?? []));
+      } catch (error) {
+        if (!(error instanceof DOMException && error.name === 'AbortError')) setAddressSuggestions([]);
+      } finally {
+        if (!controller.signal.aborted) setAddressSearchLoading(false);
+      }
+    }, 300);
 
     return () => {
       window.clearTimeout(timeout);
@@ -230,9 +271,23 @@ export default function OnboardingPage() {
     setManualCity(suggestion.city);
     setManualAddress(suggestion.label);
     setManualSelectedLabel(suggestion.label);
+    setResolvedCity(suggestion.city);
     setLat(suggestion.lat);
     setLng(suggestion.lng);
-    setLocationSuggestions([]);
+    setCitySuggestions([]);
+    setAddressSuggestions([]);
+    setMessage('');
+  };
+
+  const selectManualCity = (suggestion: LocationSuggestion) => {
+    setManualCity(suggestion.city);
+    setManualAddress('');
+    setManualSelectedLabel(suggestion.label);
+    setResolvedCity(suggestion.city);
+    setLat(suggestion.lat);
+    setLng(suggestion.lng);
+    setCitySuggestions([]);
+    setAddressSuggestions([]);
     setMessage('');
   };
 
@@ -491,23 +546,41 @@ export default function OnboardingPage() {
 
               {locationMode === 'manual' ? (
                 <div className="grid gap-4 lg:grid-cols-2">
-                  <label className="block text-sm font-bold text-[#625852] dark:text-white/80">
-                    Ville
+                  <div className="relative min-w-0">
+                    <label className="block text-sm font-bold text-[#625852] dark:text-white/80" htmlFor="onboarding-city-search">Ville</label>
                     <input
+                      id="onboarding-city-search"
                       value={manualCity}
                       onChange={(event) => {
                         setManualCity(event.target.value);
-                        if (manualSelectedLabel) setManualAddress('');
+                        setResolvedCity('');
                         setManualSelectedLabel('');
                         setLat(null);
                         setLng(null);
                       }}
                       maxLength={100}
                       autoComplete="address-level2"
+                      role="combobox"
+                      aria-autocomplete="list"
+                      aria-expanded={citySuggestions.length > 0}
+                      aria-controls="onboarding-city-suggestions"
                       placeholder="Ex. Dakar, Thiès, Paris"
                       className="mt-2 w-full min-w-0 rounded-2xl border border-[#dfd2c6] bg-[#f8f9fd] px-4 py-3.5 text-base font-normal text-[#241c18] outline-none transition placeholder:text-[#9a8b82] focus:border-[#ec3b78] dark:border-white/10 dark:bg-[#1d1f24] dark:text-white dark:placeholder:text-white/35 dark:focus:border-[#ff7ab3]"
                     />
-                  </label>
+                    {citySearchLoading && <p className="mt-2 text-xs text-[#9a8b82]" role="status">Recherche des villes…</p>}
+                    {citySuggestions.length > 0 && (
+                      <ul id="onboarding-city-suggestions" role="listbox" className="absolute z-20 mt-2 max-h-60 w-full overflow-auto rounded-2xl border border-[#eadfd5] bg-white p-2 shadow-xl dark:border-white/10 dark:bg-[#202126]">
+                        {citySuggestions.map((suggestion) => (
+                          <li key={`${suggestion.lat}:${suggestion.lng}`} role="option" aria-selected="false">
+                            <button type="button" onClick={() => selectManualCity(suggestion)} className="w-full rounded-xl px-3 py-2.5 text-left text-sm text-[#625852] transition hover:bg-[#ffedf4] hover:text-[#d63373] dark:text-white/80 dark:hover:bg-white/10 dark:hover:text-[#ffb4d0]">
+                              <span className="block font-semibold">{suggestion.city}</span>
+                              <span className="mt-0.5 block text-xs text-[#9a8b82] dark:text-white/45">{suggestion.label}</span>
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
                   <div className="relative min-w-0">
                     <label className="block text-sm font-bold text-[#625852] dark:text-white/80" htmlFor="onboarding-location-search">
                       Adresse ou quartier <span className="font-normal text-[#9a8b82]">(facultatif)</span>
@@ -525,15 +598,15 @@ export default function OnboardingPage() {
                       autoComplete="street-address"
                       role="combobox"
                       aria-autocomplete="list"
-                      aria-expanded={locationSuggestions.length > 0}
-                      aria-controls="onboarding-location-suggestions"
+                      aria-expanded={addressSuggestions.length > 0}
+                      aria-controls="onboarding-address-suggestions"
                       placeholder="Saisis une adresse ou un quartier"
                       className="mt-2 w-full min-w-0 rounded-2xl border border-[#dfd2c6] bg-[#f8f9fd] px-4 py-3.5 text-base font-normal text-[#241c18] outline-none transition placeholder:text-[#9a8b82] focus:border-[#ec3b78] dark:border-white/10 dark:bg-[#1d1f24] dark:text-white dark:placeholder:text-white/35 dark:focus:border-[#ff7ab3]"
                     />
-                    {locationSearchLoading && <p className="mt-2 text-xs text-[#9a8b82]" role="status">Recherche des adresses…</p>}
-                    {locationSuggestions.length > 0 && (
-                      <ul id="onboarding-location-suggestions" role="listbox" className="absolute z-20 mt-2 max-h-60 w-full overflow-auto rounded-2xl border border-[#eadfd5] bg-white p-2 shadow-xl dark:border-white/10 dark:bg-[#202126]">
-                        {locationSuggestions.map((suggestion) => (
+                    {addressSearchLoading && <p className="mt-2 text-xs text-[#9a8b82]" role="status">Recherche des quartiers et adresses…</p>}
+                    {addressSuggestions.length > 0 && (
+                      <ul id="onboarding-address-suggestions" role="listbox" className="absolute z-20 mt-2 max-h-60 w-full overflow-auto rounded-2xl border border-[#eadfd5] bg-white p-2 shadow-xl dark:border-white/10 dark:bg-[#202126]">
+                        {addressSuggestions.map((suggestion) => (
                           <li key={`${suggestion.lat}:${suggestion.lng}`} role="option" aria-selected="false">
                             <button type="button" onClick={() => selectManualLocation(suggestion)} className="w-full rounded-xl px-3 py-2.5 text-left text-sm text-[#625852] transition hover:bg-[#ffedf4] hover:text-[#d63373] dark:text-white/80 dark:hover:bg-white/10 dark:hover:text-[#ffb4d0]">
                               <span className="block font-semibold">{suggestion.label}</span>
