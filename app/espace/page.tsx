@@ -1811,7 +1811,6 @@ export default function EspacePage() {
     setMobileDiscoveryHistory((history) => history.slice(0, -1));
   };
   const advanceDesktopDiscovery = () => setDesktopDiscoveryIndex((index) => Math.min(filteredDiscoveryProfiles.length - 1, index + 1));
-  const goBackDesktopDiscovery = () => setDesktopDiscoveryIndex((index) => Math.max(0, index - 1));
   const activeConversation = conversations.find((conversation) => conversation.id === activeConv);
   const activeConversationPartnerId = activeConversation
     ? activeConversation.user_a === user?.id ? activeConversation.user_b : activeConversation.user_a
@@ -2013,12 +2012,6 @@ export default function EspacePage() {
                   {desktopDiscoveryProfile ? <div className="flex min-h-0 flex-col">
                     <header className="mb-3 flex shrink-0 items-center justify-between gap-4">
                       <div><h2 className="font-display text-2xl font-bold text-[#241c18] dark:text-white">Découvrir</h2><p className="mt-0.5 flex items-center gap-1.5 text-sm text-[#756960] dark:text-white/60"><MapPin size={14} className="text-[#ec1689]" />{profile?.city || 'Sénégal'}</p></div>
-                      <div className="flex items-center gap-2">
-                        <nav className="flex items-center gap-2" aria-label="Navigation des profils">
-                          <button type="button" onClick={goBackDesktopDiscovery} disabled={desktopDiscoverySafeIndex === 0} aria-label="Profil précédent" className="flex h-10 w-10 items-center justify-center rounded-full border border-[#e5e1e8] bg-white text-[#423a40] shadow-sm hover:border-[#ec3b78] hover:text-[#ec3b78] disabled:opacity-35 dark:border-white/10 dark:bg-[#1c1b21] dark:text-white"><ArrowLeft size={17} /></button>
-                          <button type="button" onClick={advanceDesktopDiscovery} disabled={desktopDiscoverySafeIndex >= filteredDiscoveryProfiles.length - 1} aria-label="Profil suivant" className="flex h-10 w-10 items-center justify-center rounded-full border border-[#e5e1e8] bg-white text-[#423a40] shadow-sm hover:border-[#ec3b78] hover:text-[#ec3b78] disabled:opacity-35 dark:border-white/10 dark:bg-[#1c1b21] dark:text-white"><ArrowRight size={17} /></button>
-                        </nav>
-                      </div>
                     </header>
                     <article className="relative min-h-0 flex-1 overflow-hidden rounded-[30px] border border-white/15 bg-[#202027] shadow-[0_22px_60px_rgba(0,0,0,.18)]">
                       {desktopDiscoveryPhotos.length ? <img src={desktopDiscoveryPhotos[discoveryPhotoIndexes[desktopDiscoveryProfile.id] ?? 0] ?? desktopDiscoveryPhotos[0]} alt={`Photo de ${desktopDiscoveryProfile.display_name}`} className="absolute inset-0 h-full w-full object-cover" /> : <div className="absolute inset-0 flex items-center justify-center bg-[#292832] text-7xl font-black text-white/70">{desktopDiscoveryProfile.display_name.charAt(0).toUpperCase()}</div>}
