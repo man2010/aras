@@ -23,6 +23,7 @@ const sections = [
     icon: Database,
     paragraphs: [
       'Nous collectons les informations que vous fournissez directement lorsque vous créez un compte ou complétez votre profil, notamment : nom ou pseudonyme, adresse e-mail, numéro de téléphone, date de naissance, ville, photo de profil, centre d’intérêts, bio, préférences et informations de compte.',
+      'Avant leur enregistrement, les photos de profil et les photos facultatives sont analysées automatiquement par un modèle de vision afin de vérifier qu’elles montrent une personne réelle et ne représentent pas uniquement un objet, une illustration ou une personnalité connue. Cette analyse ne sert pas à identifier les utilisateurs.',
       'Nous collectons aussi des données techniques et d’usage, comme l’adresse IP, le type de navigateur, les pages consultées, les interactions sur la plateforme, les logs d’authentification, les données de connexion et les informations issues de nos outils d’analyse et de sécurité.',
       'Si vous utilisez la connexion Google, nous pouvons recevoir les informations de votre compte Google nécessaires à l’authentification et au bon fonctionnement du service, conformément à votre consentement et aux paramètres de votre compte Google.',
     ],
@@ -43,6 +44,7 @@ const sections = [
     icon: LockKeyhole,
     paragraphs: [
       'ARAS ne vend pas vos données personnelles à des tiers. Nous pouvons partager certaines informations uniquement dans les cas suivants : avec les prestataires techniques nécessaires au fonctionnement du service (hébergement, authentification, messagerie, analytics, support client), avec les autorités compétentes lorsqu’une obligation légale l’exige, et dans le cadre d’une opération de sécurité ou de protection de nos utilisateurs.',
+      'Pour cette vérification, le fichier photo est transmis au fournisseur du service de vision configuré par ARAS. Il est utilisé pour la modération de l’image avant son enregistrement dans le profil.',
       'Les informations visibles publiquement sur votre profil sont celles que vous avez choisies d’afficher dans les paramètres de confidentialité. Les contenus privés (messages, échanges) ne sont accessibles qu’aux personnes autorisées par l’application.',
     ],
   },

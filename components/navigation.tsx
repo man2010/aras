@@ -4,14 +4,14 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { Menu, X, Heart, LogOut, LayoutDashboard, Bell, Moon, Sun, MessageCircle, CalendarDays, ChevronRight, Settings, User, SlidersHorizontal, MapPin } from 'lucide-react';
+import { Menu, X, Heart, LogOut, LayoutDashboard, Bell, Moon, Sun, MessageCircle, CalendarDays, ChevronRight, Settings, User, SlidersHorizontal, MapPin, Megaphone } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
 
 type NotificationPreview = {
   id: string;
-  type: 'message' | 'event' | 'like' | 'match';
+  type: 'message' | 'event' | 'like' | 'match' | 'announcement';
   title: string;
   message: string;
   href: string;
@@ -32,9 +32,10 @@ type MiniProfile = {
 
 const fallbackAvatar = '/images/default-avatar.svg';
 
-export function Navbar({ isAdminMode = false }: { isAdminMode?: boolean }) {
+export function Navbar({ isAdminMode = false, isModeratorMode = false }: { isAdminMode?: boolean; isModeratorMode?: boolean }) {
   const [open, setOpen] = useState(false);
   const [isAdmin, setIsAdmin] = useState(isAdminMode);
+  const [isModerator, setIsModerator] = useState(isModeratorMode);
   const [mounted, setMounted] = useState(false);
   const [notificationOpen, setNotificationOpen] = useState(false);
   const [notificationPreferences, setNotificationPreferences] = useState({ notif_messages: true, notif_likes: true, notif_matches: true, notif_events: true });
@@ -67,13 +68,20 @@ export function Navbar({ isAdminMode = false }: { isAdminMode?: boolean }) {
     let cancelled = false;
 
     const checkAdmin = async () => {
-      if (isAdminMode || !user) {
-        setIsAdmin(isAdminMode);
+      if (isAdminMode || isModeratorMode || !user) {
+        setIsAdmin(isAdminMode || isModeratorMode);
+        setIsModerator(isModeratorMode);
         return;
       }
 
-      const { data } = await supabase.rpc('is_admin');
-      if (!cancelled) setIsAdmin(Boolean(data));
+      const [{ data: admin }, { data: moderator }] = await Promise.all([
+        supabase.rpc('is_admin'),
+        supabase.rpc('is_moderator'),
+      ]);
+      if (!cancelled) {
+        setIsAdmin(Boolean(admin || moderator));
+        setIsModerator(Boolean(moderator && !admin));
+      }
     };
 
     checkAdmin();
@@ -81,7 +89,7 @@ export function Navbar({ isAdminMode = false }: { isAdminMode?: boolean }) {
     return () => {
       cancelled = true;
     };
-  }, [user, isAdminMode]);
+  }, [user, isAdminMode, isModeratorMode]);
 
   useEffect(() => {
     if (!user || isAdmin) {
@@ -255,16 +263,16 @@ export function Navbar({ isAdminMode = false }: { isAdminMode?: boolean }) {
         createdAt: row.created_at || row.date,
         unread: true,
       })).filter((notification) => !readEventSet.has(notification.id.replace('reminder-', 'reminder-'))) : [];
-      const storedEventNotifications: NotificationPreview[] = (storedNotifications ?? []).filter((row: { kind: string }) => row.kind === 'like_received'
+      const storedEventNotifications: NotificationPreview[] = (storedNotifications ?? []).filter((row: { kind: string }) => row.kind === 'moderator_announcement' || (row.kind === 'like_received'
         ? notificationPreferences.notif_likes
         : row.kind === 'match_created'
           ? notificationPreferences.notif_matches
-          : row.kind === 'event_registration' || row.kind === 'event_cancellation' || notificationPreferences.notif_events).map((row: { id: string; title: string; body: string; created_at: string; read_at: string | null; kind: string; actor_id: string | null }) => ({
+          : row.kind === 'event_registration' || row.kind === 'event_cancellation' || notificationPreferences.notif_events)).map((row: { id: string; title: string; body: string; created_at: string; read_at: string | null; kind: string; actor_id: string | null }) => ({
         id: `db-${row.id}`,
-        type: row.kind === 'like_received' ? 'like' as const : row.kind === 'match_created' ? 'match' as const : 'event' as const,
+        type: row.kind === 'moderator_announcement' ? 'announcement' as const : row.kind === 'like_received' ? 'like' as const : row.kind === 'match_created' ? 'match' as const : 'event' as const,
         title: row.title,
         message: row.body,
-        href: row.kind === 'like_received' ? '/espace?tab=likes' : row.kind === 'match_created' ? '/espace?tab=matches' : '/espace?tab=events',
+        href: row.kind === 'moderator_announcement' ? '/espace?tab=decouverte' : row.kind === 'like_received' ? '/espace?tab=likes' : row.kind === 'match_created' ? '/espace?tab=matches' : '/espace?tab=events',
         createdAt: row.created_at,
         avatarUrl: row.actor_id ? notificationActorAvatars.get(row.actor_id) : undefined,
         unread: !row.read_at,
@@ -342,6 +350,7 @@ export function Navbar({ isAdminMode = false }: { isAdminMode?: boolean }) {
     { type: 'like' as const, label: 'Likes reçus', Icon: Heart },
     { type: 'match' as const, label: 'Nouveaux matches', Icon: Heart },
     { type: 'message' as const, label: 'Messages', Icon: MessageCircle },
+    { type: 'announcement' as const, label: 'Informations ARAS', Icon: Megaphone },
     { type: 'event' as const, label: 'Événements à venir', Icon: CalendarDays },
   ].map((group) => ({ ...group, items: notifications.filter((notification) => notification.type === group.type) }));
 
@@ -376,9 +385,9 @@ export function Navbar({ isAdminMode = false }: { isAdminMode?: boolean }) {
     <nav className="fixed left-0 right-0 top-0 z-40 border-b border-black/5 bg-[#f8f9fd]/90 backdrop-blur-xl">
       <div className="mx-auto flex h-[60px] max-w-[1240px] items-center justify-between px-5 lg:px-8">
         {isConnected ? isAdmin ? (
-          <Link href="/admin" className="flex items-center gap-2 text-sm font-extrabold text-[#241c18]" aria-label="Administration ARAS">
+          <Link href={isModerator ? '/moderation' : '/admin'} className="flex items-center gap-2 text-sm font-extrabold text-[#241c18]" aria-label={isModerator ? 'Modération ARAS' : 'Administration ARAS'}>
             <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#ec3b78]/10 text-[#ec3b78]"><LayoutDashboard size={18} /></span>
-            <span className="hidden sm:inline">Administration ARAS</span>
+            <span className="hidden sm:inline">{isModerator ? 'Modération ARAS' : 'Administration ARAS'}</span>
           </Link>
         ) : (
           <Link
@@ -532,7 +541,7 @@ export function Navbar({ isAdminMode = false }: { isAdminMode?: boolean }) {
             {user ? (
               <>
                 {/* Résumé du profil connecté */}
-                <Link
+                {!isAdmin && <Link
                   href="/espace?tab=profile"
                   onClick={() => setOpen(false)}
                   className="flex items-center gap-3 rounded-2xl border border-[#dfd2c6] bg-white p-3"
@@ -547,11 +556,11 @@ export function Navbar({ isAdminMode = false }: { isAdminMode?: boolean }) {
                       {currentMiniProfile?.is_online ? 'En ligne' : 'Hors ligne'}
                     </span>}
                   </span>
-                </Link>
+                </Link>}
 
                 {isAdmin && (
-                  <Link href="/admin" onClick={() => setOpen(false)} className="flex items-center gap-2 hover:text-[#ec3b78] transition-colors">
-                    Admin
+                  <Link href={isModerator ? '/moderation' : '/admin'} onClick={() => setOpen(false)} className="flex items-center gap-2 hover:text-[#ec3b78] transition-colors">
+                    {isModerator ? 'Modération' : 'Administration'}
                   </Link>
                 )}
                 <button onClick={handleSignOut} className="flex items-center gap-2 text-left hover:text-[#ec3b78] transition-colors">

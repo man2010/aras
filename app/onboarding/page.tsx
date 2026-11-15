@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { ArrowLeft, ArrowRight, BookOpen, Briefcase, Camera, Check, Cigarette, ClipboardList, Heart, Languages, MapPin, MessageCircle, Plus, UserRound, Users } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
+import { uploadProfilePhoto } from '@/lib/profile-photo-upload';
 
 type Gender = 'Homme' | 'Femme';
 type Step = 0 | 1 | 2 | 3 | 4 | 5;
@@ -293,15 +294,7 @@ export default function OnboardingPage() {
 
   const uploadPhoto = async (file: File) => {
     if (!user) return '';
-    const fileExt = file.name.split('.').pop() || 'jpg';
-    const filePath = `${user.id}/${crypto.randomUUID()}.${fileExt}`;
-    const { error: uploadError } = await supabase.storage.from('avatars').upload(filePath, file, {
-      cacheControl: '3600',
-      upsert: true,
-    });
-    if (uploadError) throw uploadError;
-    const { data } = supabase.storage.from('avatars').getPublicUrl(filePath);
-    return data.publicUrl;
+    return uploadProfilePhoto(file);
   };
 
   const handleSelectFile = async (file?: File | null) => {
@@ -416,7 +409,7 @@ export default function OnboardingPage() {
       <input
         ref={hiddenFileInputRef}
         type="file"
-        accept="image/*"
+        accept="image/png,image/jpeg"
         className="hidden"
         onChange={(event) => handleSelectFile(event.target.files?.[0])}
       />
@@ -667,6 +660,7 @@ export default function OnboardingPage() {
                   </div>
                 </button>
               </div>
+              <p className="text-center text-xs leading-5 text-[#756960] dark:text-white/60">Chaque photo est vérifiée automatiquement avant son ajout au profil.</p>
             </div>
           )}
 
@@ -706,6 +700,7 @@ export default function OnboardingPage() {
                   </button>
                 ))}
               </div>
+              <p className="text-center text-xs leading-5 text-[#756960] dark:text-white/60">Chaque photo est vérifiée automatiquement avant son ajout au profil.</p>
 
             </div>
           )}

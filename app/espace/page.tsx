@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { User, MessageCircle, Heart, CalendarDays, ArrowRight, ArrowLeft, ArrowDownLeft, ArrowUpRight, ArrowLeftRight, ShieldCheck, Send, Plus, Check, CircleCheck, X, CheckCheck, Search, MapPin, Users, Eye, EyeOff, ChevronRight, ChevronDown, Flag, RotateCcw, AlertTriangle, Music2, Plane, Utensils, Dumbbell, BookOpen, Clapperboard, PartyPopper, Palette, Camera, Shirt, Laptop, Trees, Flower2, Gamepad2, PawPrint, Briefcase, Ruler, Languages, Cigarette, ClipboardList, Settings, SlidersHorizontal, Pencil, LockKeyhole, CircleHelp, LogOut, EllipsisVertical, Ban, Monitor, Trash2, UserRoundX } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import { uploadProfilePhoto } from '@/lib/profile-photo-upload';
 import { useAuth } from '@/lib/auth-context';
 import type { Profile, Conversation, Message, Story } from '@/lib/types';
 import { toConversation, toEvent, toMessage, toProfile, toStory, type EventRow, type MatchRow, type MessageRow, type ProfileRow, type StoryRow } from '@/lib/adapters';
@@ -746,10 +747,11 @@ export default function EspacePage() {
       setIsAdminAccount(false);
       return;
     }
-    void supabase.rpc('is_admin').then(({ data }) => {
+    void Promise.all([supabase.rpc('is_admin'), supabase.rpc('is_moderator')]).then(([{ data: admin }, { data: moderator }]) => {
       if (!cancelled) {
-        setIsAdminAccount(Boolean(data));
-        if (data) router.replace('/admin');
+        const isStaff = Boolean(admin || moderator);
+        setIsAdminAccount(isStaff);
+        if (isStaff) router.replace(moderator && !admin ? '/moderation' : '/admin');
       }
     });
     return () => { cancelled = true; };
@@ -1548,15 +1550,7 @@ export default function EspacePage() {
     }
 
     try {
-      const fileName = `${Date.now()}_${file.name}`;
-      const filePath = `${user.id}/${fileName}`;
-
-      const { error: uploadError } = await supabase.storage.from('avatars').upload(filePath, file);
-      if (uploadError) {
-        throw uploadError;
-      }
-
-      const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(filePath);
+      const publicUrl = await uploadProfilePhoto(file);
 
       if (slotIndex === null) {
         const updatedAvatarUrls = [publicUrl, ...galleryPhotos.filter((photo): photo is string => Boolean(photo) && photo !== publicUrl)];
@@ -1577,7 +1571,7 @@ export default function EspacePage() {
     } catch (error) {
       console.error('Upload error:', error);
       if (slotIndex === null) setImagePreview(null);
-      showInfoModal('Upload impossible', slotIndex === null ? 'Erreur lors de l\'upload de l\'image.' : 'Erreur lors de l\'upload de cette photo.', 'OK');
+      showInfoModal('Photo refusée ou non envoyée', error instanceof Error ? error.message : 'La vérification de cette photo a échoué. Réessaie.', 'OK');
     } finally {
       setUploadingImage(false);
       setGalleryUploadingIndex(null);
@@ -2193,6 +2187,7 @@ export default function EspacePage() {
                   <div className="flex items-center justify-between gap-3">
                     <div>
                       <h3 className="font-display text-xl text-[#241c18] dark:text-white">Photos</h3>
+                      <p className="mt-1 text-xs leading-5 text-[#756960] dark:text-white/60">Chaque photo est vérifiée automatiquement avant son ajout au profil.</p>
                     </div>
                     <span className="rounded-full bg-[#fce6ee] px-3 py-1 text-[10px] font-extrabold uppercase tracking-[0.14em] text-[#ec3b78] dark:bg-[#3a1e2a] dark:text-[#f9bfd2]">
                       {galleryPhotos.filter(Boolean).length}/6
