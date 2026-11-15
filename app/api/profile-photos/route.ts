@@ -90,7 +90,9 @@ export async function POST(request: Request) {
     const labelNames = labels.map((label) => (label.Name ?? '').toLocaleLowerCase('en'));
     const hasPersonLabel = labels.some((label) => /^(person|human)$/.test((label.Name ?? '').toLocaleLowerCase('en')) && (label.Confidence ?? 0) >= 75);
     const hasFace = Boolean(celebrityResult.UnrecognizedFaces?.length || celebrityResult.CelebrityFaces?.length);
-    const isCelebrity = (celebrityResult.CelebrityFaces ?? []).some((celebrity) => (celebrity.MatchConfidence ?? celebrity.Face?.Confidence ?? 0) >= 80);
+    // Rekognition only puts recognized public figures in CelebrityFaces; reject any match
+    // to avoid letting a real celebrity photo through because of a locally chosen threshold.
+    const isCelebrity = (celebrityResult.CelebrityFaces ?? []).length > 0;
     const isIllustration = labelNames.some((name) => /cartoon|drawing|illustration|animation|comic|fictional character/.test(name));
     const unsafeImage = (moderationResult.ModerationLabels ?? []).some((label) => {
       const name = `${label.Name ?? ''} ${label.ParentName ?? ''}`.toLocaleLowerCase('en');
