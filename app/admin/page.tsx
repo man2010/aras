@@ -28,6 +28,8 @@ export default function AdminPage() {
   // Stats & Data
   const [stats, setStats] = useState({
     users: 0,
+    men: 0,
+    women: 0,
     profiles: 0,
     conversations: 0,
     events: 0,
@@ -78,6 +80,7 @@ export default function AdminPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
   const [totalProfiles, setTotalProfiles] = useState(0);
+  const [genderFilter, setGenderFilter] = useState('all');
 
   const checkAdminStatus = useCallback(async () => {
     if (!user) return;
@@ -90,7 +93,9 @@ export default function AdminPage() {
   }, [router, user]);
 
   const loadProfiles = useCallback(async () => {
-    const { data, count } = await supabase.from('profiles').select('*', { count: 'exact' }).order('created_at', { ascending: false }).range((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage - 1);
+    let query = supabase.from('profiles').select('*', { count: 'exact' });
+    if (genderFilter !== 'all') query = query.eq('gender', genderFilter);
+    const { data, count } = await query.order('created_at', { ascending: false }).range((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage - 1);
     if (data) {
       const mappedProfiles = (data as (ProfileRow & { location_label?: string | null })[]).map((row) => ({
         ...toProfile(row),
@@ -115,7 +120,7 @@ export default function AdminPage() {
       setProfiles(mappedProfiles);
     }
     return count || 0;
-  }, [currentPage, itemsPerPage]);
+  }, [currentPage, genderFilter, itemsPerPage]);
 
   useEffect(() => {
     if (!authLoading && !user) router.push('/connexion');
@@ -139,7 +144,7 @@ export default function AdminPage() {
         loadSettings();
       }
     }
-  }, [isAdmin, tab, currentPage]);
+  }, [isAdmin, tab, currentPage, genderFilter]);
 
   useEffect(() => {
     if (isAdmin && tab === 'messages') void loadMessages();
@@ -169,9 +174,11 @@ export default function AdminPage() {
   }, [isAdmin, tab]);
 
   const loadStats = async () => {
-    const [profilesCount, verifiedCount, convsCount, eventsCount, reportsCount, likesCount, matchesCount, messagesCount] = await Promise.all([
+    const [profilesCount, verifiedCount, menCount, womenCount, convsCount, eventsCount, reportsCount, likesCount, matchesCount, messagesCount] = await Promise.all([
       supabase.from('profiles').select('*', { count: 'exact', head: true }),
       supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('is_verified', true),
+      supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('gender', 'Homme'),
+      supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('gender', 'Femme'),
       supabase.from('matches').select('*', { count: 'exact', head: true }),
       supabase.from('events').select('*', { count: 'exact', head: true }),
       supabase.from('reports').select('*', { count: 'exact', head: true }),
@@ -182,6 +189,8 @@ export default function AdminPage() {
     
     setStats({
       users: profilesCount.count || 0,
+      men: menCount.count || 0,
+      women: womenCount.count || 0,
       profiles: verifiedCount.count || 0,
       conversations: convsCount.count || 0,
       events: eventsCount.count || 0,
@@ -441,6 +450,8 @@ export default function AdminPage() {
       {tab === 'users' && (
         <AdminUsers
           profiles={profiles}
+          genderFilter={genderFilter}
+          onGenderFilterChange={(gender) => { setGenderFilter(gender); setCurrentPage(1); }}
           currentPage={currentPage}
           totalPages={Math.ceil(totalProfiles / itemsPerPage)}
           onPageChange={setCurrentPage}

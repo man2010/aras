@@ -8,6 +8,8 @@ type Activity = { id: string; category: 'new_message' | 'new_signup' | 'new_logi
 interface AdminDashboardProps {
   stats: {
     users: number;
+    men: number;
+    women: number;
     profiles: number;
     conversations: number;
     events: number;
@@ -32,6 +34,8 @@ export function AdminDashboard({ stats, recentActivity, activityError }: AdminDa
   const changeFilter = (value: typeof activityFilter) => { setActivityFilter(value); setActivityPage(1); };
   const statCards = [
     { label: 'Utilisateurs', value: stats.users, icon: Users, color: '#ec3b78' },
+    { label: 'Hommes', value: stats.men, icon: Users, color: '#3977b8' },
+    { label: 'Femmes', value: stats.women, icon: Users, color: '#ec3b78' },
     { label: 'Profils vérifiés', value: stats.profiles, icon: ShieldCheck, color: '#1a6b68' },
     { label: 'Conversations', value: stats.conversations, icon: MessageCircle, color: '#d89b52' },
     { label: 'Matches', value: stats.matches, icon: Heart, color: '#ec3b78' },

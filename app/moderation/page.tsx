@@ -7,7 +7,7 @@ import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
 
 type Tab = 'announcements' | 'reports';
-type Member = { id: string; full_name: string | null; city: string | null };
+type Member = { id: string; full_name: string | null; city: string | null; gender: string | null };
 type Report = { id: string; reporter_id: string; reported_id: string; type: string; reason: string; description: string | null; status: string; resolved: boolean; created_at: string };
 type Announcement = { id: string; title: string; body: string; recipient_id: string | null; recipient_count: number; created_at: string };
 
@@ -24,6 +24,7 @@ export default function ModerationPage() {
   const [audience, setAudience] = useState<'all' | 'member'>('all');
   const [recipientId, setRecipientId] = useState('');
   const [memberSearch, setMemberSearch] = useState('');
+  const [memberGenderFilter, setMemberGenderFilter] = useState<'all' | 'Homme' | 'Femme'>('all');
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [status, setStatus] = useState('');
@@ -34,7 +35,7 @@ export default function ModerationPage() {
     setLoading(true);
     const [{ data: role }, { data: memberRows }, { data: reportRows }, { data: announcementRows }] = await Promise.all([
       supabase.rpc('current_staff_role'),
-      supabase.from('profiles_visible').select('id,full_name,city').order('full_name').limit(1000),
+      supabase.from('profiles_visible').select('id,full_name,city,gender').order('full_name').limit(1000),
       supabase.from('reports').select('id,reporter_id,reported_id,type,reason,description,status,resolved,created_at').order('created_at', { ascending: false }).limit(100),
       supabase.from('moderator_announcements').select('id,title,body,recipient_id,recipient_count,created_at').order('created_at', { ascending: false }).limit(30),
     ]);
@@ -56,11 +57,16 @@ export default function ModerationPage() {
   }, [authLoading, user, router, loadWorkspace]);
 
   const memberById = useMemo(() => new Map(members.map((member) => [member.id, member])), [members]);
+  const menCount = members.filter((member) => member.gender === 'Homme').length;
+  const womenCount = members.filter((member) => member.gender === 'Femme').length;
   const filteredMembers = useMemo(() => {
     const query = memberSearch.trim().toLocaleLowerCase('fr');
-    if (!query) return members.slice(0, 30);
-    return members.filter((member) => `${member.full_name ?? ''} ${member.city ?? ''}`.toLocaleLowerCase('fr').includes(query)).slice(0, 30);
-  }, [members, memberSearch]);
+    return members.filter((member) => {
+      const matchesGender = memberGenderFilter === 'all' || member.gender === memberGenderFilter;
+      const matchesQuery = !query || `${member.full_name ?? ''} ${member.city ?? ''}`.toLocaleLowerCase('fr').includes(query);
+      return matchesGender && matchesQuery;
+    }).slice(0, 30);
+  }, [members, memberGenderFilter, memberSearch]);
   const pendingReports = reports.filter((report) => !report.resolved && report.status !== 'resolved');
 
   const sendAnnouncement = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -120,9 +126,11 @@ export default function ModerationPage() {
           <button type="button" onClick={() => void handleSignOut()} className="flex items-center gap-2 rounded-full border border-[#e7e8ee] px-4 py-2.5 text-sm font-bold text-[#625852] hover:border-[#ec3b78] hover:text-[#ec3b78]"><LogOut size={16} /> Déconnexion</button>
         </header>
 
-        <section className="mb-6 grid gap-4 sm:grid-cols-3">
+        <section className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
           <div className="rounded-3xl bg-white p-5 shadow-sm"><div className="flex items-center justify-between"><p className="text-sm font-bold text-[#756960]">En attente</p><AlertTriangle className="text-amber-500" size={19} /></div><p className="mt-3 font-display text-3xl">{pendingReports.length}</p><p className="mt-1 text-xs text-[#8d8e99]">Signalements à traiter</p></div>
           <div className="rounded-3xl bg-white p-5 shadow-sm"><div className="flex items-center justify-between"><p className="text-sm font-bold text-[#756960]">Membres</p><Users className="text-[#1a6b68]" size={19} /></div><p className="mt-3 font-display text-3xl">{members.length}</p><p className="mt-1 text-xs text-[#8d8e99]">Comptes membres disponibles</p></div>
+          <div className="rounded-3xl bg-white p-5 shadow-sm"><div className="flex items-center justify-between"><p className="text-sm font-bold text-[#756960]">Hommes</p><Users className="text-blue-600" size={19} /></div><p className="mt-3 font-display text-3xl">{menCount}</p><p className="mt-1 text-xs text-[#8d8e99]">Profils déclarés Homme</p></div>
+          <div className="rounded-3xl bg-white p-5 shadow-sm"><div className="flex items-center justify-between"><p className="text-sm font-bold text-[#756960]">Femmes</p><Users className="text-[#ec3b78]" size={19} /></div><p className="mt-3 font-display text-3xl">{womenCount}</p><p className="mt-1 text-xs text-[#8d8e99]">Profils déclarés Femme</p></div>
           <div className="rounded-3xl bg-white p-5 shadow-sm"><div className="flex items-center justify-between"><p className="text-sm font-bold text-[#756960]">Messages envoyés</p><Bell className="text-[#ec3b78]" size={19} /></div><p className="mt-3 font-display text-3xl">{announcements.length}</p><p className="mt-1 text-xs text-[#8d8e99]">Derniers messages de modération</p></div>
         </section>
 
@@ -147,6 +155,7 @@ export default function ModerationPage() {
               {audience === 'member' && <div className="mb-5 space-y-2">
                 <label htmlFor="member-search" className="block text-sm font-bold">Rechercher une personne</label>
                 <input id="member-search" value={memberSearch} onChange={(event) => setMemberSearch(event.target.value)} placeholder="Nom ou ville" className="w-full rounded-xl border border-[#e1e3eb] px-4 py-3 text-sm outline-none focus:border-[#ec3b78]" />
+                <select aria-label="Filtrer les destinataires par genre" value={memberGenderFilter} onChange={(event) => setMemberGenderFilter(event.target.value as typeof memberGenderFilter)} className="w-full rounded-xl border border-[#e1e3eb] bg-white px-4 py-3 text-sm outline-none focus:border-[#ec3b78]"><option value="all">Tous les genres</option><option value="Homme">Hommes</option><option value="Femme">Femmes</option></select>
                 <select value={recipientId} onChange={(event) => setRecipientId(event.target.value)} className="w-full rounded-xl border border-[#e1e3eb] bg-white px-4 py-3 text-sm outline-none focus:border-[#ec3b78]">
                   <option value="">Choisir un membre</option>
                   {filteredMembers.map((member) => <option key={member.id} value={member.id}>{member.full_name || 'Membre ARAS'}{member.city ? ` · ${member.city}` : ''}</option>)}

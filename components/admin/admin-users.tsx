@@ -8,13 +8,15 @@ type AdminProfile = Profile & { adminLocation?: string | null; authContact?: str
 
 interface AdminUsersProps {
   profiles: AdminProfile[];
+  genderFilter: string;
+  onGenderFilterChange: (gender: string) => void;
   currentPage: number;
   totalPages: number;
   onPageChange: (page: number) => void;
   onToggleBlocked: (profileId: string, currentlyActive: boolean) => void;
 }
 
-export function AdminUsers({ profiles, currentPage, totalPages, onPageChange, onToggleBlocked }: AdminUsersProps) {
+export function AdminUsers({ profiles, genderFilter, onGenderFilterChange, currentPage, totalPages, onPageChange, onToggleBlocked }: AdminUsersProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterCity, setFilterCity] = useState('');
   const [filterVerified, setFilterVerified] = useState<'all' | 'verified' | 'unverified'>('all');
@@ -76,6 +78,15 @@ export function AdminUsers({ profiles, currentPage, totalPages, onPageChange, on
               </div>
             </div>
             <select
+              value={genderFilter}
+              onChange={(e) => onGenderFilterChange(e.target.value)}
+              className="rounded-xl border border-[#dfd2c6] bg-[#f8f9fd] px-4 py-2.5 text-sm outline-none focus:border-[#ec3b78]"
+            >
+              <option value="all">Tous les genres</option>
+              <option value="Homme">Hommes</option>
+              <option value="Femme">Femmes</option>
+            </select>
+            <select
               value={filterCity}
               onChange={(e) => setFilterCity(e.target.value)}
               className="rounded-xl border border-[#dfd2c6] bg-[#f8f9fd] px-4 py-2.5 text-sm outline-none focus:border-[#ec3b78]"
@@ -114,6 +125,7 @@ export function AdminUsers({ profiles, currentPage, totalPages, onPageChange, on
               <thead>
                 <tr className="border-b border-[#dfd2c6]">
                   <th className="px-4 py-3 text-left text-xs font-extrabold uppercase text-[#625852]">Profil</th>
+                  <th className="px-4 py-3 text-left text-xs font-extrabold uppercase text-[#625852]">Genre</th>
                   <th className="px-4 py-3 text-left text-xs font-extrabold uppercase text-[#625852]">Contact</th>
                   <th className="px-4 py-3 text-left text-xs font-extrabold uppercase text-[#625852]">Localisation</th>
                   <th className="px-4 py-3 text-left text-xs font-extrabold uppercase text-[#625852]">Statut</th>
@@ -133,6 +145,7 @@ export function AdminUsers({ profiles, currentPage, totalPages, onPageChange, on
                         </div>
                       </div>
                     </td>
+                    <td className="px-4 py-3 text-sm text-[#756960]">{p.gender || 'Non renseigné'}</td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2 text-sm text-[#756960]">
                         {p.authContactMethod === 'phone' ? <Phone size={14} /> : <Mail size={14} />}
