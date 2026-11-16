@@ -2,12 +2,12 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { AlertTriangle, Bell, Check, Clock3, LogOut, Megaphone, RefreshCw, Send, Users } from 'lucide-react';
+import { AlertTriangle, Bell, Briefcase, Check, Clock3, LogOut, Mail, MapPin, Megaphone, Phone, RefreshCw, Search, Send, Users } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
 
 type Tab = 'announcements' | 'reports';
-type Member = { id: string; full_name: string | null; city: string | null; gender: string | null };
+type Member = { id: string; full_name: string | null; gender: string | null; birthdate: string | null; city: string | null; profession: string | null; avatar_urls: string[] | null };
 type Report = { id: string; reporter_id: string; reported_id: string; type: string; reason: string; description: string | null; status: string; resolved: boolean; created_at: string };
 type Announcement = { id: string; title: string; body: string; recipient_id: string | null; recipient_count: number; created_at: string };
 
@@ -25,6 +25,8 @@ export default function ModerationPage() {
   const [recipientId, setRecipientId] = useState('');
   const [memberSearch, setMemberSearch] = useState('');
   const [memberGenderFilter, setMemberGenderFilter] = useState<'all' | 'Homme' | 'Femme'>('all');
+  const [recipientMembers, setRecipientMembers] = useState<Member[]>([]);
+  const [memberSearchLoading, setMemberSearchLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [status, setStatus] = useState('');
@@ -35,7 +37,7 @@ export default function ModerationPage() {
     setLoading(true);
     const [{ data: role }, { data: memberRows }, { data: reportRows }, { data: announcementRows }] = await Promise.all([
       supabase.rpc('current_staff_role'),
-      supabase.from('profiles_visible').select('id,full_name,city,gender').order('full_name').limit(1000),
+      supabase.from('profiles_visible').select('id,full_name,gender,birthdate,city,profession,avatar_urls').order('full_name').limit(1000),
       supabase.from('reports').select('id,reporter_id,reported_id,type,reason,description,status,resolved,created_at').order('created_at', { ascending: false }).limit(100),
       supabase.from('moderator_announcements').select('id,title,body,recipient_id,recipient_count,created_at').order('created_at', { ascending: false }).limit(30),
     ]);
@@ -56,17 +58,29 @@ export default function ModerationPage() {
     if (user) void loadWorkspace();
   }, [authLoading, user, router, loadWorkspace]);
 
-  const memberById = useMemo(() => new Map(members.map((member) => [member.id, member])), [members]);
+  const memberById = useMemo(() => new Map([...members, ...recipientMembers].map((member) => [member.id, member])), [members, recipientMembers]);
   const menCount = members.filter((member) => member.gender === 'Homme').length;
   const womenCount = members.filter((member) => member.gender === 'Femme').length;
-  const filteredMembers = useMemo(() => {
-    const query = memberSearch.trim().toLocaleLowerCase('fr');
-    return members.filter((member) => {
-      const matchesGender = memberGenderFilter === 'all' || member.gender === memberGenderFilter;
-      const matchesQuery = !query || `${member.full_name ?? ''} ${member.city ?? ''}`.toLocaleLowerCase('fr').includes(query);
-      return matchesGender && matchesQuery;
-    }).slice(0, 30);
-  }, [members, memberGenderFilter, memberSearch]);
+  const searchRecipients = useCallback(async (query: string, gender: typeof memberGenderFilter) => {
+    const { data: sessionData } = await supabase.auth.getSession();
+    const token = sessionData.session?.access_token;
+    if (!token) return;
+    setMemberSearchLoading(true);
+    const response = await fetch('/api/moderation/members', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ query, gender }),
+    }).catch(() => null);
+    const result = response?.ok ? await response.json().catch(() => null) as { members?: Member[] } | null : null;
+    setRecipientMembers(result?.members ?? []);
+    setMemberSearchLoading(false);
+  }, []);
+
+  useEffect(() => {
+    if (tab !== 'announcements' || audience !== 'member') return;
+    const timer = window.setTimeout(() => void searchRecipients(memberSearch, memberGenderFilter), 250);
+    return () => window.clearTimeout(timer);
+  }, [audience, memberGenderFilter, memberSearch, searchRecipients, tab]);
   const pendingReports = reports.filter((report) => !report.resolved && report.status !== 'resolved');
 
   const sendAnnouncement = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -153,14 +167,20 @@ export default function ModerationPage() {
                 <button type="button" onClick={() => setAudience('member')} className={`rounded-xl border px-4 py-3 text-sm font-bold ${audience === 'member' ? 'border-[#ec3b78] bg-[#fff1f6] text-[#c92e63]' : 'border-[#e7e8ee] text-[#756960]'}`}>Une personne</button>
               </div>
               {audience === 'member' && <div className="mb-5 space-y-2">
-                <label htmlFor="member-search" className="block text-sm font-bold">Rechercher une personne</label>
-                <input id="member-search" value={memberSearch} onChange={(event) => setMemberSearch(event.target.value)} placeholder="Nom ou ville" className="w-full rounded-xl border border-[#e1e3eb] px-4 py-3 text-sm outline-none focus:border-[#ec3b78]" />
-                <select aria-label="Filtrer les destinataires par genre" value={memberGenderFilter} onChange={(event) => setMemberGenderFilter(event.target.value as typeof memberGenderFilter)} className="w-full rounded-xl border border-[#e1e3eb] bg-white px-4 py-3 text-sm outline-none focus:border-[#ec3b78]"><option value="all">Tous les genres</option><option value="Homme">Hommes</option><option value="Femme">Femmes</option></select>
-                <select value={recipientId} onChange={(event) => setRecipientId(event.target.value)} className="w-full rounded-xl border border-[#e1e3eb] bg-white px-4 py-3 text-sm outline-none focus:border-[#ec3b78]">
-                  <option value="">Choisir un membre</option>
-                  {filteredMembers.map((member) => <option key={member.id} value={member.id}>{member.full_name || 'Membre ARAS'}{member.city ? ` · ${member.city}` : ''}</option>)}
-                </select>
-                {recipientId && <p className="text-xs text-[#756960]">Destinataire : {memberById.get(recipientId)?.full_name || 'Membre ARAS'}</p>}
+                <label htmlFor="recipient-gender" className="block text-sm font-bold">1. Genre</label>
+                <select id="recipient-gender" aria-label="Filtrer les destinataires par genre" value={memberGenderFilter} onChange={(event) => { setMemberGenderFilter(event.target.value as typeof memberGenderFilter); setRecipientId(''); }} className="w-full rounded-xl border border-[#e1e3eb] bg-white px-4 py-3 text-sm outline-none focus:border-[#ec3b78]"><option value="all">Tous les genres</option><option value="Homme">Hommes</option><option value="Femme">Femmes</option></select>
+                <label htmlFor="member-search" className="block pt-2 text-sm font-bold">2. Nom, e-mail ou téléphone</label>
+                <div className="relative"><Search size={17} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#9697a1]" /><input id="member-search" value={memberSearch} onChange={(event) => { setMemberSearch(event.target.value); setRecipientId(''); }} placeholder="Rechercher un membre…" className="w-full rounded-xl border border-[#e1e3eb] py-3 pl-10 pr-4 text-sm outline-none focus:border-[#ec3b78]" /></div>
+                <div className="pt-2"><p className="mb-2 text-sm font-bold">3. Membres</p>{memberSearchLoading ? <p className="rounded-xl bg-[#f8f9fd] p-4 text-sm text-[#756960]">Recherche des profils…</p> : recipientMembers.length === 0 ? <p className="rounded-xl bg-[#f8f9fd] p-4 text-sm text-[#756960]">Aucun membre trouvé avec ces critères.</p> : <div className="grid max-h-[340px] gap-2 overflow-y-auto sm:grid-cols-2">{recipientMembers.map((member) => {
+                  const selected = recipientId === member.id;
+                  const age = member.birthdate ? Math.max(0, Math.floor((Date.now() - new Date(member.birthdate).getTime()) / 31557600000)) : null;
+                  const photo = member.avatar_urls?.find(Boolean);
+                  return <button key={member.id} type="button" onClick={() => setRecipientId(member.id)} aria-pressed={selected} className={`flex min-w-0 items-center gap-3 rounded-2xl border p-3 text-left transition ${selected ? 'border-[#ec3b78] bg-[#fff1f6] ring-2 ring-[#ec3b78]/15' : 'border-[#e7e8ee] bg-white hover:border-[#f3a5c2] hover:bg-[#fffafd]'}`}>
+                    <span className="h-14 w-14 shrink-0 overflow-hidden rounded-xl bg-[#f8f9fd]">{photo ? <img src={photo} alt="" className="h-full w-full object-cover" /> : <span className="flex h-full w-full items-center justify-center text-lg font-extrabold text-[#ec3b78]">{member.full_name?.charAt(0).toUpperCase() || 'M'}</span>}</span>
+                    <span className="min-w-0 flex-1"><span className="block truncate text-sm font-extrabold text-[#292832]">{member.full_name || 'Membre ARAS'}{age !== null ? `, ${age} ans` : ''}</span><span className="mt-1 block truncate text-xs text-[#756960]">{member.profession || 'Profession non renseignée'}</span><span className="mt-1 flex items-center gap-1 truncate text-xs text-[#8d8e99]">{member.city ? <><MapPin size={12} />{member.city}</> : member.gender || 'Membre'}</span></span>{selected && <Check size={17} className="shrink-0 text-[#ec3b78]" />}
+                  </button>;
+                })}</div>}</div>
+                {recipientId && <p className="text-xs font-semibold text-[#1a6b68]">Destinataire sélectionné : {memberById.get(recipientId)?.full_name || recipientMembers.find((member) => member.id === recipientId)?.full_name || 'Membre ARAS'}</p>}
               </div>}
               <label htmlFor="announcement-title" className="mb-2 block text-sm font-bold">Titre</label>
               <input id="announcement-title" required maxLength={120} value={title} onChange={(event) => setTitle(event.target.value)} className="mb-5 w-full rounded-xl border border-[#e1e3eb] px-4 py-3 text-sm outline-none focus:border-[#ec3b78]" />
