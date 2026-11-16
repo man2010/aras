@@ -272,7 +272,7 @@ export function Navbar({ isAdminMode = false, isModeratorMode = false }: { isAdm
         type: row.kind === 'moderator_announcement' ? 'announcement' as const : row.kind === 'like_received' ? 'like' as const : row.kind === 'match_created' ? 'match' as const : 'event' as const,
         title: row.title,
         message: row.body,
-        href: row.kind === 'moderator_announcement' ? '/espace?tab=decouverte' : row.kind === 'like_received' ? '/espace?tab=likes' : row.kind === 'match_created' ? '/espace?tab=matches' : '/espace?tab=events',
+        href: row.kind === 'moderator_announcement' ? `/espace?tab=messages&announcement=${row.id}` : row.kind === 'like_received' ? '/espace?tab=likes' : row.kind === 'match_created' ? '/espace?tab=matches' : '/espace?tab=events',
         createdAt: row.created_at,
         avatarUrl: row.actor_id ? notificationActorAvatars.get(row.actor_id) : undefined,
         unread: !row.read_at,
@@ -314,6 +314,11 @@ export function Navbar({ isAdminMode = false, isModeratorMode = false }: { isAdm
         if (error || !updatedNotification) return;
         setUnreadEventCount((count) => Math.max(0, count - (notification.unread ? 1 : 0)));
         setNotifications((current) => current.filter((item) => item.id !== notification.id));
+        if (notification.type === 'announcement') {
+          router.push(`/espace?tab=messages&announcement=${notificationId}`);
+          setNotificationOpen(false);
+          return;
+        }
         router.push(notification.href);
         setNotificationOpen(false);
         return;

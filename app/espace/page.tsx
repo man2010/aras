@@ -378,6 +378,7 @@ export default function EspacePage() {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeConv, setActiveConv] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
+  const [activeModeratorAnnouncement, setActiveModeratorAnnouncement] = useState<{ id: string; title: string; body: string; created_at: string } | null>(null);
   const [conversationProfiles, setConversationProfiles] = useState<Record<string, Profile>>({});
   const [newMessage, setNewMessage] = useState('');
   const [messageSearch, setMessageSearch] = useState('');
@@ -824,6 +825,7 @@ export default function EspacePage() {
     // Handle URL parameters for tab and conversation
     const tabParam = searchParams.get('tab');
     const convParam = searchParams.get('conv');
+    const announcementId = searchParams.get('announcement');
     const validTabs: Tab[] = [
       'decouverte', 'profile', 'messages', 'likes', 'matches', 'events',
       'settings-profile', 'settings-privacy', 'settings-security', 'settings-subscription', 'settings-help',
@@ -835,7 +837,17 @@ export default function EspacePage() {
       setActiveConv(convParam);
       setTab('messages');
     }
-  }, [searchParams]);
+    if (announcementId && user) {
+      let cancelled = false;
+      setActiveModeratorAnnouncement(null);
+      setActiveConv(null);
+      setTab('messages');
+      void supabase.from('user_notifications').select('id,title,body,created_at').eq('id', announcementId).eq('user_id', user.id).eq('kind', 'moderator_announcement').maybeSingle()
+        .then(({ data }) => { if (!cancelled) setActiveModeratorAnnouncement(data); });
+      return () => { cancelled = true; };
+    }
+    setActiveModeratorAnnouncement(null);
+  }, [searchParams, user]);
 
   useEffect(() => {
     let cancelled = false;
@@ -2312,6 +2324,31 @@ export default function EspacePage() {
           {/* MESSAGES TAB */}
           {tab === 'messages' && (
             <div>
+              {activeModeratorAnnouncement ? (
+                <section className="flex h-[calc(100dvh-180px)] min-h-[420px] flex-col overflow-hidden rounded-[26px] border border-[#dfd2c6] bg-white p-4 shadow-[0_8px_30px_rgba(83,46,32,.05)] sm:p-6">
+                  <header className="mb-4 flex items-center gap-3 border-b border-[#eadfd5] pb-4">
+                    <button type="button" onClick={() => { setActiveModeratorAnnouncement(null); router.replace('/espace?tab=messages'); }} className="flex h-9 w-9 items-center justify-center rounded-full border border-[#dfd2c6] text-[#625852]" aria-label="Retour aux conversations">
+                      <ArrowLeft size={17} />
+                    </button>
+                    <div className="flex h-11 w-11 items-center justify-center rounded-full bg-[#ec3b78]/10 text-sm font-extrabold text-[#ec3b78]">A</div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-extrabold text-[#241c18]">ARAS</p>
+                      <p className="text-xs text-[#9a8b82]">Information officielle</p>
+                    </div>
+                  </header>
+                  <div className="min-h-0 flex-1 overflow-y-auto rounded-xl bg-[#f8f9fd] p-4 sm:p-6">
+                    <div className="flex justify-start">
+                      <article className="max-w-[min(90%,48rem)] rounded-2xl bg-white px-4 py-3 text-sm text-[#241c18] shadow-sm sm:px-5">
+                        <p className="mb-2 text-xs font-bold text-[#ec3b78]">{activeModeratorAnnouncement.title}</p>
+                        <p className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]">{activeModeratorAnnouncement.body}</p>
+                        <time className="mt-2 block text-right text-[10px] text-[#9a8b82]">
+                          {new Date(activeModeratorAnnouncement.created_at).toLocaleString('fr-FR', { dateStyle: 'medium', timeStyle: 'short' })}
+                        </time>
+                      </article>
+                    </div>
+                  </div>
+                </section>
+              ) : (
               <div className="grid min-w-0 gap-4 lg:grid-cols-[340px_minmax(0,1fr)] lg:gap-6">
               <div className={`${activeConv ? 'hidden lg:block' : 'block'} max-h-[calc(100dvh-180px)] min-w-0 overflow-y-auto rounded-[26px] border border-[#dfd2c6] bg-white p-3 shadow-[0_8px_30px_rgba(83,46,32,.05)] sm:p-4 lg:max-h-none`}>
                 <p className="px-2 pb-3 font-display text-xl">Conversations</p>
@@ -2450,6 +2487,7 @@ export default function EspacePage() {
                 )}
               </div>
               </div>
+              )}
             </div>
           )}
 
