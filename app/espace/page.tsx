@@ -13,6 +13,18 @@ import { AppSidebar, type EspaceTab } from '@/components/app-sidebar';
 import { Slider } from '@/components/ui/slider';
 
 type Tab = EspaceTab;
+const ESPACE_TABS: Tab[] = ['decouverte', 'profile', 'messages', 'likes', 'matches', 'events', 'settings-profile', 'settings-privacy', 'settings-security', 'settings-subscription', 'settings-help'];
+
+function getInitialEspaceTab(): Tab {
+  if (typeof window === 'undefined') return 'decouverte';
+  try {
+    const savedTab = window.sessionStorage.getItem('aras:active-espace-tab');
+    return savedTab && ESPACE_TABS.includes(savedTab as Tab) ? savedTab as Tab : 'decouverte';
+  } catch {
+    return 'decouverte';
+  }
+}
+
 const PROFILE_CARD_SELECT = 'id,updated_at,full_name,gender,birthdate,city,zone,bio,interests,languages,religion,caste,marital_status,smoking_habit,avatar_urls,lat,lng,is_active,is_online,last_seen_at,is_verified,is_premium,show_age,show_online_status,show_distance,created_at,height,profession,profile_status,onboarding_completed';
 
 const PROFILE_INTEREST_OPTIONS = [
@@ -305,7 +317,7 @@ export default function EspacePage() {
   const { user, loading: authLoading, setUnreadCount, signOut } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [tab, setTab] = useState<Tab>('decouverte');
+  const [tab, setTab] = useState<Tab>(getInitialEspaceTab);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [profileLoading, setProfileLoading] = useState(true);
   const [profileLoadError, setProfileLoadError] = useState(false);
@@ -756,6 +768,10 @@ export default function EspacePage() {
     });
     return () => { cancelled = true; };
   }, [user, router]);
+
+  useEffect(() => {
+    try { window.sessionStorage.setItem('aras:active-espace-tab', tab); } catch { /* Storage can be disabled by the browser. */ }
+  }, [tab]);
 
   useEffect(() => {
     window.dispatchEvent(new CustomEvent('aras:app-tab', { detail: tab }));

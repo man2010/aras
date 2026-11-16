@@ -7,9 +7,9 @@ import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
 
 type Tab = 'announcements' | 'reports';
-type Member = { id: string; full_name: string | null; gender: string | null; birthdate: string | null; city: string | null; profession: string | null; avatar_urls: string[] | null };
+type Member = { id: string; full_name: string | null; gender: string | null; birthdate: string | null; city: string | null; profession: string | null; avatar_urls: string[] | null; profile_status?: string | null; onboarding_completed?: boolean | null };
 type Report = { id: string; reporter_id: string; reported_id: string; type: string; reason: string; description: string | null; status: string; resolved: boolean; created_at: string };
-type Announcement = { id: string; title: string; body: string; recipient_id: string | null; recipient_count: number; created_at: string };
+type Announcement = { id: string; title: string; body: string; recipient_id: string | null; recipient_ids?: string[]; target_incomplete_only?: boolean; recipient_count: number; created_at: string };
 
 export default function ModerationPage() {
   const { user, loading: authLoading, signOut } = useAuth();
@@ -22,9 +22,11 @@ export default function ModerationPage() {
   const [title, setTitle] = useState('Information de la modération ARAS');
   const [body, setBody] = useState('');
   const [audience, setAudience] = useState<'all' | 'member'>('all');
-  const [recipientId, setRecipientId] = useState('');
+  const [recipientIds, setRecipientIds] = useState<string[]>([]);
+  const [targetIncompleteOnly, setTargetIncompleteOnly] = useState(false);
   const [memberSearch, setMemberSearch] = useState('');
   const [memberGenderFilter, setMemberGenderFilter] = useState<'all' | 'Homme' | 'Femme'>('all');
+  const [incompleteOnly, setIncompleteOnly] = useState(false);
   const [recipientMembers, setRecipientMembers] = useState<Member[]>([]);
   const [memberSearchLoading, setMemberSearchLoading] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -39,7 +41,7 @@ export default function ModerationPage() {
       supabase.rpc('current_staff_role'),
       supabase.from('profiles_visible').select('id,full_name,gender,birthdate,city,profession,avatar_urls').order('full_name').limit(1000),
       supabase.from('reports').select('id,reporter_id,reported_id,type,reason,description,status,resolved,created_at').order('created_at', { ascending: false }).limit(100),
-      supabase.from('moderator_announcements').select('id,title,body,recipient_id,recipient_count,created_at').order('created_at', { ascending: false }).limit(30),
+      supabase.from('moderator_announcements').select('id,title,body,recipient_id,recipient_ids,target_incomplete_only,recipient_count,created_at').order('created_at', { ascending: false }).limit(30),
     ]);
     const allowed = role === 'admin' || role === 'moderator';
     setAuthorized(allowed);
@@ -61,7 +63,7 @@ export default function ModerationPage() {
   const memberById = useMemo(() => new Map([...members, ...recipientMembers].map((member) => [member.id, member])), [members, recipientMembers]);
   const menCount = members.filter((member) => member.gender === 'Homme').length;
   const womenCount = members.filter((member) => member.gender === 'Femme').length;
-  const searchRecipients = useCallback(async (query: string, gender: typeof memberGenderFilter) => {
+  const searchRecipients = useCallback(async (query: string, gender: typeof memberGenderFilter, incomplete: boolean) => {
     const { data: sessionData } = await supabase.auth.getSession();
     const token = sessionData.session?.access_token;
     if (!token) return;
@@ -69,7 +71,7 @@ export default function ModerationPage() {
     const response = await fetch('/api/moderation/members', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ query, gender }),
+      body: JSON.stringify({ query, gender, incompleteOnly: incomplete }),
     }).catch(() => null);
     const result = response?.ok ? await response.json().catch(() => null) as { members?: Member[] } | null : null;
     setRecipientMembers(result?.members ?? []);
@@ -78,24 +80,27 @@ export default function ModerationPage() {
 
   useEffect(() => {
     if (tab !== 'announcements' || audience !== 'member') return;
-    const timer = window.setTimeout(() => void searchRecipients(memberSearch, memberGenderFilter), 250);
+    const timer = window.setTimeout(() => void searchRecipients(memberSearch, memberGenderFilter, incompleteOnly), 250);
     return () => window.clearTimeout(timer);
-  }, [audience, memberGenderFilter, memberSearch, searchRecipients, tab]);
+  }, [audience, incompleteOnly, memberGenderFilter, memberSearch, searchRecipients, tab]);
   const pendingReports = reports.filter((report) => !report.resolved && report.status !== 'resolved');
 
   const sendAnnouncement = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setError('');
     setStatus('');
-    if (!body.trim() || (audience === 'member' && !recipientId)) {
-      setError(audience === 'member' ? 'Choisis un destinataire et écris ton message.' : 'Écris le message à envoyer.');
+    if (!body.trim() || (audience === 'member' && !targetIncompleteOnly && recipientIds.length === 0)) {
+      setError(audience === 'member' ? 'Choisis un ou plusieurs profils, ou cible les comptes incomplets, puis écris ton message.' : 'Écris le message à envoyer.');
       return;
     }
     setSending(true);
-    const { data, error: sendError } = await supabase.rpc('send_moderator_announcement', {
+    const { data, error: sendError } = await supabase.rpc('send_moderator_announcement_batch', {
       p_title: title.trim(),
       p_body: body.trim(),
-      p_recipient_id: audience === 'member' ? recipientId : null,
+      p_recipient_ids: audience === 'member' && !targetIncompleteOnly ? recipientIds : [],
+      p_target_incomplete_only: audience === 'member' && targetIncompleteOnly,
+      p_target_gender: audience === 'member' && targetIncompleteOnly && memberGenderFilter !== 'all' ? memberGenderFilter : null,
+      p_send_to_all: audience === 'all',
     });
     setSending(false);
     if (sendError) {
@@ -106,7 +111,8 @@ export default function ModerationPage() {
     const recipientCount = Number((result as { recipient_count?: number } | null)?.recipient_count ?? 0);
     setStatus(`Notification envoyée à ${recipientCount} ${recipientCount > 1 ? 'personnes' : 'personne'}.`);
     setBody('');
-    setRecipientId('');
+    setRecipientIds([]);
+    setTargetIncompleteOnly(false);
     await loadWorkspace();
   };
 
@@ -163,24 +169,27 @@ export default function ModerationPage() {
               <div className="mb-6"><p className="text-xs font-extrabold uppercase tracking-[.16em] text-[#ec3b78]">Communication</p><h2 className="mt-2 font-display text-2xl">Envoyer une notification</h2><p className="mt-2 text-sm leading-6 text-[#756960]">Le message apparaîtra dans les notifications des personnes ciblées.</p></div>
               <label className="mb-2 block text-sm font-bold">Destinataires</label>
               <div className="mb-5 grid grid-cols-2 gap-2">
-                <button type="button" onClick={() => { setAudience('all'); setRecipientId(''); }} className={`rounded-xl border px-4 py-3 text-sm font-bold ${audience === 'all' ? 'border-[#ec3b78] bg-[#fff1f6] text-[#c92e63]' : 'border-[#e7e8ee] text-[#756960]'}`}>Tout le monde</button>
-                <button type="button" onClick={() => setAudience('member')} className={`rounded-xl border px-4 py-3 text-sm font-bold ${audience === 'member' ? 'border-[#ec3b78] bg-[#fff1f6] text-[#c92e63]' : 'border-[#e7e8ee] text-[#756960]'}`}>Une personne</button>
+                <button type="button" onClick={() => { setAudience('all'); setRecipientIds([]); setTargetIncompleteOnly(false); }} className={`rounded-xl border px-4 py-3 text-sm font-bold ${audience === 'all' ? 'border-[#ec3b78] bg-[#fff1f6] text-[#c92e63]' : 'border-[#e7e8ee] text-[#756960]'}`}>Tout le monde</button>
+                <button type="button" onClick={() => setAudience('member')} className={`rounded-xl border px-4 py-3 text-sm font-bold ${audience === 'member' ? 'border-[#ec3b78] bg-[#fff1f6] text-[#c92e63]' : 'border-[#e7e8ee] text-[#756960]'}`}>Profils ciblés</button>
               </div>
               {audience === 'member' && <div className="mb-5 space-y-2">
                 <label htmlFor="recipient-gender" className="block text-sm font-bold">1. Genre</label>
-                <select id="recipient-gender" aria-label="Filtrer les destinataires par genre" value={memberGenderFilter} onChange={(event) => { setMemberGenderFilter(event.target.value as typeof memberGenderFilter); setRecipientId(''); }} className="w-full rounded-xl border border-[#e1e3eb] bg-white px-4 py-3 text-sm outline-none focus:border-[#ec3b78]"><option value="all">Tous les genres</option><option value="Homme">Hommes</option><option value="Femme">Femmes</option></select>
+                <select id="recipient-gender" aria-label="Filtrer les destinataires par genre" value={memberGenderFilter} onChange={(event) => { setMemberGenderFilter(event.target.value as typeof memberGenderFilter); setRecipientIds([]); setTargetIncompleteOnly(false); }} className="w-full rounded-xl border border-[#e1e3eb] bg-white px-4 py-3 text-sm outline-none focus:border-[#ec3b78]"><option value="all">Tous les genres</option><option value="Homme">Hommes</option><option value="Femme">Femmes</option></select>
+                <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-[#e7e8ee] bg-[#f8f9fd] p-3 text-sm"><input type="checkbox" checked={incompleteOnly} onChange={(event) => { setIncompleteOnly(event.target.checked); setRecipientIds([]); setTargetIncompleteOnly(false); }} className="mt-0.5 h-4 w-4 accent-[#ec3b78]" /><span><span className="block font-extrabold">Comptes à finaliser</span><span className="mt-1 block text-xs leading-5 text-[#756960]">Affiche les profils dont l’onboarding ou le statut de profil n’est pas terminé.</span></span></label>
+                {incompleteOnly && <button type="button" onClick={() => { setTargetIncompleteOnly((current) => !current); setRecipientIds([]); }} className={`rounded-xl border px-4 py-3 text-sm font-extrabold ${targetIncompleteOnly ? 'border-[#ec3b78] bg-[#fff1f6] text-[#c92e63]' : 'border-[#e7e8ee] bg-white text-[#756960]'}`}>{targetIncompleteOnly ? 'Tous les comptes incomplets seront ciblés' : 'Sélectionner tous les comptes incomplets'}</button>}
                 <label htmlFor="member-search" className="block pt-2 text-sm font-bold">2. Nom, e-mail ou téléphone</label>
-                <div className="relative"><Search size={17} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#9697a1]" /><input id="member-search" value={memberSearch} onChange={(event) => { setMemberSearch(event.target.value); setRecipientId(''); }} placeholder="Rechercher un membre…" className="w-full rounded-xl border border-[#e1e3eb] py-3 pl-10 pr-4 text-sm outline-none focus:border-[#ec3b78]" /></div>
-                <div className="pt-2"><p className="mb-2 text-sm font-bold">3. Membres</p>{memberSearchLoading ? <p className="rounded-xl bg-[#f8f9fd] p-4 text-sm text-[#756960]">Recherche des profils…</p> : recipientMembers.length === 0 ? <p className="rounded-xl bg-[#f8f9fd] p-4 text-sm text-[#756960]">Aucun membre trouvé avec ces critères.</p> : <div className="grid max-h-[340px] gap-2 overflow-y-auto sm:grid-cols-2">{recipientMembers.map((member) => {
-                  const selected = recipientId === member.id;
+                <div className="relative"><Search size={17} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#9697a1]" /><input id="member-search" value={memberSearch} onChange={(event) => { setMemberSearch(event.target.value); setRecipientIds([]); setTargetIncompleteOnly(false); }} placeholder="Rechercher un membre…" className="w-full rounded-xl border border-[#e1e3eb] py-3 pl-10 pr-4 text-sm outline-none focus:border-[#ec3b78]" /></div>
+                <div className="pt-2"><div className="mb-2 flex items-center justify-between gap-3"><p className="text-sm font-bold">3. Membres</p>{recipientMembers.length > 0 && !targetIncompleteOnly && <button type="button" onClick={() => setRecipientIds((current) => current.length === recipientMembers.length ? [] : recipientMembers.map((member) => member.id))} className="text-xs font-extrabold text-[#c92e63]">{recipientIds.length === recipientMembers.length ? 'Tout désélectionner' : 'Sélectionner les résultats'}</button>}</div>{memberSearchLoading ? <p className="rounded-xl bg-[#f8f9fd] p-4 text-sm text-[#756960]">Recherche des profils…</p> : recipientMembers.length === 0 ? <p className="rounded-xl bg-[#f8f9fd] p-4 text-sm text-[#756960]">Aucun membre trouvé avec ces critères.</p> : <div className="grid max-h-[340px] gap-2 overflow-y-auto sm:grid-cols-2">{recipientMembers.map((member) => {
                   const age = member.birthdate ? Math.max(0, Math.floor((Date.now() - new Date(member.birthdate).getTime()) / 31557600000)) : null;
                   const photo = member.avatar_urls?.find(Boolean);
-                  return <button key={member.id} type="button" onClick={() => setRecipientId(member.id)} aria-pressed={selected} className={`flex min-w-0 items-center gap-3 rounded-2xl border p-3 text-left transition ${selected ? 'border-[#ec3b78] bg-[#fff1f6] ring-2 ring-[#ec3b78]/15' : 'border-[#e7e8ee] bg-white hover:border-[#f3a5c2] hover:bg-[#fffafd]'}`}>
+                  const selected = recipientIds.includes(member.id);
+                  const incomplete = member.onboarding_completed !== true || member.profile_status !== 'completed';
+                  return <button key={member.id} type="button" disabled={targetIncompleteOnly} onClick={() => setRecipientIds((current) => selected ? current.filter((id) => id !== member.id) : [...current, member.id])} aria-pressed={selected} className={`flex min-w-0 items-center gap-3 rounded-2xl border p-3 text-left transition disabled:cursor-not-allowed disabled:opacity-60 ${selected ? 'border-[#ec3b78] bg-[#fff1f6] ring-2 ring-[#ec3b78]/15' : 'border-[#e7e8ee] bg-white hover:border-[#f3a5c2] hover:bg-[#fffafd]'}`}>
                     <span className="h-14 w-14 shrink-0 overflow-hidden rounded-xl bg-[#f8f9fd]">{photo ? <img src={photo} alt="" className="h-full w-full object-cover" /> : <span className="flex h-full w-full items-center justify-center text-lg font-extrabold text-[#ec3b78]">{member.full_name?.charAt(0).toUpperCase() || 'M'}</span>}</span>
-                    <span className="min-w-0 flex-1"><span className="block truncate text-sm font-extrabold text-[#292832]">{member.full_name || 'Membre ARAS'}{age !== null ? `, ${age} ans` : ''}</span><span className="mt-1 block truncate text-xs text-[#756960]">{member.profession || 'Profession non renseignée'}</span><span className="mt-1 flex items-center gap-1 truncate text-xs text-[#8d8e99]">{member.city ? <><MapPin size={12} />{member.city}</> : member.gender || 'Membre'}</span></span>{selected && <Check size={17} className="shrink-0 text-[#ec3b78]" />}
+                    <span className="min-w-0 flex-1"><span className="block truncate text-sm font-extrabold text-[#292832]">{member.full_name || 'Membre ARAS'}{age !== null ? `, ${age} ans` : ''}</span><span className="mt-1 block truncate text-xs text-[#756960]">{member.profession || 'Profession non renseignée'}</span><span className="mt-1 flex items-center gap-1 truncate text-xs text-[#8d8e99]">{member.city ? <><MapPin size={12} />{member.city}</> : member.gender || 'Membre'}</span>{incomplete && <span className="mt-1 inline-flex rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-700">Compte à finaliser</span>}</span>{selected && <Check size={17} className="shrink-0 text-[#ec3b78]" />}
                   </button>;
                 })}</div>}</div>
-                {recipientId && <p className="text-xs font-semibold text-[#1a6b68]">Destinataire sélectionné : {memberById.get(recipientId)?.full_name || recipientMembers.find((member) => member.id === recipientId)?.full_name || 'Membre ARAS'}</p>}
+                {targetIncompleteOnly ? <p className="text-xs font-semibold text-[#1a6b68]">La notification sera envoyée à tous les comptes incomplets.</p> : recipientIds.length > 0 && <p className="text-xs font-semibold text-[#1a6b68]">{recipientIds.length} profil(s) sélectionné(s).</p>}
               </div>}
               <label htmlFor="announcement-title" className="mb-2 block text-sm font-bold">Titre</label>
               <input id="announcement-title" required maxLength={120} value={title} onChange={(event) => setTitle(event.target.value)} className="mb-5 w-full rounded-xl border border-[#e1e3eb] px-4 py-3 text-sm outline-none focus:border-[#ec3b78]" />
@@ -192,7 +201,7 @@ export default function ModerationPage() {
 
             <section className="rounded-3xl bg-white p-5 shadow-sm sm:p-7">
               <div className="mb-5"><p className="text-xs font-extrabold uppercase tracking-[.16em] text-[#1a6b68]">Historique</p><h2 className="mt-2 font-display text-2xl">Messages récents</h2></div>
-              {announcements.length === 0 ? <p className="rounded-2xl bg-[#f8f9fd] p-5 text-sm text-[#756960]">Aucun message envoyé pour le moment.</p> : <div className="space-y-3">{announcements.map((announcement) => <article key={announcement.id} className="rounded-2xl border border-[#e9eaf0] p-4"><div className="flex items-start justify-between gap-3"><div><h3 className="font-extrabold">{announcement.title}</h3><p className="mt-1 whitespace-pre-wrap text-sm leading-5 text-[#756960]">{announcement.body}</p></div><span className="shrink-0 rounded-full bg-[#eef7f5] px-2.5 py-1 text-[10px] font-extrabold text-[#1a6b68]">{announcement.recipient_count} reçu{announcement.recipient_count === 1 ? '' : 's'}</span></div><p className="mt-3 flex items-center gap-1.5 text-xs text-[#9697a1]"><Clock3 size={13} />{new Date(announcement.created_at).toLocaleString('fr-FR')} · {announcement.recipient_id ? memberById.get(announcement.recipient_id)?.full_name || 'Un membre' : 'Tous les membres'}</p></article>)}</div>}
+              {announcements.length === 0 ? <p className="rounded-2xl bg-[#f8f9fd] p-5 text-sm text-[#756960]">Aucun message envoyé pour le moment.</p> : <div className="space-y-3">{announcements.map((announcement) => <article key={announcement.id} className="rounded-2xl border border-[#e9eaf0] p-4"><div className="flex items-start justify-between gap-3"><div><h3 className="font-extrabold">{announcement.title}</h3><p className="mt-1 whitespace-pre-wrap text-sm leading-5 text-[#756960]">{announcement.body}</p></div><span className="shrink-0 rounded-full bg-[#eef7f5] px-2.5 py-1 text-[10px] font-extrabold text-[#1a6b68]">{announcement.recipient_count} reçu{announcement.recipient_count === 1 ? '' : 's'}</span></div><p className="mt-3 flex items-center gap-1.5 text-xs text-[#9697a1]"><Clock3 size={13} />{new Date(announcement.created_at).toLocaleString('fr-FR')} · {announcement.recipient_id ? memberById.get(announcement.recipient_id)?.full_name || 'Un membre' : announcement.target_incomplete_only ? 'Comptes à finaliser' : (announcement.recipient_ids?.length ?? 0) > 0 ? `${announcement.recipient_ids!.length} profils ciblés` : 'Tous les membres'}</p></article>)}</div>}
             </section>
           </div>
         ) : (

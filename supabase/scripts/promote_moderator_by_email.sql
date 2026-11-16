@@ -2,7 +2,7 @@
 -- Remplacer l’adresse ci-dessous par l’adresse exacte du compte à promouvoir.
 DO $$
 DECLARE
-  target_email text := lower(btrim('baldemouhamadoumansour6@gmail.com'));
+  target_email text := lower(btrim('nibacilaa@gmail.com'));
   target_user_id uuid;
   existing_role text;
 BEGIN

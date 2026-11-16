@@ -13,6 +13,8 @@ type ProfileRow = {
   city: string | null;
   profession: string | null;
   avatar_urls: string[] | null;
+  profile_status: string | null;
+  onboarding_completed: boolean | null;
 };
 
 function matchesContact(user: { email?: string; phone?: string }, query: string) {
@@ -32,15 +34,17 @@ export async function POST(request: Request) {
   const { data: role, error: roleError } = await userClient.rpc('current_staff_role');
   if (roleError || (role !== 'admin' && role !== 'moderator')) return NextResponse.json({ error: 'Accès non autorisé.' }, { status: 403 });
 
-  let body: { query?: unknown; gender?: unknown };
+  let body: { query?: unknown; gender?: unknown; incompleteOnly?: unknown };
   try { body = await request.json(); } catch { return NextResponse.json({ error: 'Requête invalide.' }, { status: 400 }); }
   const query = typeof body.query === 'string' ? body.query.trim().slice(0, 120).toLocaleLowerCase('fr') : '';
   const gender = body.gender === 'Homme' || body.gender === 'Femme' ? body.gender : null;
+  const incompleteOnly = body.incompleteOnly === true;
   const admin = getSupabaseAdmin();
   if (!admin) return NextResponse.json({ error: 'Recherche de membres indisponible.' }, { status: 503 });
 
-  let profileQuery = admin.from('profiles').select('id,full_name,gender,birthdate,city,profession,avatar_urls').eq('is_active', true).eq('is_temporarily_deactivated', false).order('created_at', { ascending: false });
+  let profileQuery = admin.from('profiles').select('id,full_name,gender,birthdate,city,profession,avatar_urls,profile_status,onboarding_completed').eq('is_active', true).eq('is_temporarily_deactivated', false).order('created_at', { ascending: false });
   if (gender) profileQuery = profileQuery.eq('gender', gender);
+  if (incompleteOnly) profileQuery = profileQuery.or('onboarding_completed.eq.false,onboarding_completed.is.null,profile_status.neq.completed,profile_status.is.null');
   if (query) profileQuery = profileQuery.ilike('full_name', `%${query.replace(/[%_,]/g, ' ')}%`);
   const { data: nameRows, error: profileError } = await profileQuery.limit(30);
   if (profileError) return NextResponse.json({ error: 'Recherche de membres indisponible.' }, { status: 503 });
@@ -57,8 +61,9 @@ export async function POST(request: Request) {
       }).map((authUser) => authUser.id);
       const missingIds = matchingIds.filter((id) => !profileById.has(id));
       if (missingIds.length) {
-        let matchesQuery = admin.from('profiles').select('id,full_name,gender,birthdate,city,profession,avatar_urls').in('id', missingIds).eq('is_active', true).eq('is_temporarily_deactivated', false);
+        let matchesQuery = admin.from('profiles').select('id,full_name,gender,birthdate,city,profession,avatar_urls,profile_status,onboarding_completed').in('id', missingIds).eq('is_active', true).eq('is_temporarily_deactivated', false);
         if (gender) matchesQuery = matchesQuery.eq('gender', gender);
+        if (incompleteOnly) matchesQuery = matchesQuery.or('onboarding_completed.eq.false,onboarding_completed.is.null,profile_status.neq.completed,profile_status.is.null');
         const { data: contactRows, error: contactError } = await matchesQuery.limit(30 - profileById.size);
         if (contactError) return NextResponse.json({ error: 'Recherche de membres indisponible.' }, { status: 503 });
         for (const row of contactRows ?? []) {
