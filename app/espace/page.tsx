@@ -347,7 +347,6 @@ export default function EspacePage() {
   const [mobileDiscoveryHistory, setMobileDiscoveryHistory] = useState<number[]>([]);
   const [expandedDiscoveryProfile, setExpandedDiscoveryProfile] = useState(false);
   const [discoveryPhotoIndexes, setDiscoveryPhotoIndexes] = useState<Record<string, number>>({});
-  const discoveryTouchStartX = useRef<number | null>(null);
   const [toggleBusyId, setToggleBusyId] = useState<string | null>(null);
   const [profileForm, setProfileForm] = useState({ display_name: '', age: '', city: 'Dakar', bio: '', profession: '', photo_url: '', interests: [] as string[], languages: [] as string[], religion: '', caste: '', marital_status: '', smoking_habit: '' });
   const [profileCityFocused, setProfileCityFocused] = useState(false);
@@ -1695,6 +1694,15 @@ export default function EspacePage() {
     return matchesCity && matchesAge && matchesProfession && matchesHeight && matchesReligion && matchesPreference && matchesSituation && matchesInterests && matchesDistance;
   });
   const mobileDiscoveryProfile = filteredDiscoveryProfiles[mobileDiscoveryIndex];
+  useEffect(() => {
+    if (filteredDiscoveryProfiles.length === 0) {
+      setMobileDiscoveryIndex(0);
+      setMobileDiscoveryHistory([]);
+      return;
+    }
+    setMobileDiscoveryIndex((index) => index >= filteredDiscoveryProfiles.length ? 0 : index);
+    setMobileDiscoveryHistory((history) => history.filter((index) => index < filteredDiscoveryProfiles.length));
+  }, [filteredDiscoveryProfiles.length]);
   const desktopDiscoverySafeIndex = Math.min(desktopDiscoveryIndex, Math.max(0, filteredDiscoveryProfiles.length - 1));
   const desktopDiscoveryProfile = filteredDiscoveryProfiles[desktopDiscoverySafeIndex];
   const refreshCurrentDiscoveryProfiles = useCallback(async () => {
@@ -1831,13 +1839,9 @@ export default function EspacePage() {
   }
 
   const advanceMobileDiscovery = () => {
-    if (mobileDiscoveryIndex >= filteredDiscoveryProfiles.length - 1) {
-      setMobileDiscoveryHistory((history) => [...history, mobileDiscoveryIndex]);
-      setMobileDiscoveryIndex(filteredDiscoveryProfiles.length);
-      return;
-    }
+    if (filteredDiscoveryProfiles.length === 0) return;
     setMobileDiscoveryHistory((history) => [...history, mobileDiscoveryIndex]);
-    setMobileDiscoveryIndex((index) => index + 1);
+    setMobileDiscoveryIndex((index) => index >= filteredDiscoveryProfiles.length - 1 ? 0 : index + 1);
   };
   const goBackMobileDiscovery = () => {
     setMobileDiscoveryIndex((index) => index >= filteredDiscoveryProfiles.length ? Math.max(0, index - 1) : mobileDiscoveryHistory.at(-1) ?? Math.max(0, index - 1));
@@ -1917,16 +1921,11 @@ export default function EspacePage() {
                 </div>
               ) : (
                 <>
-                {filteredDiscoveryProfiles.length > 0 && mobileDiscoveryIndex >= filteredDiscoveryProfiles.length && <section className="mx-auto flex min-h-0 w-full max-w-[560px] flex-1 flex-col items-center justify-center rounded-[30px] bg-white px-6 text-center shadow dark:bg-[#19191f] lg:hidden">
-                  <Users size={44} className="text-[#9a8b82]" />
-                  <div className="mt-5 flex flex-wrap justify-center gap-3"><button type="button" onClick={goBackMobileDiscovery} className="rounded-full border px-5 py-3 text-sm font-bold">Revenir au profil précédent</button><button type="button" onClick={() => { setMobileDiscoveryIndex(0); setMobileDiscoveryHistory([]); }} className="rounded-full bg-[#ec3b78] px-5 py-3 text-sm font-bold text-white">Recommencer</button></div>
-                </section>}
                 {mobileDiscoveryProfile && (
                   <section className="mx-auto flex h-full min-h-0 w-full max-w-[560px] flex-col lg:contents" aria-label="Profils à découvrir">
                     <article
                       key={mobileDiscoveryProfile.id}
                       onMouseEnter={() => { if (window.matchMedia('(min-width: 1024px)').matches) void recordProfileVisit(mobileDiscoveryProfile.id); }}
-                      onTouchStart={(event) => { discoveryTouchStartX.current = event.touches[0]?.clientX ?? null; }}
                       onClick={(event) => {
                         if ((event.target as HTMLElement).closest('button')) return;
                         const bounds = event.currentTarget.getBoundingClientRect();
@@ -1934,14 +1933,6 @@ export default function EspacePage() {
                         if (!photos.length) return;
                         const delta = event.clientX > bounds.left + bounds.width / 2 ? 1 : -1;
                         setDiscoveryPhotoIndexes((current) => ({ ...current, [mobileDiscoveryProfile.id]: ((current[mobileDiscoveryProfile.id] ?? 0) + delta + photos.length) % photos.length }));
-                      }}
-                      onTouchEnd={(event) => {
-                        const startX = discoveryTouchStartX.current;
-                        const endX = event.changedTouches[0]?.clientX;
-                        discoveryTouchStartX.current = null;
-                        if (startX === null || endX === undefined || Math.abs(endX - startX) < 65) return;
-                        if (endX > startX) goBackMobileDiscovery();
-                        else advanceMobileDiscovery();
                       }}
                       className="relative mx-auto flex min-h-0 w-full flex-1 flex-col touch-pan-y lg:hidden"
                     >
