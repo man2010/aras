@@ -2465,7 +2465,7 @@ export default function EspacePage() {
                       {messages.length === 0 && <p className="py-8 text-center text-sm text-[#9a8b82]">Démarrez la conversation.</p>}
                     </div>
                     <form onSubmit={sendMessage} className="mt-3 flex min-w-0 shrink-0 gap-2">
-                      <input value={newMessage} onChange={(e) => setNewMessage(e.target.value)} placeholder="Votre message..." className="min-w-0 flex-1 rounded-full border border-[#dfd2c6] bg-[#f8f9fd] px-3 py-3 text-sm outline-none focus:border-[#ec3b78] sm:px-4" />
+                      <input value={newMessage} onChange={(e) => setNewMessage(e.target.value)} placeholder="Votre message..." className="min-w-0 flex-1 rounded-full border border-[#dfd2c6] bg-[#f8f9fd] px-3 py-3 text-base outline-none focus:border-[#ec3b78] sm:px-4 sm:text-sm" />
                       <button type="submit" className="flex h-12 w-12 items-center justify-center rounded-full bg-[#ec3b78] text-white transition hover:bg-[#c92e63]"><Send size={18} /></button>
                     </form>
                   </>
