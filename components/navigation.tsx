@@ -31,6 +31,24 @@ type MiniProfile = {
 };
 
 const fallbackAvatar = '/images/default-avatar.svg';
+const NOTIFICATION_PAGE_SIZE = 500;
+
+async function fetchAllNotificationRows<T>(
+  fetchPage: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: unknown }>
+): Promise<T[]> {
+  const rows: T[] = [];
+  for (let from = 0; ; from += NOTIFICATION_PAGE_SIZE) {
+    const { data, error } = await fetchPage(from, from + NOTIFICATION_PAGE_SIZE - 1);
+    if (error) {
+      console.error('[notifications] Unable to load a notification page.', error);
+      break;
+    }
+    const page = data ?? [];
+    rows.push(...page);
+    if (page.length < NOTIFICATION_PAGE_SIZE) break;
+  }
+  return rows;
+}
 
 export function Navbar({ isAdminMode = false, isModeratorMode = false }: { isAdminMode?: boolean; isModeratorMode?: boolean }) {
   const [open, setOpen] = useState(false);
@@ -186,44 +204,45 @@ export function Navbar({ isAdminMode = false, isModeratorMode = false }: { isAdm
     let cancelled = false;
     const readEventsKey = `aras-read-events-${user.id}`;
     const loadNotifications = async () => {
-      const [{ data: messageRows }, { data: eventRows }, { data: registrations }, { data: storedNotifications }] = await Promise.all([
-        supabase
+      const [messageRows, eventRows, registrations, storedNotifications] = await Promise.all([
+        fetchAllNotificationRows((from, to) => supabase
           .from('messages')
           .select('id, sender_id, content, created_at, match_id')
           .eq('receiver_id', user.id)
           .eq('is_read', false)
           .order('created_at', { ascending: false })
-          .limit(6),
-        supabase
+          .order('id', { ascending: true })
+          .range(from, to)),
+        fetchAllNotificationRows((from, to) => supabase
           .from('events')
           .select('id, title, description, date, location, city, image_url, created_at')
           .eq('is_active', true)
           .gte('date', new Date().toISOString())
           .gte('created_at', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString())
           .order('date', { ascending: true })
-          .limit(5),
-        supabase.from('event_registrations').select('event_id').eq('user_id', user.id).eq('status', 'confirmed'),
-        supabase.from('user_notifications').select('id, title, body, created_at, read_at, kind, actor_id').eq('user_id', user.id).is('read_at', null).order('created_at', { ascending: false }).limit(20),
+          .order('id', { ascending: true })
+          .range(from, to)),
+        fetchAllNotificationRows((from, to) => supabase.from('event_registrations').select('event_id').eq('user_id', user.id).eq('status', 'confirmed').order('event_id', { ascending: true }).range(from, to)),
+        fetchAllNotificationRows((from, to) => supabase.from('user_notifications').select('id, title, body, created_at, read_at, kind, actor_id').eq('user_id', user.id).is('read_at', null).order('created_at', { ascending: false }).order('id', { ascending: true }).range(from, to)),
       ]);
 
       const reminderFrom = new Date().toISOString();
       const reminderUntil = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
-      const registeredEventIds = (registrations ?? []).map((row: { event_id: string }) => row.event_id);
-      const { data: reminderRows } = registeredEventIds.length
-        ? await supabase.from('events').select('id, title, date, location, city, created_at').in('id', registeredEventIds).gte('date', reminderFrom).lte('date', reminderUntil).eq('is_active', true)
-        : { data: [] };
+      const registeredEventIds = registrations.map((row: { event_id: string }) => row.event_id);
+      const reminderRows = (await Promise.all(Array.from({ length: Math.ceil(registeredEventIds.length / 200) }, (_, index) => {
+        const eventIdBatch = registeredEventIds.slice(index * 200, index * 200 + 200);
+        return fetchAllNotificationRows((from, to) => supabase.from('events').select('id, title, date, location, city, created_at').in('id', eventIdBatch).gte('date', reminderFrom).lte('date', reminderUntil).eq('is_active', true).order('date', { ascending: true }).order('id', { ascending: true }).range(from, to));
+      }))).flat();
 
-      const senderIds = Array.from(new Set((messageRows ?? []).map((row: { sender_id: string }) => row.sender_id)));
-      const { data: senderRows } = senderIds.length > 0
-        ? await supabase.from('profiles_visible').select('id, full_name, avatar_urls').in('id', senderIds)
-        : { data: [] };
-      const senderMap = new Map((senderRows ?? []).map((row: { id: string; full_name: string | null; avatar_urls: string[] | null }) => [
+      const senderIds = Array.from(new Set(messageRows.map((row: { sender_id: string }) => row.sender_id)));
+      const senderRows = (await Promise.all(Array.from({ length: Math.ceil(senderIds.length / 200) }, (_, index) => supabase.from('profiles_visible').select('id, full_name, avatar_urls').in('id', senderIds.slice(index * 200, index * 200 + 200))))).flatMap(({ data }) => data ?? []);
+      const senderMap = new Map(senderRows.map((row: { id: string; full_name: string | null; avatar_urls: string[] | null }) => [
         row.id,
         { name: row.full_name || 'Nouveau message', avatarUrl: row.avatar_urls?.[0] },
       ]));
-      const notificationActorIds = Array.from(new Set((storedNotifications ?? []).map((row: { actor_id: string | null }) => row.actor_id).filter((id: string | null): id is string => Boolean(id))));
-      const { data: notificationActors } = notificationActorIds.length ? await supabase.from('profiles_visible').select('id, avatar_urls').in('id', notificationActorIds) : { data: [] };
-      const notificationActorAvatars = new Map((notificationActors ?? []).map((row: { id: string; avatar_urls: string[] | null }) => [row.id, row.avatar_urls?.[0] ?? undefined]));
+      const notificationActorIds = Array.from(new Set(storedNotifications.map((row: { actor_id: string | null }) => row.actor_id).filter((id: string | null): id is string => Boolean(id))));
+      const notificationActors = (await Promise.all(Array.from({ length: Math.ceil(notificationActorIds.length / 200) }, (_, index) => supabase.from('profiles_visible').select('id, avatar_urls').in('id', notificationActorIds.slice(index * 200, index * 200 + 200))))).flatMap(({ data }) => data ?? []);
+      const notificationActorAvatars = new Map(notificationActors.map((row: { id: string; avatar_urls: string[] | null }) => [row.id, row.avatar_urls?.[0] ?? undefined]));
       let readEventIds: string[] = [];
       try {
         readEventIds = JSON.parse(window.localStorage.getItem(readEventsKey) || '[]') as string[];
@@ -272,14 +291,14 @@ export function Navbar({ isAdminMode = false, isModeratorMode = false }: { isAdm
         type: row.kind === 'moderator_announcement' ? 'announcement' as const : row.kind === 'like_received' ? 'like' as const : row.kind === 'match_created' ? 'match' as const : 'event' as const,
         title: row.title,
         message: row.body,
-        href: row.kind === 'moderator_announcement' ? `/espace?tab=messages&announcement=${row.id}` : row.kind === 'like_received' ? '/espace?tab=likes' : row.kind === 'match_created' ? '/espace?tab=matches' : '/espace?tab=events',
+        href: row.kind === 'moderator_announcement' ? `/espace?tab=messages&announcement=${row.id}` : row.kind === 'like_received' ? row.actor_id ? `/espace?tab=likes&like=${row.actor_id}` : '/espace?tab=likes' : row.kind === 'match_created' ? '/espace?tab=matches' : '/espace?tab=events',
         createdAt: row.created_at,
         avatarUrl: row.actor_id ? notificationActorAvatars.get(row.actor_id) : undefined,
         unread: !row.read_at,
       }));
 
       if (!cancelled) {
-        setNotifications([...messageNotifications, ...storedEventNotifications, ...eventNotifications, ...reminderNotifications].sort((first, second) => new Date(second.createdAt).getTime() - new Date(first.createdAt).getTime()).slice(0, 8));
+        setNotifications([...messageNotifications, ...storedEventNotifications, ...eventNotifications, ...reminderNotifications].sort((first, second) => new Date(second.createdAt).getTime() - new Date(first.createdAt).getTime()));
         setUnreadEventCount([...storedEventNotifications, ...eventNotifications, ...reminderNotifications].filter((notification) => notification.unread).length);
       }
     };

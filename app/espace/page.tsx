@@ -851,6 +851,23 @@ export default function EspacePage() {
   }, [searchParams, user]);
 
   useEffect(() => {
+    const profileId = searchParams.get('like');
+    if (!profileId || !user) return;
+    let cancelled = false;
+    setTab('likes');
+    setLikesView('received');
+    setActiveModeratorAnnouncement(null);
+    setActiveConv(null);
+    void supabase.from('profiles_visible').select(PROFILE_CARD_SELECT).eq('id', profileId).maybeSingle()
+      .then(({ data }) => {
+        if (cancelled || !data) return;
+        setProfileDetailPhotoIndex(0);
+        setSelectedProfileDetail(toProfile(data as ProfileRow));
+      });
+    return () => { cancelled = true; };
+  }, [searchParams, user]);
+
+  useEffect(() => {
     if (!user) {
       setModeratorConversationMessages([]);
       return;
