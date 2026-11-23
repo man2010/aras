@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, ArrowRight, BookOpen, Briefcase, Camera, Check, Cigarette, ClipboardList, Heart, Languages, MapPin, MessageCircle, Plus, UserRound, Users } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
@@ -159,45 +159,58 @@ export default function OnboardingPage() {
   const [smokingHabit, setSmokingHabit] = useState('');
   const [bio, setBio] = useState('');
 
+  const applyDraft = useCallback((draft: Partial<OnboardingDraft>) => {
+    if (Number.isInteger(draft.step) && (draft.step as number) >= 0 && (draft.step as number) <= 5) setStep(draft.step as Step);
+    if (typeof draft.name === 'string') setName(draft.name);
+    if (draft.gender === '' || draft.gender === 'Homme' || draft.gender === 'Femme') setGender(draft.gender);
+    if (typeof draft.birthdate === 'string') setBirthdate(draft.birthdate);
+    if (typeof draft.locationLabel === 'string') setLocationLabel(draft.locationLabel);
+    if (typeof draft.cityName === 'string') setCityName(draft.cityName);
+    if (draft.locationMode === 'manual' || draft.locationMode === 'automatic') setLocationMode(draft.locationMode);
+    if (typeof draft.manualCity === 'string') setManualCity(draft.manualCity);
+    if (typeof draft.manualAddress === 'string') setManualAddress(draft.manualAddress);
+    if (typeof draft.manualSelectedLabel === 'string') setManualSelectedLabel(draft.manualSelectedLabel);
+    if (typeof draft.resolvedCity === 'string') setResolvedCity(draft.resolvedCity);
+    if (typeof draft.lat === 'number' || draft.lat === null) setLat(draft.lat);
+    if (typeof draft.lng === 'number' || draft.lng === null) setLng(draft.lng);
+    if (typeof draft.primaryPhoto === 'string') setPrimaryPhoto(draft.primaryPhoto);
+    if (Array.isArray(draft.extraPhotos) && draft.extraPhotos.length === 6 && draft.extraPhotos.every((photo) => photo === null || typeof photo === 'string')) setExtraPhotos(draft.extraPhotos);
+    if (typeof draft.profession === 'string') setProfession(draft.profession);
+    if (Array.isArray(draft.interests) && draft.interests.every((item) => typeof item === 'string')) setInterests(draft.interests);
+    if (Array.isArray(draft.languages) && draft.languages.every((item) => typeof item === 'string')) setLanguages(draft.languages);
+    if (typeof draft.religion === 'string') setReligion(draft.religion);
+    if (typeof draft.caste === 'string') setCaste(draft.caste);
+    if (typeof draft.maritalStatus === 'string') setMaritalStatus(draft.maritalStatus);
+    if (typeof draft.smokingHabit === 'string') setSmokingHabit(draft.smokingHabit);
+    if (typeof draft.bio === 'string') setBio(draft.bio);
+  }, []);
+
   useEffect(() => {
     if (!user) return;
 
     const draftKey = `aras:onboarding-draft:${user.id}`;
-    try {
-      const rawDraft = window.localStorage.getItem(draftKey);
-      if (rawDraft) {
-        const draft = JSON.parse(rawDraft) as Partial<OnboardingDraft>;
-        if (draft.version === 1) {
-          if (Number.isInteger(draft.step) && (draft.step as number) >= 0 && (draft.step as number) <= 5) setStep(draft.step as Step);
-          if (typeof draft.name === 'string') setName(draft.name);
-          if (draft.gender === '' || draft.gender === 'Homme' || draft.gender === 'Femme') setGender(draft.gender);
-          if (typeof draft.birthdate === 'string') setBirthdate(draft.birthdate);
-          if (typeof draft.locationLabel === 'string') setLocationLabel(draft.locationLabel);
-          if (typeof draft.cityName === 'string') setCityName(draft.cityName);
-          if (draft.locationMode === 'manual' || draft.locationMode === 'automatic') setLocationMode(draft.locationMode);
-          if (typeof draft.manualCity === 'string') setManualCity(draft.manualCity);
-          if (typeof draft.manualAddress === 'string') setManualAddress(draft.manualAddress);
-          if (typeof draft.manualSelectedLabel === 'string') setManualSelectedLabel(draft.manualSelectedLabel);
-          if (typeof draft.resolvedCity === 'string') setResolvedCity(draft.resolvedCity);
-          if (typeof draft.lat === 'number' || draft.lat === null) setLat(draft.lat);
-          if (typeof draft.lng === 'number' || draft.lng === null) setLng(draft.lng);
-          if (typeof draft.primaryPhoto === 'string') setPrimaryPhoto(draft.primaryPhoto);
-          if (Array.isArray(draft.extraPhotos) && draft.extraPhotos.length === 6 && draft.extraPhotos.every((photo) => photo === null || typeof photo === 'string')) setExtraPhotos(draft.extraPhotos);
-          if (typeof draft.profession === 'string') setProfession(draft.profession);
-          if (Array.isArray(draft.interests) && draft.interests.every((item) => typeof item === 'string')) setInterests(draft.interests);
-          if (Array.isArray(draft.languages) && draft.languages.every((item) => typeof item === 'string')) setLanguages(draft.languages);
-          if (typeof draft.religion === 'string') setReligion(draft.religion);
-          if (typeof draft.caste === 'string') setCaste(draft.caste);
-          if (typeof draft.maritalStatus === 'string') setMaritalStatus(draft.maritalStatus);
-          if (typeof draft.smokingHabit === 'string') setSmokingHabit(draft.smokingHabit);
-          if (typeof draft.bio === 'string') setBio(draft.bio);
+    let cancelled = false;
+    void (async () => {
+      let draft: Partial<OnboardingDraft> | null = null;
+      const { data } = await supabase.from('profiles').select('onboarding_draft').eq('id', user.id).maybeSingle();
+      if (cancelled) return;
+      if (data?.onboarding_draft && typeof data.onboarding_draft === 'object') {
+        draft = data.onboarding_draft as Partial<OnboardingDraft>;
+      }
+      // Import drafts made by the previous device-only version when no server draft exists.
+      if (!draft?.version) {
+        try {
+          const rawDraft = window.localStorage.getItem(draftKey);
+          if (rawDraft) draft = JSON.parse(rawDraft) as Partial<OnboardingDraft>;
+        } catch {
+          // A corrupt or unavailable local draft should not prevent onboarding.
         }
       }
-    } catch {
-      // A corrupt or unavailable local draft should not prevent onboarding.
-    }
-    setDraftLoadedForUser(user.id);
-  }, [user]);
+      if (draft?.version === 1) applyDraft(draft);
+      setDraftLoadedForUser(user.id);
+    })();
+    return () => { cancelled = true; };
+  }, [user, applyDraft]);
 
   useEffect(() => {
     if (!user || draftLoadedForUser !== user.id) return;
@@ -211,6 +224,15 @@ export default function OnboardingPage() {
     } catch {
       // Storage can be disabled or full; the form remains usable for this visit.
     }
+    const timeout = window.setTimeout(() => {
+      void supabase.from('profiles').update({ onboarding_draft: draft }).eq('id', user.id).select('id').maybeSingle()
+        .then(({ data, error }) => {
+          if (!error && data) {
+            try { window.localStorage.removeItem(`aras:onboarding-draft:${user.id}`); } catch { /* Ignore unavailable storage. */ }
+          }
+        });
+    }, 500);
+    return () => window.clearTimeout(timeout);
   }, [user, draftLoadedForUser, step, name, gender, birthdate, locationLabel, cityName, locationMode, manualCity, manualAddress, manualSelectedLabel, resolvedCity, lat, lng, primaryPhoto, extraPhotos, profession, interests, languages, religion, caste, maritalStatus, smokingHabit, bio]);
 
   const steps = ['Profil', 'Localisation', 'Photo principale', 'Photos', 'Infos facultatives', 'Aperçu'];
@@ -443,6 +465,7 @@ export default function OnboardingPage() {
       photos,
       profile_status: 'completed',
       onboarding_completed: true,
+      onboarding_draft: null,
       is_active: true,
     };
 
@@ -502,11 +525,8 @@ export default function OnboardingPage() {
             <p className="text-[11px] font-extrabold uppercase tracking-[0.22em] text-[#d63373] dark:text-[#ff7ab3]">Finaliser le profil</p>
             <h1 className="mt-2 font-display text-3xl tracking-[-0.05em] text-[#241c18] dark:text-white sm:mt-3 sm:text-4xl lg:text-5xl">Bienvenue chez ARAS</h1>
           </div>
-          <div className="self-start text-left sm:text-right">
-            <div className="inline-flex rounded-full border border-[#eadfd5] bg-[#f8f9fd] px-3 py-2 text-[10px] font-bold uppercase tracking-[0.12em] text-[#625852] dark:border-white/10 dark:bg-white/5 dark:text-white/80 sm:px-4 sm:text-xs sm:tracking-[0.18em]">
-              Étape {step + 1} / {steps.length}
-            </div>
-            <p className="mt-2 text-[11px] text-[#9a8b82] dark:text-white/45">Ta progression est enregistrée automatiquement sur cet appareil.</p>
+          <div className="self-start rounded-full border border-[#eadfd5] bg-[#f8f9fd] px-3 py-2 text-[10px] font-bold uppercase tracking-[0.12em] text-[#625852] dark:border-white/10 dark:bg-white/5 dark:text-white/80 sm:self-auto sm:px-4 sm:text-xs sm:tracking-[0.18em]">
+            Étape {step + 1} / {steps.length}
           </div>
         </div>
 
