@@ -13,6 +13,7 @@ import { AppSidebar, type EspaceTab } from '@/components/app-sidebar';
 import { Slider } from '@/components/ui/slider';
 
 type Tab = EspaceTab;
+type ModeratorConversationMessage = { id: string; title: string; body: string; created_at: string; read_at: string | null };
 const ESPACE_TABS: Tab[] = ['decouverte', 'profile', 'messages', 'likes', 'matches', 'events', 'settings-profile', 'settings-privacy', 'settings-security', 'settings-subscription', 'settings-help'];
 
 function getInitialEspaceTab(): Tab {
@@ -378,6 +379,7 @@ export default function EspacePage() {
   const [activeConv, setActiveConv] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [activeModeratorAnnouncement, setActiveModeratorAnnouncement] = useState<{ id: string; title: string; body: string; created_at: string } | null>(null);
+  const [moderatorConversationMessages, setModeratorConversationMessages] = useState<ModeratorConversationMessage[]>([]);
   const [conversationProfiles, setConversationProfiles] = useState<Record<string, Profile>>({});
   const [newMessage, setNewMessage] = useState('');
   const [messageSearch, setMessageSearch] = useState('');
@@ -847,6 +849,45 @@ export default function EspacePage() {
     }
     setActiveModeratorAnnouncement(null);
   }, [searchParams, user]);
+
+  useEffect(() => {
+    if (!user) {
+      setModeratorConversationMessages([]);
+      return;
+    }
+    let cancelled = false;
+    const loadModeratorMessages = async () => {
+      const allMessages: ModeratorConversationMessage[] = [];
+      const pageSize = 500;
+      for (let offset = 0; !cancelled; offset += pageSize) {
+        const { data, error } = await supabase.from('user_notifications')
+          .select('id,title,body,created_at,read_at')
+          .eq('user_id', user.id)
+          .eq('kind', 'moderator_announcement')
+          .order('created_at', { ascending: true })
+          .range(offset, offset + pageSize - 1);
+        if (error) return;
+        const page = (data ?? []) as ModeratorConversationMessage[];
+        allMessages.push(...page);
+        if (page.length < pageSize) break;
+      }
+      if (!cancelled) setModeratorConversationMessages(allMessages);
+    };
+    void loadModeratorMessages();
+    const channel = supabase.channel(`moderator-conversation-${user.id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'user_notifications', filter: `user_id=eq.${user.id}` }, () => void loadModeratorMessages())
+      .subscribe();
+    return () => {
+      cancelled = true;
+      void supabase.removeChannel(channel);
+    };
+  }, [user]);
+
+  useEffect(() => {
+    if (!user || !activeModeratorAnnouncement) return;
+    void supabase.from('user_notifications').update({ read_at: new Date().toISOString() })
+      .eq('user_id', user.id).eq('kind', 'moderator_announcement').is('read_at', null);
+  }, [user, activeModeratorAnnouncement?.id]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1860,6 +1901,12 @@ export default function EspacePage() {
     const name = conversationProfiles[otherId]?.display_name || '';
     return name.toLowerCase().includes(messageSearch.trim().toLowerCase());
   });
+  const latestModeratorMessage = moderatorConversationMessages.at(-1);
+  const unreadModeratorMessages = moderatorConversationMessages.filter((item) => !item.read_at).length;
+  const showModeratorConversation = Boolean(latestModeratorMessage) && (!messageSearch.trim()
+    || 'aras'.includes(messageSearch.trim().toLocaleLowerCase('fr'))
+    || latestModeratorMessage?.title.toLocaleLowerCase('fr').includes(messageSearch.trim().toLocaleLowerCase('fr'))
+    || latestModeratorMessage?.body.toLocaleLowerCase('fr').includes(messageSearch.trim().toLocaleLowerCase('fr')));
   const filterCardClass = 'rounded-[26px] bg-white p-6 shadow-[0_10px_28px_rgba(20,20,30,.06)] dark:bg-[#242424] dark:shadow-none';
   const filterChipClass = (selected: boolean) => `inline-flex min-h-11 items-center gap-2 rounded-full border px-4 py-2 text-sm transition ${selected ? 'border-[#ec1689] bg-[#ec1689]/10 text-[#ec1689] dark:bg-[#ec1689]/15 dark:text-[#ff4b9b]' : 'border-[#e4e5eb] bg-transparent text-[#696b76] hover:border-[#ec1689]/60 dark:border-white/10 dark:text-white/65 dark:hover:border-[#ec1689]/60'}`;
 
@@ -2327,23 +2374,25 @@ export default function EspacePage() {
                       <p className="text-xs text-[#9a8b82]">Information officielle</p>
                     </div>
                   </header>
-                  <div className="min-h-0 flex-1 overflow-y-auto rounded-xl bg-[#f8f9fd] p-4 sm:p-6">
-                    <div className="flex justify-start">
-                      <article className="max-w-[min(90%,48rem)] rounded-2xl bg-white px-4 py-3 text-sm text-[#241c18] shadow-sm sm:px-5">
-                        <p className="mb-2 text-xs font-bold text-[#ec3b78]">{activeModeratorAnnouncement.title}</p>
-                        <p className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]">{activeModeratorAnnouncement.body}</p>
-                        <time className="mt-2 block text-right text-[10px] text-[#9a8b82]">
-                          {new Date(activeModeratorAnnouncement.created_at).toLocaleString('fr-FR', { dateStyle: 'medium', timeStyle: 'short' })}
-                        </time>
-                      </article>
-                    </div>
+                  <div className="min-h-0 flex-1 space-y-3 overflow-y-auto rounded-xl bg-[#f8f9fd] p-4 sm:p-6">
+                    {(moderatorConversationMessages.length ? moderatorConversationMessages : [activeModeratorAnnouncement]).map((item) => (
+                      <div key={item.id} className="flex justify-start">
+                        <article className={`max-w-[min(90%,48rem)] rounded-2xl bg-white px-4 py-3 text-sm text-[#241c18] shadow-sm sm:px-5 ${item.id === activeModeratorAnnouncement.id ? 'ring-2 ring-[#ec3b78]/30' : ''}`}>
+                          <p className="mb-2 text-xs font-bold text-[#ec3b78]">{item.title}</p>
+                          <p className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]">{item.body}</p>
+                          <time className="mt-2 block text-right text-[10px] text-[#9a8b82]">
+                            {new Date(item.created_at).toLocaleString('fr-FR', { dateStyle: 'medium', timeStyle: 'short' })}
+                          </time>
+                        </article>
+                      </div>
+                    ))}
                   </div>
                 </section>
               ) : (
               <div className="grid min-w-0 gap-4 lg:grid-cols-[340px_minmax(0,1fr)] lg:gap-6">
               <div className={`${activeConv ? 'hidden lg:block' : 'block'} max-h-[calc(100dvh-180px)] min-w-0 overflow-y-auto rounded-[26px] border border-[#dfd2c6] bg-white p-3 shadow-[0_8px_30px_rgba(83,46,32,.05)] sm:p-4 lg:max-h-none`}>
                 <p className="px-2 pb-3 font-display text-xl">Conversations</p>
-                {conversations.length > 0 && (
+                {(conversations.length > 0 || moderatorConversationMessages.length > 0) && (
                   <div className="relative mb-3 px-2">
                     <Search size={15} className="absolute left-5 top-1/2 -translate-y-1/2 text-[#9a8b82]" />
                     <input
@@ -2354,17 +2403,36 @@ export default function EspacePage() {
                     />
                   </div>
                 )}
-                {conversations.length === 0 ? (
+                {conversations.length === 0 && moderatorConversationMessages.length === 0 ? (
                   <div className="px-2 py-8 text-center">
                     <MessageCircle size={28} className="mx-auto text-[#dfd2c6]" />
                     <p className="mt-3 text-sm text-[#756960]">Aucune conversation pour l&apos;instant.</p>
                     <p className="mt-1 text-xs text-[#9a8b82]">Ouvrez un profil et appuyez sur l’icône message pour démarrer une discussion.</p>
                     <Link href="/decouverte" className="mt-4 inline-block rounded-full bg-[#ec3b78] px-5 py-2.5 text-xs font-extrabold text-white">Découvrir des profils</Link>
                   </div>
-                ) : filteredConversations.length === 0 ? (
+                ) : filteredConversations.length === 0 && !showModeratorConversation ? (
                   <p className="px-2 py-8 text-center text-sm text-[#9a8b82]">Aucune conversation ne correspond à « {messageSearch} ».</p>
                 ) : (
                   <div className="space-y-1">
+                    {showModeratorConversation && latestModeratorMessage && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setActiveConv(null);
+                          setActiveModeratorAnnouncement(latestModeratorMessage);
+                          router.replace(`/espace?tab=messages&announcement=${latestModeratorMessage.id}`);
+                        }}
+                        className={`flex w-full items-center gap-3 rounded-xl border px-3 py-3 text-left transition ${activeModeratorAnnouncement ? 'border-[#ec3b78]/40 bg-[#fae4e2]' : 'border-[#dfd2c6] hover:bg-[#f8f9fd]'}`}
+                      >
+                        <div className="relative flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#ec3b78]/10 text-sm font-extrabold text-[#ec3b78]">A
+                          {unreadModeratorMessages > 0 && <span className="absolute -bottom-1 -right-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-[#ec3b78] px-1 text-[10px] font-extrabold text-white">{unreadModeratorMessages > 9 ? '9+' : unreadModeratorMessages}</span>}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center justify-between gap-2"><p className="truncate text-sm font-bold text-[#241c18]">ARAS</p><time className="shrink-0 text-[10px] text-[#9a8b82]">{new Date(latestModeratorMessage.created_at).toLocaleDateString('fr-FR')}</time></div>
+                          <p className="mt-0.5 truncate text-xs text-[#9a8b82]">{latestModeratorMessage.body}</p>
+                        </div>
+                      </button>
+                    )}
                     {filteredConversations.map((c) => {
                       const otherId = c.user_a === user.id ? c.user_b : c.user_a;
                       const otherProfile = conversationProfiles[otherId];
