@@ -4,19 +4,23 @@ import { useState } from 'react';
 import { Search, Ban, Mail, Phone, MapPin, Briefcase, CheckCircle, XCircle, Download, X } from 'lucide-react';
 import type { Profile } from '@/lib/types';
 
-type AdminProfile = Profile & { adminLocation?: string | null; authContact?: string | null; authContactMethod?: 'email' | 'phone' | null };
+type AdminProfile = Profile & { adminLocation?: string | null; adminPlan?: string | null; authContact?: string | null; authContactMethod?: 'email' | 'phone' | null };
 
 interface AdminUsersProps {
   profiles: AdminProfile[];
   genderFilter: string;
   onGenderFilterChange: (gender: string) => void;
+  planFilter: string;
+  onPlanFilterChange: (plan: string) => void;
   currentPage: number;
   totalPages: number;
   onPageChange: (page: number) => void;
   onToggleBlocked: (profileId: string, currentlyActive: boolean) => void;
+  loadError?: string;
+  loaded?: boolean;
 }
 
-export function AdminUsers({ profiles, genderFilter, onGenderFilterChange, currentPage, totalPages, onPageChange, onToggleBlocked }: AdminUsersProps) {
+export function AdminUsers({ profiles, genderFilter, onGenderFilterChange, planFilter, onPlanFilterChange, currentPage, totalPages, onPageChange, onToggleBlocked, loadError = '', loaded = true }: AdminUsersProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterCity, setFilterCity] = useState('');
   const [filterVerified, setFilterVerified] = useState<'all' | 'verified' | 'unverified'>('all');
@@ -31,7 +35,8 @@ export function AdminUsers({ profiles, genderFilter, onGenderFilterChange, curre
     const matchesVerified = filterVerified === 'all' ||
                          (filterVerified === 'verified' && p.is_verified) ||
                          (filterVerified === 'unverified' && !p.is_verified);
-    return matchesSearch && matchesCity && matchesVerified;
+    const matchesPlan = planFilter === 'all' || (p.adminPlan ?? 'discovery') === planFilter;
+    return matchesSearch && matchesCity && matchesVerified && matchesPlan;
   });
 
   const cities = Array.from(new Set(profiles.map((p) => p.adminLocation || p.city)));
@@ -62,6 +67,7 @@ export function AdminUsers({ profiles, genderFilter, onGenderFilterChange, curre
   return (
     <>
       <div className="space-y-6">
+        {loadError && <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800">Les profils restent affichés avec les dernières données chargées. Actualisation impossible : {loadError}</p>}
         {/* Filters */}
         <div className="rounded-[22px] bg-white p-4 shadow-[0_8px_30pxrgba(83,46,32,.05)]">
           <div className="flex flex-wrap gap-4">
@@ -96,6 +102,9 @@ export function AdminUsers({ profiles, genderFilter, onGenderFilterChange, curre
                 <option key={city} value={city}>{city}</option>
               ))}
             </select>
+            <select aria-label="Filtrer par formule" value={planFilter} onChange={(e) => onPlanFilterChange(e.target.value)} className="rounded-xl border border-[#dfd2c6] bg-[#f8f9fd] px-4 py-2.5 text-sm outline-none focus:border-[#ec3b78]">
+              <option value="all">Toutes les formules</option><option value="discovery">Gratuit</option><option value="premium">Premium</option><option value="elite">Elite</option><option value="golden">Golden</option>
+            </select>
             <select
               value={filterVerified}
               onChange={(e) => setFilterVerified(e.target.value as 'all' | 'verified' | 'unverified')}
@@ -118,7 +127,7 @@ export function AdminUsers({ profiles, genderFilter, onGenderFilterChange, curre
         <div className="rounded-[26px] bg-white p-6 shadow-[0_8px_30pxrgba(83,46,32,.05)]">
           <div className="mb-4 flex items-center justify-between">
             <h2 className="font-display text-2xl">Gestion des profils</h2>
-            <p className="text-sm text-[#756960]">{filteredProfiles.length} profil(s) affiché(s)</p>
+            <p className="text-sm text-[#756960]">{loaded ? `${filteredProfiles.length} profil(s) affiché(s)` : 'Chargement…'}</p>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full">
@@ -198,6 +207,8 @@ export function AdminUsers({ profiles, genderFilter, onGenderFilterChange, curre
                 ))}
               </tbody>
             </table>
+            {loaded && filteredProfiles.length === 0 && <p className="py-8 text-center text-sm text-[#756960]">Aucun profil ne correspond aux filtres.</p>}
+            {!loaded && !loadError && <div className="space-y-3 py-5">{[0, 1, 2].map((item) => <div key={item} className="h-12 animate-pulse rounded-xl bg-[#f3f2f6]" />)}</div>}
           </div>
           {totalPages > 1 && (
             <div className="mt-6 flex items-center justify-between">

@@ -18,12 +18,22 @@ interface AdminDashboardProps {
     matches: number;
     messages: number;
     views: number;
+    newProfiles30: number;
+    incompleteProfiles: number;
+    activePremium: number;
+    activeElite: number;
+    goldenPending: number;
   };
   recentActivity: Activity[];
+  activityLoaded?: boolean;
   activityError?: string;
+  statsLoading?: boolean;
+  statsLoaded?: boolean;
+  statsError?: string;
+  onRefresh?: () => void;
 }
 
-export function AdminDashboard({ stats, recentActivity, activityError }: AdminDashboardProps) {
+export function AdminDashboard({ stats, recentActivity, activityLoaded = true, activityError, statsLoading = false, statsLoaded = true, statsError = '', onRefresh }: AdminDashboardProps) {
   const [activityFilter, setActivityFilter] = useState<'all' | Activity['category']>('all');
   const [activityPage, setActivityPage] = useState(1);
   const [selectedActivity, setSelectedActivity] = useState<Activity | null>(null);
@@ -33,6 +43,7 @@ export function AdminDashboard({ stats, recentActivity, activityError }: AdminDa
   const visibleActivity = filteredActivity.slice((activityPage - 1) * pageSize, activityPage * pageSize);
   const changeFilter = (value: typeof activityFilter) => { setActivityFilter(value); setActivityPage(1); };
   const statCards = [
+    { label: 'Nouveaux profils · 30 jours', value: stats.newProfiles30, icon: Users, color: '#ec3b78' },
     { label: 'Utilisateurs', value: stats.users, icon: Users, color: '#ec3b78' },
     { label: 'Hommes', value: stats.men, icon: Users, color: '#3977b8' },
     { label: 'Femmes', value: stats.women, icon: Users, color: '#ec3b78' },
@@ -43,10 +54,16 @@ export function AdminDashboard({ stats, recentActivity, activityError }: AdminDa
     { label: 'Signalements', value: stats.reports, icon: AlertTriangle, color: '#c92e63' },
     { label: 'Likes', value: stats.likes, icon: Heart, color: '#ec3b78' },
     { label: 'Messages', value: stats.messages, icon: MessageCircle, color: '#1a6b68' },
+    { label: 'Onboarding à terminer', value: stats.incompleteProfiles, icon: Clock, color: '#d89b52' },
+    { label: 'Abonnements Premium actifs', value: stats.activePremium, icon: ShieldCheck, color: '#ec3b78' },
+    { label: 'Abonnements Elite actifs', value: stats.activeElite, icon: ShieldCheck, color: '#1a6b68' },
+    { label: 'Demandes Golden à traiter', value: stats.goldenPending, icon: AlertTriangle, color: '#d89b52' },
   ];
 
   return (
     <div className="space-y-8">
+      <div className="flex items-center justify-between gap-3"><div><h2 className="font-display text-2xl">Vue d’ensemble</h2><p className="mt-1 text-sm text-[#9a8b82]">Indicateurs actuels et activité récente.</p></div><button type="button" onClick={onRefresh} disabled={statsLoading} className="rounded-full border border-[#e4e1eb] bg-white px-4 py-2.5 text-sm font-bold text-[#625852] disabled:opacity-50">{statsLoading ? 'Actualisation…' : 'Actualiser'}</button></div>
+      {statsError && <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800"><span>Les indicateurs n’ont pas été actualisés : {statsError}</span><button type="button" onClick={onRefresh} className="font-bold underline">Réessayer</button></div>}
       {/* KPI Cards */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         {statCards.map((stat) => (
@@ -55,7 +72,7 @@ export function AdminDashboard({ stats, recentActivity, activityError }: AdminDa
               <stat.icon size={20} className="text-[#756960]" style={{ color: stat.color }} />
               <span className="text-[10px] font-bold uppercase tracking-wider text-[#9a8b82]">Total</span>
             </div>
-            <p className="mt-4 font-display text-3xl font-semibold">{stat.value}</p>
+            {!statsLoaded ? (statsLoading ? <div className="mt-4 h-9 w-20 animate-pulse rounded-lg bg-[#f0eef3]" aria-label="Chargement" /> : <p className="mt-4 font-display text-3xl font-semibold">—</p>) : <p className="mt-4 font-display text-3xl font-semibold">{stat.value.toLocaleString('fr-FR')}</p>}
             <p className="mt-1 text-xs font-bold uppercase tracking-wider text-[#9a8b82]">{stat.label}</p>
           </div>
         ))}
@@ -64,13 +81,15 @@ export function AdminDashboard({ stats, recentActivity, activityError }: AdminDa
       {/* Recent Activity */}
       <div className="rounded-[26px] bg-white p-6 shadow-[0_8px_30px_rgba(83,46,32,.05)]">
         <div className="mb-5 flex flex-wrap items-end justify-between gap-4">
-          <div><h2 className="font-display text-2xl">Journal d’activité</h2><p className="mt-1 text-xs text-[#9a8b82]">Événements enregistrés sur les 90 derniers jours · {filteredActivity.length} résultat(s)</p></div>
+          <div><h2 className="font-display text-2xl">Journal d’activité</h2><p className="mt-1 text-xs text-[#9a8b82]">Événements enregistrés sur les 90 derniers jours · {activityLoaded ? `${filteredActivity.length} résultat(s)` : '—'}</p></div>
           <select aria-label="Filtrer les activités" value={activityFilter} onChange={(event) => changeFilter(event.target.value as typeof activityFilter)} className="rounded-xl border border-[#dfd2c6] bg-[#f8f9fd] px-4 py-2.5 text-sm outline-none focus:border-[#ec3b78]">
             <option value="all">Toutes les activités</option><option value="new_message">Nouveaux messages</option><option value="new_signup">Nouvelles inscriptions</option><option value="new_login">Nouvelles connexions</option><option value="new_match">Nouveaux matches</option><option value="new_event">Nouveaux événements</option>
           </select>
         </div>
         {activityError && <p role="status" className="mb-4 rounded-xl border border-[#f4d7a5] bg-[#fff8e9] px-4 py-3 text-sm font-semibold text-[#8c5d12]">{activityError}</p>}
-        {filteredActivity.length === 0 ? (
+        {!activityLoaded ? (
+          <div className="py-8 text-center"><Clock size={40} className="mx-auto animate-pulse text-[#dfd2c6]" /><p className="mt-4 text-sm text-[#756960]">{activityError ? 'Activité indisponible pour le moment.' : 'Chargement des activités…'}</p></div>
+        ) : filteredActivity.length === 0 ? (
           <div className="py-8 text-center">
             <Clock size={40} className="mx-auto text-[#dfd2c6]" />
             <p className="mt-4 text-sm text-[#756960]">Aucune activité récente.</p>

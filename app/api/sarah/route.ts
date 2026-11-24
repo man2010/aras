@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { getSupabaseAdmin } from '@/lib/supabase-admin';
 
 export const runtime = 'nodejs';
 
@@ -47,12 +48,25 @@ function fallbackAnswer(message: string) {
 }
 
 export async function POST(request: Request) {
+  const startedAt = Date.now();
   try {
     const body = (await request.json()) as { message?: string; history?: ChatMessage[] };
     const message = body.message?.trim();
 
     if (!message) {
       return NextResponse.json({ error: 'Message manquant.' }, { status: 400 });
+    }
+
+    let configuredPrompt = systemPrompt;
+    const admin = getSupabaseAdmin();
+    if (admin) {
+      const { data: settings } = await admin.from('settings').select('key,value').in('key', ['sara_enabled', 'sara_system_instructions']);
+      const values = Object.fromEntries((settings ?? []).map((row) => [row.key, row.value]));
+      if (values.sara_enabled === 'false') {
+        await recordUsage(admin, 'disabled', null, startedAt);
+        return NextResponse.json({ answer: 'SARA est momentanément indisponible. Vous pouvez contacter l’équipe ARAS depuis la page Contact.' });
+      }
+      if (values.sara_system_instructions?.trim()) configuredPrompt = `${systemPrompt}\n\nInstructions complémentaires de l’équipe ARAS :\n${values.sara_system_instructions.trim()}`;
     }
 
     const usesCloud = Boolean(process.env.OLLAMA_API_KEY);
@@ -73,7 +87,7 @@ export async function POST(request: Request) {
         body: JSON.stringify({
           model,
           messages: [
-            { role: 'system', content: systemPrompt },
+            { role: 'system', content: configuredPrompt },
             ...(Array.isArray(body.history) ? body.history.slice(-6) : []),
             { role: 'user', content: message },
           ],
@@ -86,6 +100,7 @@ export async function POST(request: Request) {
 
       if (!response.ok) {
         const errorText = await response.text();
+        await recordUsage(admin, 'fallback', model, startedAt);
         return NextResponse.json(
           {
             answer: fallbackAnswer(message),
@@ -102,8 +117,10 @@ export async function POST(request: Request) {
       };
 
       const answer = data.message?.content || data.response || fallbackAnswer(message);
+      await recordUsage(admin, 'answered', model, startedAt);
       return NextResponse.json({ answer });
     } catch {
+      await recordUsage(admin, 'fallback', model, startedAt);
       return NextResponse.json({
         answer: fallbackAnswer(message),
         warning:
@@ -116,4 +133,10 @@ export async function POST(request: Request) {
       { status: 500 }
     );
   }
+}
+
+async function recordUsage(admin: ReturnType<typeof getSupabaseAdmin>, outcome: 'answered' | 'fallback' | 'disabled' | 'error', model: string | null, startedAt: number) {
+  if (!admin) return;
+  const { error } = await admin.from('sara_usage_events').insert({ outcome, model, elapsed_ms: Math.max(0, Date.now() - startedAt) });
+  if (error) console.error('[sarah] Could not record aggregate usage:', error.message);
 }

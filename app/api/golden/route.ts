@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { getSupabaseAdmin } from '@/lib/supabase-admin';
 
 const ALLOWED_CONTACT_METHODS = new Set(['SMS', 'Appel', 'WhatsApp', 'E-mail']);
 const supportEmail = process.env.CONTACT_TO_EMAIL?.trim() || process.env.GMAIL_EMAIL?.trim();
@@ -18,15 +19,23 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Vérifiez les champs obligatoires et les deux consentements.' }, { status: 400 });
     }
 
-    if (!process.env.GMAIL_EMAIL || !process.env.GMAIL_APP_PASSWORD || !supportEmail) {
-      return NextResponse.json({ error: 'Le traitement des demandes Golden est momentanément indisponible.' }, { status: 503 });
-    }
-
-    const nodemailer = await import('nodemailer');
-    const transporter = nodemailer.default.createTransport({
-      service: 'gmail',
-      auth: { user: process.env.GMAIL_EMAIL, pass: process.env.GMAIL_APP_PASSWORD },
+    const admin = getSupabaseAdmin();
+    if (!admin) return NextResponse.json({ error: 'Le traitement des demandes Golden est momentanément indisponible.' }, { status: 503 });
+    const { error: saveError } = await admin.from('golden_requests').insert({
+      name: values.name,
+      gender: values.gender,
+      birthdate: values.birthdate,
+      location: values.location,
+      marital_status: values.maritalStatus,
+      religion: values.religion || null,
+      age_range: values.ageRange || null,
+      preferred_location: values.preferredLocation || null,
+      expectations: values.expectations || null,
+      contact: values.contact,
+      preferred_contact: values.preferredContact,
+      privacy_consent: true,
     });
+    if (saveError) return NextResponse.json({ error: 'Impossible d’enregistrer votre demande. Réessayez plus tard.' }, { status: 503 });
     const message = [
       'Nouvelle demande membre Golden (offre actuellement gratuite)',
       `Prénom ou pseudo : ${values.name}`,
@@ -43,14 +52,24 @@ export async function POST(request: Request) {
       'Consentement confidentialité : accepté',
     ].join('\n');
 
-    await transporter.sendMail({
-      from: { name: 'SupportAras', address: process.env.CONTACT_FROM_EMAIL?.trim() || process.env.GMAIL_EMAIL },
-      to: supportEmail,
-      subject: '[ARAS] Demande membre Golden',
-      text: message,
-    });
+    let emailNotified = false;
+    if (process.env.GMAIL_EMAIL && process.env.GMAIL_APP_PASSWORD && supportEmail) {
+      try {
+        const nodemailer = await import('nodemailer');
+        const transporter = nodemailer.default.createTransport({ service: 'gmail', auth: { user: process.env.GMAIL_EMAIL, pass: process.env.GMAIL_APP_PASSWORD } });
+        await transporter.sendMail({
+          from: { name: 'SupportAras', address: process.env.CONTACT_FROM_EMAIL?.trim() || process.env.GMAIL_EMAIL },
+          to: supportEmail,
+          subject: '[ARAS] Demande membre Golden',
+          text: message,
+        });
+        emailNotified = true;
+      } catch (mailError) {
+        console.error('[golden] Request saved but email notification failed:', mailError);
+      }
+    }
 
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({ ok: true, emailNotified });
   } catch {
     return NextResponse.json({ error: 'Impossible de préparer votre demande. Réessayez plus tard.' }, { status: 500 });
   }

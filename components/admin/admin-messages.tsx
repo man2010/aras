@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { MessageSquare, Search, Filter, Eye, Trash2, Download } from 'lucide-react';
+import { AdminMessageComposer } from './admin-message-composer';
 
 interface AdminMessagesProps {
   messages: any[];
@@ -15,9 +16,12 @@ interface AdminMessagesProps {
   onPageChange: (page: number) => void;
   onFiltersChange: (search: string, conversationId: string) => void;
   onDeleteMessage: (messageId: string) => void;
+  active?: boolean;
+  loadError?: string;
+  loaded?: boolean;
 }
 
-export function AdminMessages({ messages, profiles, totalMessages, readMessages, conversationCount, currentPage, totalPages, conversations, onPageChange, onFiltersChange, onDeleteMessage }: AdminMessagesProps) {
+export function AdminMessages({ messages, profiles, totalMessages, readMessages, conversationCount, currentPage, totalPages, conversations, onPageChange, onFiltersChange, onDeleteMessage, active = true, loadError = '', loaded = true }: AdminMessagesProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterConversation, setFilterConversation] = useState('');
 
@@ -50,6 +54,8 @@ export function AdminMessages({ messages, profiles, totalMessages, readMessages,
 
   return (
     <div className="space-y-6">
+      <AdminMessageComposer active={active} />
+      {loadError && <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800">Les messages précédemment chargés sont conservés. Actualisation impossible : {loadError}</p>}
       {/* Filters */}
       <div className="rounded-[22px] bg-white p-4 shadow-[0_8px_30px_rgba(83,46,32,.05)]">
         <div className="flex flex-wrap gap-4">
@@ -88,17 +94,17 @@ export function AdminMessages({ messages, profiles, totalMessages, readMessages,
       <div className="grid gap-4 sm:grid-cols-3">
         <div className="rounded-[22px] bg-white p-4 shadow-[0_8px_30px_rgba(83,46,32,.05)]">
           <MessageSquare size={20} className="text-[#ec3b78]" />
-          <p className="mt-2 font-display text-2xl font-semibold">{totalMessages}</p>
+          <p className="mt-2 font-display text-2xl font-semibold">{loaded ? totalMessages.toLocaleString('fr-FR') : '—'}</p>
           <p className="text-xs font-bold uppercase text-[#9a8b82]">Total messages</p>
         </div>
         <div className="rounded-[22px] bg-white p-4 shadow-[0_8px_30px_rgba(83,46,32,.05)]">
           <Eye size={20} className="text-[#1a6b68]" />
-          <p className="mt-2 font-display text-2xl font-semibold">{readMessages}</p>
+          <p className="mt-2 font-display text-2xl font-semibold">{loaded ? readMessages.toLocaleString('fr-FR') : '—'}</p>
           <p className="text-xs font-bold uppercase text-[#9a8b82]">Messages lus</p>
         </div>
         <div className="rounded-[22px] bg-white p-4 shadow-[0_8px_30px_rgba(83,46,32,.05)]">
           <MessageSquare size={20} className="text-[#d89b52]" />
-          <p className="mt-2 font-display text-2xl font-semibold">{conversationCount}</p>
+          <p className="mt-2 font-display text-2xl font-semibold">{loaded ? conversationCount.toLocaleString('fr-FR') : '—'}</p>
           <p className="text-xs font-bold uppercase text-[#9a8b82]">Conversations</p>
         </div>
       </div>
@@ -107,10 +113,10 @@ export function AdminMessages({ messages, profiles, totalMessages, readMessages,
       <div className="rounded-[26px] bg-white p-6 shadow-[0_8px_30px_rgba(83,46,32,.05)]">
         <div className="mb-4 flex items-center justify-between">
           <h2 className="font-display text-2xl">Messages</h2>
-          <p className="text-sm text-[#756960]">{totalMessages} message(s) correspondant aux filtres</p>
+          <p className="text-sm text-[#756960]">{loaded ? `${totalMessages.toLocaleString('fr-FR')} message(s) correspondant aux filtres` : 'Chargement…'}</p>
         </div>
 
-        {messages.length === 0 ? (
+        {!loaded ? (loadError ? <p className="py-8 text-center text-sm text-[#756960]">Les messages n’ont pas encore pu être chargés.</p> : <div className="space-y-3 py-5">{[0, 1, 2].map((item) => <div key={item} className="h-16 animate-pulse rounded-xl bg-[#f3f2f6]" />)}</div>) : messages.length === 0 ? (
           <div className="py-12 text-center">
             <MessageSquare size={48} className="mx-auto text-[#dfd2c6]" />
             <p className="mt-4 text-sm text-[#756960]">Aucun message pour le moment.</p>

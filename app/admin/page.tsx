@@ -6,7 +6,7 @@ import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
 import type { Profile } from '@/lib/types';
 import { toProfile, type ProfileRow } from '@/lib/adapters';
-import { AdminLayout } from '@/components/admin/admin-layout';
+import { AdminLayout, type AdminTab } from '@/components/admin/admin-layout';
 import { AdminDashboard } from '@/components/admin/admin-dashboard';
 import { AdminUsers } from '@/components/admin/admin-users';
 import { AdminReports } from '@/components/admin/admin-reports';
@@ -14,16 +14,32 @@ import { AdminEvents } from '@/components/admin/admin-events';
 import { AdminMessages } from '@/components/admin/admin-messages';
 import { AdminAnalytics } from '@/components/admin/admin-analytics';
 import { AdminSettings } from '@/components/admin/admin-settings';
+import { AdminOperations } from '@/components/admin/admin-operations';
+import { AdminFakeProfiles } from '@/components/admin/admin-fake-profiles';
 
-type AdminTab = 'dashboard' | 'users' | 'reports' | 'events' | 'messages'  | 'analytics' | 'settings';
 type AdminActivity = { id: string; category: 'new_message' | 'new_signup' | 'new_login' | 'new_match' | 'new_event'; type: string; description: string; created_at: string; details: Record<string, string> };
-type AdminProfile = Profile & { adminLocation?: string | null; authContact?: string | null; authContactMethod?: 'email' | 'phone' | null };
+type AdminProfile = Profile & { adminLocation?: string | null; adminPlan?: string | null; authContact?: string | null; authContactMethod?: 'email' | 'phone' | null };
+type AdminAnalyticsSnapshot = { dailySignups: { date: string; count: number }[]; dailyMessages: { date: string; count: number }[]; dailyMatches: { date: string; count: number }[]; userDemographics: { city: string; count: number }[]; topProfiles: { profileId: string; profileName: string; likes: number }[] };
 
 export default function AdminPage() {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
   const [tab, setTab] = useState<AdminTab>('dashboard');
+  const [tabPreferenceReady, setTabPreferenceReady] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [adminStatusLoading, setAdminStatusLoading] = useState(true);
+  const [adminStatusError, setAdminStatusError] = useState('');
+  const [statsLoaded, setStatsLoaded] = useState(false);
+  const [statsUpdatedAt, setStatsUpdatedAt] = useState(0);
+  const [statsLoading, setStatsLoading] = useState(false);
+  const [statsError, setStatsError] = useState('');
+  const [profilesLoaded, setProfilesLoaded] = useState(false);
+  const [reportsLoaded, setReportsLoaded] = useState(false);
+  const [eventsLoaded, setEventsLoaded] = useState(false);
+  const [messagesLoaded, setMessagesLoaded] = useState(false);
+  const [analyticsLoaded, setAnalyticsLoaded] = useState(false);
+  const [analyticsLoading, setAnalyticsLoading] = useState(false);
+  const [analyticsError, setAnalyticsError] = useState('');
   
   // Stats & Data
   const [stats, setStats] = useState({
@@ -38,6 +54,11 @@ export default function AdminPage() {
     matches: 0,
     messages: 0,
     views: 0,
+    newProfiles30: 0,
+    incompleteProfiles: 0,
+    activePremium: 0,
+    activeElite: 0,
+    goldenPending: 0,
   });
   
   const [profiles, setProfiles] = useState<AdminProfile[]>([]);
@@ -46,7 +67,12 @@ export default function AdminPage() {
   const [eventParticipants, setEventParticipants] = useState<Record<string, any[]>>({});
   const [recentActivity, setRecentActivity] = useState<AdminActivity[]>([]);
   const [activityLogError, setActivityLogError] = useState('');
+  const [activityLoaded, setActivityLoaded] = useState(false);
+  const [activityUpdatedAt, setActivityUpdatedAt] = useState(0);
   const [eventLoadError, setEventLoadError] = useState('');
+  const [profileLoadError, setProfileLoadError] = useState('');
+  const [reportLoadError, setReportLoadError] = useState('');
+  const [messageLoadError, setMessageLoadError] = useState('');
   const [messages, setMessages] = useState<any[]>([]);
   const [conversationProfiles, setConversationProfiles] = useState<Record<string, any>>({});
   const [messagePage, setMessagePage] = useState(1);
@@ -81,26 +107,41 @@ export default function AdminPage() {
   const [itemsPerPage] = useState(10);
   const [totalProfiles, setTotalProfiles] = useState(0);
   const [genderFilter, setGenderFilter] = useState('all');
+  const [planFilter, setPlanFilter] = useState('all');
 
   const checkAdminStatus = useCallback(async () => {
-    if (!user) return;
-    const { data: canAccessAdmin } = await supabase.rpc('is_admin');
-    if (canAccessAdmin) {
-      setIsAdmin(true);
-    } else {
-      router.push('/espace');
+    if (!user) { setAdminStatusLoading(false); return; }
+    setAdminStatusLoading(true);
+    setAdminStatusError('');
+    const { data: canAccessAdmin, error } = await supabase.rpc('is_admin');
+    if (error) {
+      setAdminStatusError('La vérification des accès a échoué. Réessaie sans perdre la page ouverte.');
+      setAdminStatusLoading(false);
+      return;
     }
+    if (canAccessAdmin) setIsAdmin(true);
+    else router.push('/espace');
+    setAdminStatusLoading(false);
   }, [router, user]);
 
   const loadProfiles = useCallback(async () => {
+    setProfileLoadError('');
     let query = supabase.from('profiles').select('*', { count: 'exact' });
     if (genderFilter !== 'all') query = query.eq('gender', genderFilter);
-    const { data, count } = await query.order('created_at', { ascending: false }).range((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage - 1);
+    const { data, count, error } = await query.order('created_at', { ascending: false }).range((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage - 1);
+    if (error) { setProfileLoadError(error.message); return totalProfiles; }
     if (data) {
       const mappedProfiles = (data as (ProfileRow & { location_label?: string | null })[]).map((row) => ({
         ...toProfile(row),
         adminLocation: row.city || row.location_label || row.zone || null,
       })) as AdminProfile[];
+      const { data: subscriptionRows } = await supabase.from('user_subscriptions').select('user_id,plan_code,status,ends_at').in('user_id', mappedProfiles.map((profile) => profile.id)).in('status', ['active', 'pending']).order('created_at', { ascending: false });
+      const currentPlans = new Map<string, string>();
+      for (const subscription of subscriptionRows ?? []) {
+        if (subscription.status !== 'active' || (subscription.ends_at && new Date(subscription.ends_at) <= new Date())) continue;
+        if (!currentPlans.has(subscription.user_id)) currentPlans.set(subscription.user_id, subscription.plan_code);
+      }
+      for (const profile of mappedProfiles) profile.adminPlan = currentPlans.get(profile.id) ?? 'discovery';
       const { data: sessionData } = await supabase.auth.getSession();
       const accessToken = sessionData.session?.access_token;
       if (accessToken && mappedProfiles.length) {
@@ -118,9 +159,10 @@ export default function AdminPage() {
         }
       }
       setProfiles(mappedProfiles);
+      setProfilesLoaded(true);
     }
     return count || 0;
-  }, [currentPage, genderFilter, itemsPerPage]);
+  }, [currentPage, genderFilter, itemsPerPage, totalProfiles]);
 
   useEffect(() => {
     if (!authLoading && !user) router.push('/connexion');
@@ -128,40 +170,43 @@ export default function AdminPage() {
   }, [authLoading, user, router, checkAdminStatus]);
 
   useEffect(() => {
-    if (isAdmin) {
-      loadStats();
-      loadRecentActivity();
-      
-      if (tab === 'users') {
-        loadProfiles().then(count => setTotalProfiles(count));
-      }
-      if (tab === 'reports') loadReports();
-      if (tab === 'events') loadEvents();
-      if (tab === 'analytics') {
-        loadAnalytics().then((data) => setAnalytics(data));
-      }
-      if (tab === 'settings') {
-        loadSettings();
-      }
-    }
-  }, [isAdmin, tab, currentPage, genderFilter]);
+    if (!isAdmin || !tabPreferenceReady || tab !== 'dashboard') return;
+    if (!statsLoaded || Date.now() - statsUpdatedAt > 60_000) void loadStats();
+    if (!activityLoaded || Date.now() - activityUpdatedAt > 60_000) void loadRecentActivity();
+  }, [isAdmin, tabPreferenceReady, tab, statsLoaded, statsUpdatedAt, activityLoaded, activityUpdatedAt]);
 
   useEffect(() => {
-    if (isAdmin && tab === 'messages') void loadMessages();
-  }, [isAdmin, tab, messagePage, messageSearch, messageConversation]);
+    if (isAdmin && tabPreferenceReady && tab === 'users') void loadProfiles().then((count) => setTotalProfiles(count));
+  }, [isAdmin, tabPreferenceReady, tab, currentPage, genderFilter]);
+
+  useEffect(() => { if (isAdmin && tabPreferenceReady && tab === 'reports') void loadReports(); }, [isAdmin, tabPreferenceReady, tab]);
+  useEffect(() => { if (isAdmin && tabPreferenceReady && tab === 'events') void loadEvents(); }, [isAdmin, tabPreferenceReady, tab]);
+  useEffect(() => {
+    if (isAdmin && tabPreferenceReady && tab === 'analytics' && !analyticsLoaded) void loadAnalytics();
+  }, [isAdmin, tabPreferenceReady, tab, analyticsLoaded]);
+  useEffect(() => { if (isAdmin && tabPreferenceReady && tab === 'settings') void loadSettings(); }, [isAdmin, tabPreferenceReady, tab]);
 
   useEffect(() => {
     if (!isAdmin) return;
-    if (tab === 'dashboard') {
-      const channel = supabase.channel('admin-live-dashboard')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, () => { void loadStats(); void loadRecentActivity(); })
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'messages' }, () => { void loadStats(); void loadRecentActivity(); })
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'matches' }, () => { void loadStats(); void loadRecentActivity(); })
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'events' }, () => { void loadStats(); void loadRecentActivity(); })
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'admin_activity_logs' }, () => void loadRecentActivity())
-        .subscribe();
-      return () => { void supabase.removeChannel(channel); };
-    }
+    const validTabs: AdminTab[] = ['dashboard', 'users', 'reports', 'fake-profiles', 'events', 'messages', 'analytics', 'payments', 'golden', 'sara', 'team', 'settings'];
+    try {
+      const storedTab = window.localStorage.getItem('aras:admin-tab');
+      if (storedTab && validTabs.includes(storedTab as AdminTab)) setTab(storedTab as AdminTab);
+    } catch { /* Storage may be disabled by the browser. */ }
+    setTabPreferenceReady(true);
+  }, [isAdmin]);
+
+  const changeTab = (nextTab: AdminTab) => {
+    setTab(nextTab);
+    try { window.localStorage.setItem('aras:admin-tab', nextTab); } catch { /* Storage may be disabled. */ }
+  };
+
+  useEffect(() => {
+    if (isAdmin && tabPreferenceReady && tab === 'messages') void loadMessages();
+  }, [isAdmin, tabPreferenceReady, tab, messagePage, messageSearch, messageConversation]);
+
+  useEffect(() => {
+    if (!isAdmin || !tabPreferenceReady) return;
     if (tab !== 'reports' && tab !== 'events') return;
     const table = tab === 'reports' ? 'reports' : 'event_registrations';
     const channel = supabase.channel(`admin-live-${table}-${tab}`)
@@ -171,70 +216,53 @@ export default function AdminPage() {
       })
       .subscribe();
     return () => { void supabase.removeChannel(channel); };
-  }, [isAdmin, tab]);
+  }, [isAdmin, tabPreferenceReady, tab]);
 
   const loadStats = async () => {
-    const [profilesCount, verifiedCount, menCount, womenCount, convsCount, eventsCount, reportsCount, likesCount, matchesCount, messagesCount] = await Promise.all([
-      supabase.from('profiles').select('*', { count: 'exact', head: true }),
-      supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('is_verified', true),
-      supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('gender', 'Homme'),
-      supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('gender', 'Femme'),
-      supabase.from('matches').select('*', { count: 'exact', head: true }),
-      supabase.from('events').select('*', { count: 'exact', head: true }),
-      supabase.from('reports').select('*', { count: 'exact', head: true }),
-      supabase.from('swipes').select('*', { count: 'exact', head: true }).eq('type', 'like'),
-      supabase.from('matches').select('*', { count: 'exact', head: true }).eq('is_match', true),
-      supabase.from('messages').select('*', { count: 'exact', head: true }),
-    ]);
-    
+    setStatsLoading(true);
+    setStatsError('');
+    const { data, error } = await supabase.rpc('get_admin_dashboard_snapshot');
+    if (error || !data) {
+      setStatsError(error?.message || 'Impossible de charger les indicateurs. Applique la migration des snapshots admin.');
+      setStatsLoading(false);
+      return;
+    }
     setStats({
-      users: profilesCount.count || 0,
-      men: menCount.count || 0,
-      women: womenCount.count || 0,
-      profiles: verifiedCount.count || 0,
-      conversations: convsCount.count || 0,
-      events: eventsCount.count || 0,
-      reports: reportsCount.count || 0,
-      likes: likesCount.count || 0,
-      matches: matchesCount.count || 0,
-      messages: messagesCount.count || 0,
-      views: 0, // À implémenter avec une vue table
+      users: Number(data.users ?? 0), men: Number(data.men ?? 0), women: Number(data.women ?? 0), profiles: Number(data.verified ?? 0),
+      conversations: Number(data.conversations ?? 0), events: Number(data.events ?? 0), reports: Number(data.reports ?? 0), likes: Number(data.likes ?? 0),
+      matches: Number(data.matches ?? 0), messages: Number(data.messages ?? 0), views: 0, newProfiles30: Number(data.newProfiles30 ?? 0),
+      incompleteProfiles: Number(data.incompleteProfiles ?? 0), activePremium: Number(data.activePremium ?? 0), activeElite: Number(data.activeElite ?? 0), goldenPending: Number(data.goldenPending ?? 0),
     });
+    setStatsLoaded(true);
+    setStatsLoading(false);
+    setStatsUpdatedAt(Date.now());
   };
 
   const loadRecentActivity = async () => {
-    const since = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
-    const [profileResult, messageResult, matchResult, eventResult, loginResult] = await Promise.all([
-      supabase.from('profiles').select('id,display_name,city,profession,created_at').gte('created_at', since).order('created_at', { ascending: false }).limit(500),
-      supabase.from('messages').select('id,sender_id,receiver_id,match_id,created_at').gte('created_at', since).order('created_at', { ascending: false }).limit(500),
-      supabase.from('matches').select('id,user_1_id,user_2_id,created_at').eq('is_match', true).gte('created_at', since).order('created_at', { ascending: false }).limit(500),
-      supabase.from('events').select('id,title,date,location,city,created_at').gte('created_at', since).order('created_at', { ascending: false }).limit(500),
-      supabase.from('admin_activity_logs').select('id,user_id,country,region,city,browser,operating_system,device,user_agent,page,created_at').eq('kind', 'login').gte('created_at', since).order('created_at', { ascending: false }).limit(500),
-    ]);
-    setActivityLogError(loginResult.error ? 'Les logs de connexion ne sont pas disponibles. Exécute la migration admin la plus récente dans Supabase.' : '');
-    const involvedIds = Array.from(new Set([
-      ...(profileResult.data ?? []).map((row: any) => row.id),
-      ...(messageResult.data ?? []).flatMap((row: any) => [row.sender_id, row.receiver_id]),
-      ...(matchResult.data ?? []).flatMap((row: any) => [row.user_1_id, row.user_2_id]),
-      ...(loginResult.data ?? []).map((row: any) => row.user_id),
-    ].filter(Boolean)));
-    const { data: involvedProfiles } = involvedIds.length
-      ? await supabase.from('profiles').select('id,display_name,city,profession').in('id', involvedIds)
-      : { data: [] as any[] };
-    const profilesById = new Map((involvedProfiles ?? []).map((row: any) => [row.id, row]));
-    const items: AdminActivity[] = [
-      ...(profileResult.data ?? []).map((row: any) => ({ id: `signup-${row.id}`, category: 'new_signup' as const, type: 'Nouvelle inscription', description: `${row.display_name || 'Un membre'} a créé son profil`, created_at: row.created_at, details: { Nom: row.display_name || 'Non renseigné', Ville: row.city || 'Non renseignée', Profession: row.profession || 'Non renseignée', 'Identifiant utilisateur': row.id } })),
-      ...(messageResult.data ?? []).map((row: any) => ({ id: `message-${row.id}`, category: 'new_message' as const, type: 'Nouveau message', description: `Message envoyé par ${profilesById.get(row.sender_id)?.display_name || row.sender_id}`, created_at: row.created_at, details: { Expéditeur: profilesById.get(row.sender_id)?.display_name || row.sender_id, Destinataire: profilesById.get(row.receiver_id)?.display_name || row.receiver_id, Conversation: row.match_id || 'Sans identifiant', 'ID du message': row.id } })),
-      ...(matchResult.data ?? []).map((row: any) => ({ id: `match-${row.id}`, category: 'new_match' as const, type: 'Nouveau match', description: `${profilesById.get(row.user_1_id)?.display_name || 'Membre'} et ${profilesById.get(row.user_2_id)?.display_name || 'membre'} ont matché`, created_at: row.created_at, details: { 'Membre 1': profilesById.get(row.user_1_id)?.display_name || row.user_1_id, 'Membre 2': profilesById.get(row.user_2_id)?.display_name || row.user_2_id, 'ID du match': row.id } })),
-      ...(eventResult.data ?? []).map((row: any) => ({ id: `event-${row.id}`, category: 'new_event' as const, type: 'Nouvel événement', description: row.title, created_at: row.created_at, details: { Événement: row.title, Lieu: row.location, Ville: row.city, Date: row.date, 'ID événement': row.id } })),
-      ...(loginResult.data ?? []).map((row: any) => ({ id: `login-${row.id}`, category: 'new_login' as const, type: 'Nouvelle connexion', description: `${profilesById.get(row.user_id)?.display_name || 'Utilisateur'} · ${[row.city, row.region, row.country].filter(Boolean).join(', ') || 'Localisation inconnue'} · ${row.browser || 'Navigateur inconnu'}`, created_at: row.created_at, details: { Utilisateur: profilesById.get(row.user_id)?.display_name || row.user_id, Ville: row.city || 'Non détectée', Région: row.region || 'Non détectée', Pays: row.country || 'Non détecté', Navigateur: row.browser || 'Inconnu', Système: row.operating_system || 'Inconnu', Appareil: row.device || 'Inconnu', 'Agent utilisateur': row.user_agent || 'Non disponible', Page: row.page || 'Connexion', 'Horodatage (UTC)': row.created_at } })),
-    ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-    setRecentActivity(items);
+    const { data, error } = await supabase.rpc('get_admin_recent_activity', { p_limit: 100 });
+    if (error || !data) {
+      setActivityLogError(error?.message || 'Le journal d’activité est indisponible. Applique la migration admin la plus récente.');
+      return;
+    }
+    setActivityLogError('');
+    setRecentActivity(data as AdminActivity[]);
+    setActivityLoaded(true);
+    setActivityUpdatedAt(Date.now());
   };
 
   const loadReports = async () => {
-    const { data } = await supabase.from('reports').select('*').order('created_at', { ascending: false }).limit(50);
+    setReportLoadError('');
+    const rows: any[] = [];
+    const pageSize = 500;
+    for (let offset = 0; ; offset += pageSize) {
+      const { data, error } = await supabase.from('reports').select('*').order('created_at', { ascending: false }).range(offset, offset + pageSize - 1);
+      if (error) { setReportLoadError(error.message); return; }
+      rows.push(...(data ?? []));
+      if (!data || data.length < pageSize) break;
+    }
+    const data = rows;
     if (data) setReports(data.map((row: any) => ({ ...row, reported_id: row.reported_id ?? row.reported_profile_id, resolved: row.resolved ?? row.status === 'resolved' })));
+    if (data) setReportsLoaded(true);
     
     // Charger les profils des personnes impliquées
     const reporterIds = data?.map((r: any) => r.reporter_id) || [];
@@ -242,23 +270,26 @@ export default function AdminPage() {
     const allIds = Array.from(new Set([...reporterIds, ...reportedIds]));
     
     if (allIds.length > 0) {
-      const { data: profileData } = await supabase.from('profiles').select('*').in('id', allIds);
-      if (profileData) {
-        const profileMap: Record<string, any> = {};
-        profileData.forEach((p: any) => {
+      const profileMap: Record<string, any> = {};
+      for (let offset = 0; offset < allIds.length; offset += 100) {
+        const { data: profileData } = await supabase.from('profiles').select('*').in('id', allIds.slice(offset, offset + 100));
+        profileData?.forEach((p: any) => {
           const profile = toProfile(p as ProfileRow);
           profileMap[p.id] = { ...profile, full_name: profile.display_name, avatar_urls: profile.avatar_urls?.length ? profile.avatar_urls : [profile.photo_url] };
         });
-        setConversationProfiles(profileMap);
       }
+      setConversationProfiles((current) => ({ ...current, ...profileMap }));
     }
   };
 
   const loadEvents = async () => {
     const { data, error: eventsError } = await supabase.from('events').select('*').order('date', { ascending: false });
-    if (data) setEvents(data || []);
-    const { data: registrations, error: registrationError } = await supabase.from('event_registrations').select('event_id,user_id,status');
-    setEventLoadError(eventsError ? `Impossible de charger les événements : ${eventsError.message}` : registrationError ? `Impossible de charger les inscriptions : ${registrationError.message}. Vérifie que la migration admin est appliquée dans Supabase.` : '');
+    if (eventsError) { setEventLoadError(`Impossible de charger les événements : ${eventsError.message}`); return; }
+    if (data) setEvents(data);
+    const { data: registrations, error: registrationError } = await supabase.from('event_registrations').select('event_id,user_id,status,attended_at');
+    if (registrationError) { setEventLoadError(`Impossible de charger les inscriptions : ${registrationError.message}`); return; }
+    setEventLoadError('');
+    setEventsLoaded(true);
     const activeRegistrations = (registrations ?? []).filter((registration: any) => registration.status !== 'cancelled');
     const userIds = Array.from(new Set(activeRegistrations.map((registration: any) => registration.user_id).filter(Boolean)));
     const { data: participantProfiles } = userIds.length ? await supabase.from('profiles').select('*').in('id', userIds) : { data: [] as any[] };
@@ -273,18 +304,22 @@ export default function AdminPage() {
 
   const messagesPerPage = 50;
   const loadMessages = async () => {
+    setMessageLoadError('');
     let query = supabase.from('messages').select('*', { count: 'exact' }).order('created_at', { ascending: false });
     let readQuery = supabase.from('messages').select('id', { count: 'exact', head: true }).eq('is_read', true);
     if (messageSearch.trim()) query = query.ilike('content', `%${messageSearch.trim()}%`);
     if (messageSearch.trim()) readQuery = readQuery.ilike('content', `%${messageSearch.trim()}%`);
     if (messageConversation) query = query.eq('match_id', messageConversation);
     if (messageConversation) readQuery = readQuery.eq('match_id', messageConversation);
-    const [{ data, count }, readResult, matchesResult] = await Promise.all([
+    const [{ data, count, error: queryError }, readResult, matchesResult] = await Promise.all([
       query.range((messagePage - 1) * messagesPerPage, messagePage * messagesPerPage - 1),
       readQuery,
       supabase.from('matches').select('id', { count: 'exact', head: true }).eq('is_match', true),
     ]);
+    const messageQueryError = queryError || readResult.error || matchesResult.error;
+    if (messageQueryError) { setMessageLoadError(messageQueryError.message); return; }
     setMessages(data ?? []);
+    setMessagesLoaded(true);
     setMessageCount(count ?? 0);
     setReadMessageCount(readResult.count ?? 0);
     setConversationCount(matchesResult.count ?? 0);
@@ -307,65 +342,31 @@ export default function AdminPage() {
     }
   };
 
-  const loadAnalytics = async () => {
-    const from = new Date();
-    from.setUTCDate(from.getUTCDate() - 89);
-    from.setUTCHours(0, 0, 0, 0);
-    const fromIso = from.toISOString();
-    const [profilesResult, messagesResult, matchesResult, swipesResult] = await Promise.all([
-      supabase.from('profiles').select('created_at').gte('created_at', fromIso),
-      supabase.from('messages').select('created_at').gte('created_at', fromIso),
-      supabase.from('matches').select('created_at').eq('is_match', true).gte('created_at', fromIso),
-      supabase.from('swipes').select('swiped_id,created_at').eq('type', 'like').gte('created_at', fromIso),
-    ]);
-    const dates = Array.from({ length: 90 }, (_, index) => {
-      const date = new Date(from);
-      date.setUTCDate(date.getUTCDate() + index);
-      return date.toISOString().slice(0, 10);
+  const loadAnalytics = async (days = 30) => {
+    setAnalyticsLoading(true);
+    setAnalyticsError('');
+    const today = new Date();
+    const from = new Date(today);
+    from.setUTCDate(from.getUTCDate() - (days - 1));
+    const { data, error } = await supabase.rpc('get_admin_analytics_snapshot', {
+      p_from: from.toISOString().slice(0, 10),
+      p_to: today.toISOString().slice(0, 10),
     });
-    const groupByDate = (rows: any[] | null) => {
-      const grouped = new Map(dates.map((date) => [date, 0]));
-      (rows ?? []).forEach((row) => {
-        if (!row.created_at) return;
-        const date = new Date(row.created_at).toISOString().slice(0, 10);
-        if (grouped.has(date)) grouped.set(date, (grouped.get(date) ?? 0) + 1);
-      });
-      return dates.map((date) => ({ date, count: grouped.get(date) ?? 0 }));
-    };
-    const dailySignups = groupByDate(profilesResult.data);
-    const dailyMessages = groupByDate(messagesResult.data);
-    const dailyMatches = groupByDate(matchesResult.data);
-
-    // Démographie par ville
-    const { data: allProfiles } = await supabase.from('profiles').select('city');
-    const cityCounts: Record<string, number> = {};
-    if (allProfiles && Array.isArray(allProfiles)) {
-      allProfiles.forEach((p: any) => {
-        if (p.city) {
-          cityCounts[p.city] = (cityCounts[p.city] || 0) + 1;
-        }
-      });
+    if (error || !data) {
+      setAnalyticsError(error?.message || 'Impossible de charger les données Analytics. Applique la migration des snapshots admin.');
+      setAnalyticsLoading(false);
+      return;
     }
-    const userDemographics = Object.entries(cityCounts)
-      .map(([city, count]) => ({ city, count }))
-      .sort((a, b) => b.count - a.count);
-
-    console.log('User demographics:', userDemographics);
-
-    const likesByProfile = new Map<string, number>();
-    (swipesResult.data ?? []).forEach((swipe: any) => likesByProfile.set(swipe.swiped_id, (likesByProfile.get(swipe.swiped_id) ?? 0) + 1));
-    const popularIds = Array.from(likesByProfile.entries()).sort((a, b) => b[1] - a[1]).slice(0, 10).map(([id]) => id);
-    const { data: popularProfiles } = popularIds.length ? await supabase.from('profiles').select('id,display_name').in('id', popularIds) : { data: [] as any[] };
-    const profileNames = new Map((popularProfiles ?? []).map((row: any) => [row.id, row.display_name || 'Profil']));
-    const topProfiles = popularIds.filter((id) => profileNames.has(id)).map((profileId) => ({ profileId, profileName: profileNames.get(profileId) ?? 'Profil', likes: likesByProfile.get(profileId) ?? 0 }));
-    const analyticsData = {
-      dailySignups,
-      dailyMessages,
-      dailyMatches,
-      userDemographics,
-      topProfiles,
-    };
-    return analyticsData;
+    const snapshot = data as AdminAnalyticsSnapshot;
+    setAnalytics({
+      dailySignups: snapshot.dailySignups ?? [],
+      dailyMessages: snapshot.dailyMessages ?? [],
+      dailyMatches: snapshot.dailyMatches ?? [],
+      userDemographics: snapshot.userDemographics ?? [],
+      topProfiles: snapshot.topProfiles ?? [],
+    });
+    setAnalyticsLoaded(true);
+    setAnalyticsLoading(false);
   };
   const loadSettings = async () => {
     const { data } = await supabase.from('settings').select('*');
@@ -414,61 +415,93 @@ export default function AdminPage() {
   };
 
   const resolveReport = async (reportId: string) => {
-    if (!confirm('Marquer ce signalement comme résolu ?')) return;
     const { error } = await supabase.from('reports').update({ resolved: true, status: 'resolved', resolved_at: new Date().toISOString() }).eq('id', reportId);
-    if (!error) {
-      loadReports();
-    }
+    if (error) { alert(`Impossible de classer le signalement : ${error.message}`); return; }
+    await loadReports();
+  };
+
+  const reopenReport = async (reportId: string) => {
+    const { error } = await supabase.from('reports').update({ resolved: false, status: 'pending', resolved_at: null }).eq('id', reportId);
+    if (error) { alert(`Impossible de réouvrir le signalement : ${error.message}`); return; }
+    await loadReports();
+  };
+
+  const sendReportWarning = async (reportId: string) => {
+    const { error } = await supabase.from('reports').update({ resolved: true, status: 'warning_sent', resolved_at: new Date().toISOString() }).eq('id', reportId);
+    if (error) { alert(`L’avertissement a été envoyé, mais le signalement n’a pas pu être actualisé : ${error.message}`); return; }
+    await loadReports();
   };
 
   const dismissReport = async (reportId: string) => {
-    if (!confirm('Supprimer ce signalement ?')) return;
-    const { error } = await supabase.from('reports').delete().eq('id', reportId);
-    if (!error) {
-      loadReports();
-    }
+    if (!confirm('Écarter ce signalement et conserver sa trace dans l’historique ?')) return;
+    const { error } = await supabase.from('reports').update({ resolved: true, status: 'dismissed', resolved_at: new Date().toISOString() }).eq('id', reportId);
+    if (error) { alert(`Impossible d’écarter le signalement : ${error.message}`); return; }
+    await loadReports();
   };
 
-  if (authLoading || !user) {
+  if (authLoading || !user || adminStatusLoading) {
     return <main className="flex min-h-screen items-center justify-center bg-[#f8f9fd] pt-[72px]"><p className="text-sm font-bold text-[#9a8b82]">Chargement...</p></main>;
   }
+
+  if (adminStatusError) return <main className="flex min-h-screen items-center justify-center bg-[#f8f9fd] p-6 pt-[72px]"><div className="max-w-lg rounded-2xl bg-white p-6 text-center shadow"><p className="font-bold text-[#8f294c]">{adminStatusError}</p><button type="button" onClick={() => void checkAdminStatus()} className="mt-4 rounded-full bg-[#ec3b78] px-5 py-2.5 text-sm font-bold text-white">Réessayer</button></div></main>;
 
   if (!isAdmin) {
     return <main className="flex min-h-screen items-center justify-center bg-[#f8f9fd] pt-[72px]"><p className="text-sm font-bold text-[#9a8b82]">Accès non autorisé</p></main>;
   }
 
   return (
-    <AdminLayout tab={tab} onTabChange={setTab}>
-      {tab === 'dashboard' && (
+    <AdminLayout tab={tab} onTabChange={changeTab}>
+      <div hidden={tab !== 'dashboard'}>
         <AdminDashboard
           stats={stats}
           recentActivity={recentActivity}
+          activityLoaded={activityLoaded}
           activityError={activityLogError}
+          statsLoading={statsLoading}
+          statsLoaded={statsLoaded}
+          statsError={statsError}
+          onRefresh={() => { void loadStats(); void loadRecentActivity(); }}
         />
-      )}
+      </div>
 
-      {tab === 'users' && (
+      <div hidden={tab !== 'users'}>
         <AdminUsers
           profiles={profiles}
           genderFilter={genderFilter}
           onGenderFilterChange={(gender) => { setGenderFilter(gender); setCurrentPage(1); }}
+          planFilter={planFilter}
+          onPlanFilterChange={(plan) => { setPlanFilter(plan); setCurrentPage(1); }}
           currentPage={currentPage}
           totalPages={Math.ceil(totalProfiles / itemsPerPage)}
           onPageChange={setCurrentPage}
           onToggleBlocked={toggleProfileAccess}
+          loadError={profileLoadError}
+          loaded={profilesLoaded}
         />
-      )}
+      </div>
 
-      {tab === 'reports' && (
+      <div hidden={tab !== 'reports'}>
         <AdminReports
           reports={reports}
           profiles={conversationProfiles}
           onResolveReport={resolveReport}
           onDismissReport={dismissReport}
+          onSuspendProfile={(profileId) => {
+            if (confirm('Suspendre ce compte ? La personne ne pourra plus accéder à ARAS.')) void toggleProfileAccess(profileId, true);
+          }}
+          onWarningSent={sendReportWarning}
+          onReopenReport={reopenReport}
+          onCompose={() => changeTab('messages')}
+          loadError={reportLoadError}
+          loaded={reportsLoaded}
         />
-      )}
+      </div>
 
-      {tab === 'events' && (
+      <div hidden={tab !== 'fake-profiles'}>
+        <AdminFakeProfiles active={tab === 'fake-profiles'} />
+      </div>
+
+      <div hidden={tab !== 'events'}>
         <AdminEvents
           events={events}
           participants={eventParticipants}
@@ -486,10 +519,17 @@ export default function AdminPage() {
           onToggleStatus={(id, status) => {
             supabase.from('events').update({ is_active: !status }).eq('id', id).then(() => loadEvents());
           }}
+          onToggleAttendance={(entry, attended) => {
+            supabase.from('event_registrations').update({ attended_at: attended ? new Date().toISOString() : null }).eq('event_id', entry.event_id).eq('user_id', entry.user_id).then(({ error }) => {
+              if (error) alert(`Impossible de modifier la présence : ${error.message}`);
+              else void loadEvents();
+            });
+          }}
+          loaded={eventsLoaded}
         />
-      )}
+      </div>
 
-      {tab === 'messages' && (
+      <div hidden={tab !== 'messages'}>
         <AdminMessages
           messages={messages}
           profiles={conversationProfiles}
@@ -501,25 +541,37 @@ export default function AdminPage() {
           conversations={conversationIds}
           onPageChange={setMessagePage}
           onFiltersChange={handleMessageFiltersChange}
+          active={tab === 'messages'}
+          loadError={messageLoadError}
+          loaded={messagesLoaded}
           onDeleteMessage={(id) => {
             if (!confirm('Supprimer ce message ?')) return;
             supabase.from('messages').delete().eq('id', id).then(() => loadMessages());
           }}
         />
-      )}
+      </div>
 
-      {tab === 'analytics' && (
+      <div hidden={tab !== 'analytics'}>
         <AdminAnalytics
           analytics={analytics}
+          loading={analyticsLoading}
+          loaded={analyticsLoaded}
+          error={analyticsError}
+          onRefresh={() => void loadAnalytics()}
+          onRangeChange={(days) => void loadAnalytics(days)}
         />
-      )}
+      </div>
 
-      {tab === 'settings' && (
+      <div hidden={tab !== 'settings'}>
         <AdminSettings
           settings={settings}
           onSaveSettings={saveSettings}
         />
-      )}
+      </div>
+
+      <div hidden={!(['payments', 'golden', 'sara', 'team'] as AdminTab[]).includes(tab)}>
+        <AdminOperations tab={(['payments', 'golden', 'sara', 'team'] as AdminTab[]).includes(tab) ? tab as 'payments' | 'golden' | 'sara' | 'team' : 'payments'} active={(['payments', 'golden', 'sara', 'team'] as AdminTab[]).includes(tab)} />
+      </div>
     </AdminLayout>
   );
 }

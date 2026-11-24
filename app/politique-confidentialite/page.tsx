@@ -24,6 +24,7 @@ const sections = [
     paragraphs: [
       'Nous collectons les informations que vous fournissez directement lorsque vous créez un compte ou complétez votre profil, notamment : nom ou pseudonyme, adresse e-mail, numéro de téléphone, date de naissance, ville, photo de profil, centre d’intérêts, bio, préférences et informations de compte.',
       'Avant leur enregistrement, les photos de profil et les photos facultatives sont analysées automatiquement par Amazon Rekognition afin de vérifier qu’elles montrent une personne et ne représentent pas uniquement un objet, une illustration, une célébrité ou un contenu interdit. La détection de célébrités sert à modérer les images et ne vérifie pas l’identité de l’utilisateur.',
+      'Les photos déjà enregistrées peuvent aussi être réanalysées automatiquement une fois par jour afin de repérer les contenus potentiellement non conformes. Les résultats sont examinés par l’équipe ARAS et peuvent entraîner un avertissement ou une restriction du compte après vérification humaine.',
       'Nous collectons aussi des données techniques et d’usage, comme l’adresse IP, le type de navigateur, les pages consultées, les interactions sur la plateforme, les logs d’authentification, les données de connexion et les informations issues de nos outils d’analyse et de sécurité.',
       'Si vous utilisez la connexion Google, nous pouvons recevoir les informations de votre compte Google nécessaires à l’authentification et au bon fonctionnement du service, conformément à votre consentement et aux paramètres de votre compte Google.',
     ],
@@ -44,7 +45,7 @@ const sections = [
     icon: LockKeyhole,
     paragraphs: [
       'ARAS ne vend pas vos données personnelles à des tiers. Nous pouvons partager certaines informations uniquement dans les cas suivants : avec les prestataires techniques nécessaires au fonctionnement du service (hébergement, authentification, messagerie, analytics, support client), avec les autorités compétentes lorsqu’une obligation légale l’exige, et dans le cadre d’une opération de sécurité ou de protection de nos utilisateurs.',
-      'Pour cette vérification, le fichier photo est transmis à Amazon Rekognition, un service d’Amazon Web Services (AWS), puis utilisé pour modérer l’image avant son enregistrement dans le profil. Le traitement est soumis aux conditions et à la politique de confidentialité d’AWS.',
+      'Pour la vérification initiale et les contrôles périodiques, le fichier photo est transmis à Amazon Rekognition, un service d’Amazon Web Services (AWS), afin de modérer l’image. Le traitement est soumis aux conditions et à la politique de confidentialité d’AWS.',
       'Les informations visibles publiquement sur votre profil sont celles que vous avez choisies d’afficher dans les paramètres de confidentialité. Les contenus privés (messages, échanges) ne sont accessibles qu’aux personnes autorisées par l’application.',
     ],
   },

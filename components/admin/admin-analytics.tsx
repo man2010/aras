@@ -11,9 +11,14 @@ interface AdminAnalyticsProps {
     userDemographics: { city: string; count: number }[];
     topProfiles: { profileId: string; profileName: string; likes: number }[];
   };
+  loading?: boolean;
+  loaded?: boolean;
+  error?: string;
+  onRefresh?: () => void;
+  onRangeChange?: (days: number) => void;
 }
 
-export function AdminAnalytics({ analytics }: AdminAnalyticsProps) {
+export function AdminAnalytics({ analytics, loading = false, loaded = true, error = '', onRefresh, onRangeChange }: AdminAnalyticsProps) {
   const [timeRange, setTimeRange] = useState<'7d' | '30d' | '90d'>('30d');
   const days = Number.parseInt(timeRange, 10);
   const dailySignups = analytics.dailySignups.slice(-days);
@@ -21,6 +26,8 @@ export function AdminAnalytics({ analytics }: AdminAnalyticsProps) {
   const dailyMatches = analytics.dailyMatches.slice(-days);
   const total = (items: { count: number }[]) => items.reduce((sum, item) => sum + item.count, 0);
   const barHeight = (count: number, items: { count: number }[]) => count === 0 ? 0 : Math.max(8, (count / Math.max(1, ...items.map((item) => item.count))) * 100);
+
+  if (!loaded) return <div className="space-y-5"><div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="font-display text-2xl">Analytics</h2><p className="mt-1 text-sm text-[#9a8b82]">Chargement des données agrégées…</p></div><button type="button" onClick={onRefresh} disabled={loading} className="rounded-full border bg-white px-4 py-2 text-sm font-bold disabled:opacity-50">{loading ? 'Chargement…' : 'Réessayer'}</button></div>{error && <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800">{error} Vérifie que la migration des snapshots Analytics est appliquée dans Supabase.</p>}<div className="grid gap-6 lg:grid-cols-2">{Array.from({ length: 5 }, (_, index) => <div key={index} className="h-72 animate-pulse rounded-[26px] bg-white shadow-sm" />)}</div></div>;
 
   const handleExport = () => {
     const csv = [
@@ -45,11 +52,11 @@ export function AdminAnalytics({ analytics }: AdminAnalyticsProps) {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h2 className="font-display text-2xl">Analytics</h2>
+        <div><h2 className="font-display text-2xl">Analytics</h2><p className="mt-1 text-sm text-[#9a8b82]">Synthèse calculée côté base, sans limite de lignes navigateur.</p></div>
         <div className="flex gap-2">
           <select
             value={timeRange}
-            onChange={(e) => setTimeRange(e.target.value as '7d' | '30d' | '90d')}
+            onChange={(e) => { const value = e.target.value as '7d' | '30d' | '90d'; setTimeRange(value); onRangeChange?.(Number.parseInt(value, 10)); }}
             className="rounded-xl border border-[#dfd2c6] bg-[#f8f9fd] px-4 py-2.5 text-sm outline-none focus:border-[#ec3b78]"
           >
             <option value="7d">7 jours</option>
@@ -62,8 +69,11 @@ export function AdminAnalytics({ analytics }: AdminAnalyticsProps) {
           >
             <Download size={14} /> Exporter
           </button>
+          <button type="button" onClick={onRefresh} disabled={loading} className="rounded-full border border-[#dfd2c6] bg-white px-4 py-2 text-xs font-extrabold disabled:opacity-50">{loading ? 'Actualisation…' : 'Actualiser'}</button>
         </div>
       </div>
+      {error && <p role="alert" className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">Les données affichées sont la dernière version chargée. L’actualisation a échoué : {error}</p>}
+      {loading && <p role="status" className="text-xs text-[#9a8b82]">Actualisation en cours…</p>}
 
       <div className="grid gap-4 sm:grid-cols-3">
         {[{ label: 'Nouveaux profils', value: total(dailySignups), color: '#ec3b78' }, { label: 'Messages', value: total(dailyMessages), color: '#1a6b68' }, { label: 'Matches', value: total(dailyMatches), color: '#d89b52' }].map((metric) => (

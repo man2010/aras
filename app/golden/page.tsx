@@ -3,6 +3,8 @@
 import Link from 'next/link';
 import { FormEvent, useState } from 'react';
 import { Crown, ShieldCheck } from 'lucide-react';
+import { useEffect } from 'react';
+import { supabase } from '@/lib/supabase';
 
 const fieldClass = 'mt-2 min-h-12 w-full rounded-xl border border-[#dfd2c6] bg-white px-4 py-3 text-base font-normal text-[#241c18] outline-none transition focus:border-[#c88a27] focus:ring-2 focus:ring-[#c88a27]/20';
 const labelClass = 'block text-sm font-semibold text-[#625852]';
@@ -11,6 +13,13 @@ export default function GoldenPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [sent, setSent] = useState(false);
+  const [goldenPrice, setGoldenPrice] = useState(29500);
+
+  useEffect(() => {
+    void supabase.from('subscription_plans').select('price_fcfa').eq('code', 'golden').maybeSingle().then(({ data }) => {
+      if (data?.price_fcfa != null) setGoldenPrice(data.price_fcfa);
+    });
+  }, []);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -77,7 +86,7 @@ export default function GoldenPage() {
 
           <div className="flex flex-col gap-3 rounded-2xl border border-[#e2c98f] bg-gradient-to-r from-[#fcf2e5] to-[#f5e0c6] px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
             <div><p className="font-bold text-[#24171b]">Adhésion membre Golden</p><p className="mt-1 text-sm text-[#756960]">Accès aux événements privés organisés par ARAS</p></div>
-            <p className="whitespace-nowrap text-right"><span className="block text-sm font-semibold text-[#9a8b82] line-through">29 500 FCFA</span><span className="font-display text-2xl font-bold text-[#c88a27] sm:text-3xl">Gratuit actuellement</span></p>
+            <p className="whitespace-nowrap text-right"><span className="block text-sm font-semibold text-[#9a8b82] line-through">{new Intl.NumberFormat('fr-FR').format(goldenPrice)} FCFA</span><span className="font-display text-2xl font-bold text-[#c88a27] sm:text-3xl">Gratuit actuellement</span></p>
           </div>
 
           <div className="space-y-3 text-sm leading-5 text-[#625852]">

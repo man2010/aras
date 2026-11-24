@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Calendar, Plus, Edit, Trash2, MapPin, Users, DollarSign, CheckCircle, XCircle, X, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Calendar, Plus, Edit, Trash2, MapPin, Users, DollarSign, CheckCircle, XCircle, X, ChevronLeft, ChevronRight, Download } from 'lucide-react';
 import { AdminEventModal } from './admin-event-modal';
 
 interface AdminEventsProps {
@@ -12,9 +12,11 @@ interface AdminEventsProps {
   onEditEvent: (eventId: string, eventData: any) => void;
   onDeleteEvent: (eventId: string) => void;
   onToggleStatus: (eventId: string, currentStatus: boolean) => void;
+  onToggleAttendance: (entry: any, attended: boolean) => void;
+  loaded?: boolean;
 }
 
-export function AdminEvents({ events, participants, loadError, onCreateEvent, onEditEvent, onDeleteEvent, onToggleStatus }: AdminEventsProps) {
+export function AdminEvents({ events, participants, loadError, onCreateEvent, onEditEvent, onDeleteEvent, onToggleStatus, onToggleAttendance, loaded = true }: AdminEventsProps) {
   const [filterStatus, setFilterStatus] = useState<'all' | 'upcoming' | 'past'>('all');
   const [showModal, setShowModal] = useState(false);
   const [editingEvent, setEditingEvent] = useState<any>(null);
@@ -39,6 +41,12 @@ export function AdminEvents({ events, participants, loadError, onCreateEvent, on
   const participantPageSize = 10;
   const participantPageCount = Math.max(1, Math.ceil(eventParticipants.length / participantPageSize));
   const pageParticipants = eventParticipants.slice((participantPage - 1) * participantPageSize, participantPage * participantPageSize);
+  const exportAttendance = () => {
+    const rows = [['Nom', 'Ville', 'Statut inscription', 'Présent', 'Date présence'], ...eventParticipants.map((entry) => [entry.profile?.display_name || '', entry.profile?.city || '', entry.status || '', entry.attended_at ? 'Oui' : 'Non', entry.attended_at || ''])];
+    const csv = rows.map((row) => row.map((value) => `"${String(value).replace(/"/g, '""')}"`).join(',')).join('\n');
+    const url = URL.createObjectURL(new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' }));
+    const anchor = document.createElement('a'); anchor.href = url; anchor.download = `inscriptions_${selectedEvent?.title || 'aras'}.csv`; anchor.click(); URL.revokeObjectURL(url);
+  };
 
   const handleCreateEvent = (eventData: any) => {
     onCreateEvent(eventData);
@@ -155,7 +163,8 @@ export function AdminEvents({ events, participants, loadError, onCreateEvent, on
           ))}
         </div>
 
-        {filtered.length === 0 && (
+        {!loaded && !loadError && <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">{[0, 1, 2].map((item) => <div key={item} className="h-72 animate-pulse rounded-[26px] bg-white" />)}</div>}
+        {loaded && filtered.length === 0 && (
           <div className="rounded-[26px] bg-white p-12 text-center shadow-[0_8px_30pxrgba(83,46,32,.05)]">
             <Calendar size={48} className="mx-auto text-[#dfd2c6]" />
             <p className="mt-4 text-sm text-[#756960]">Aucun événement pour le moment.</p>
@@ -167,14 +176,17 @@ export function AdminEvents({ events, participants, loadError, onCreateEvent, on
       {selectedEvent && (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/55 p-4" role="dialog" aria-modal="true" aria-label={`Participants à ${selectedEvent.title}`}>
           <section className="flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-[28px] bg-white shadow-[0_24px_80px_rgba(0,0,0,.3)]">
-            <header className="flex items-center justify-between gap-4 border-b border-[#f3e9dc] p-5 sm:p-6"><div><p className="text-xs font-extrabold uppercase tracking-widest text-[#ec3b78]">Inscriptions à l’événement</p><h2 className="mt-1 font-display text-2xl">{selectedEvent.title}</h2><p className="mt-1 text-sm text-[#756960]">{eventParticipants.length} participant(s) · page {participantPage} sur {participantPageCount}</p></div><button type="button" onClick={() => setParticipantsEventId(null)} aria-label="Fermer" className="rounded-full bg-[#f8f9fd] p-2"><X size={18} /></button></header>
+            <header className="flex items-center justify-between gap-4 border-b border-[#f3e9dc] p-5 sm:p-6"><div><p className="text-xs font-extrabold uppercase tracking-widest text-[#ec3b78]">Inscriptions à l’événement</p><h2 className="mt-1 font-display text-2xl">{selectedEvent.title}</h2><p className="mt-1 text-sm text-[#756960]">{eventParticipants.length} participant(s) · page {participantPage} sur {participantPageCount}</p><button type="button" onClick={exportAttendance} className="mt-3 rounded-full bg-[#1a6b68] px-3 py-2 text-xs font-bold text-white"><Download size={13} className="mr-1 inline"/>Exporter la liste</button></div><button type="button" onClick={() => setParticipantsEventId(null)} aria-label="Fermer" className="rounded-full bg-[#f8f9fd] p-2"><X size={18} /></button></header>
             <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-6">
               {eventParticipants.length === 0 ? <p className="rounded-2xl bg-[#f8f9fd] p-8 text-center text-sm text-[#756960]">Aucune inscription enregistrée.</p> : <div className="space-y-2">{pageParticipants.map((entry) => (
-                <button key={`${selectedEvent.id}-${entry.user_id}`} type="button" onClick={() => entry.profile && setSelectedParticipant(entry.profile)} disabled={!entry.profile} className="flex w-full items-center gap-3 rounded-2xl border border-[#f0e6dc] p-3 text-left transition hover:bg-[#f8f9fd] disabled:opacity-60 sm:gap-4 sm:p-4">
+                <div key={`${selectedEvent.id}-${entry.user_id}`} className="flex w-full items-center gap-3 rounded-2xl border border-[#f0e6dc] p-3 sm:gap-4 sm:p-4">
+                  <button type="button" onClick={() => entry.profile && setSelectedParticipant(entry.profile)} disabled={!entry.profile} className="flex min-w-0 flex-1 items-center gap-3 text-left disabled:opacity-60">
                   <img src={entry.profile?.photo_url || '/images/default-avatar.png'} alt="" className="h-11 w-11 shrink-0 rounded-full object-cover" />
                   <span className="min-w-0 flex-1"><span className="block truncate text-sm font-bold text-[#241c18]">{entry.profile?.display_name || 'Profil indisponible'}</span><span className="block truncate text-xs text-[#756960]">{entry.profile ? `${entry.profile.age} ans · ${entry.profile.city}` : 'Utilisateur sans profil relié'}</span></span>
+                  </button>
                   <span className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] font-extrabold ${entry.status === 'confirmed' ? 'bg-[#e5f0ed] text-[#1a6b68]' : 'bg-[#fff3d9] text-[#8c5d12]'}`}>{entry.status === 'confirmed' ? 'Confirmé' : entry.status === 'payment_pending' ? 'En attente paiement' : entry.status}</span>
-                </button>
+                  <button type="button" disabled={entry.status !== 'confirmed'} onClick={() => onToggleAttendance(entry, !entry.attended_at)} className={`shrink-0 rounded-full px-3 py-2 text-xs font-bold ${entry.attended_at ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-100 text-gray-700'} disabled:opacity-40`}>{entry.attended_at ? 'Présent' : 'Marquer présent'}</button>
+                </div>
               ))}</div>}
             </div>
             {participantPageCount > 1 && <footer className="flex items-center justify-between border-t border-[#f3e9dc] p-4"><button type="button" disabled={participantPage === 1} onClick={() => setParticipantPage((page) => Math.max(1, page - 1))} className="inline-flex items-center gap-1 rounded-full bg-[#f8f9fd] px-4 py-2 text-sm font-bold disabled:opacity-40"><ChevronLeft size={16} /> Précédent</button><span className="text-xs text-[#756960]">{(participantPage - 1) * participantPageSize + 1}–{Math.min(participantPage * participantPageSize, eventParticipants.length)} sur {eventParticipants.length}</span><button type="button" disabled={participantPage === participantPageCount} onClick={() => setParticipantPage((page) => Math.min(participantPageCount, page + 1))} className="inline-flex items-center gap-1 rounded-full bg-[#ec3b78] px-4 py-2 text-sm font-bold text-white disabled:opacity-40">Suivant <ChevronRight size={16} /></button></footer>}

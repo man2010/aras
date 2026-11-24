@@ -106,6 +106,30 @@ html.dark .border-\[\#dfd2c6\], html.dark .border-\[\#eadfd5\], html.dark .borde
 html.dark input, html.dark textarea, html.dark select { color: #f5f5f5; }
 html.dark ::-webkit-scrollbar-thumb { background: #505050; border-color: #121212; }
 
+/* Harmonise toutes les rubriques de l’admin avec le mode sombre du tableau de bord. */
+html.dark .admin-console { background-color: #121116 !important; color: #f5f2f5; }
+html.dark .admin-console [class*="bg-[#fbe5ed]"],
+html.dark .admin-console [class*="bg-[#fff1f6]"],
+html.dark .admin-console [class*="bg-[#fffafd]"],
+html.dark .admin-console [class*="bg-[#fae4e2]"],
+html.dark .admin-console [class*="bg-[#fce8ef]"] { background-color: #38232d !important; }
+html.dark .admin-console [class*="bg-[#e2f0e9]"],
+html.dark .admin-console [class*="bg-[#e5f0ed]"],
+html.dark .admin-console [class*="bg-[#eef7f5]"] { background-color: #1d3430 !important; }
+html.dark .admin-console [class*="bg-[#fff0dc]"],
+html.dark .admin-console [class*="bg-[#fff8e9]"],
+html.dark .admin-console [class*="bg-[#fae4e2]"] { background-color: #382e20 !important; }
+html.dark .admin-console [class*="bg-[#f6f7fb]"],
+html.dark .admin-console [class*="bg-[#f3f2f6]"],
+html.dark .admin-console [class*="bg-[#f8f9fc]"],
+html.dark .admin-console [class*="bg-[#f8f9fd]"] { background-color: #19181f !important; }
+html.dark .admin-console [class*="border-[#e8e2e7]"],
+html.dark .admin-console [class*="border-[#f0e8e5]"],
+html.dark .admin-console [class*="border-[#efedf2]"],
+html.dark .admin-console [class*="border-[#f3e9dc]"] { border-color: #38343e !important; }
+html.dark .admin-console [class*="text-[#1a6b68]"] { color: #70c7b5 !important; }
+html.dark .admin-console [class*="text-[#8c5d12]"] { color: #f0c36e !important; }
+
 .auth-phone-input {
   --react-international-phone-height: 46px;
   --react-international-phone-border-radius: 0.75rem;

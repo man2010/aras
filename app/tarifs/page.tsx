@@ -4,14 +4,22 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { Check, Crown, Sparkles, Heart, ShieldCheck } from 'lucide-react';
 import { useTheme } from 'next-themes';
+import { supabase } from '@/lib/supabase';
 
 export default function TarifsPage() {
   const { resolvedTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
+  const [catalogPrices, setCatalogPrices] = useState({ premium: 4500, elite: 14500, golden: 29500 });
   const isDark = mounted && resolvedTheme === 'dark';
 
   useEffect(() => {
     setMounted(true);
+    let cancelled = false;
+    void supabase.from('subscription_plans').select('code,price_fcfa').in('code', ['premium', 'elite', 'golden']).then(({ data }) => {
+      if (cancelled || !data) return;
+      setCatalogPrices((current) => ({ ...current, ...Object.fromEntries(data.map((item) => [item.code, item.price_fcfa])) }));
+    });
+    return () => { cancelled = true; };
   }, []);
   const plans = [
     {
@@ -35,7 +43,7 @@ export default function TarifsPage() {
     },
     {
       name: 'Premium',
-      price: '4 500',
+      price: new Intl.NumberFormat('fr-FR').format(catalogPrices.premium),
       period: 'FCFA / mois',
       icon: Sparkles,
       bg: '#ec3b78',
@@ -61,7 +69,7 @@ export default function TarifsPage() {
     },
     {
       name: 'Elite',
-      price: '14 500',
+      price: new Intl.NumberFormat('fr-FR').format(catalogPrices.elite),
       period: 'FCFA / mois',
       icon: Crown,
       bg: '#241c18',
@@ -92,7 +100,7 @@ export default function TarifsPage() {
 
   const faqs = [
     { q: 'La formule gratuite suffit-elle pour commencer ?', r: 'Oui, la formule gratuite permet déjà de créer votre profil, découvrir les profils et tester la plateforme avec les bases essentielles.' },
-    { q: 'Le Premium est-il gratuit pour les femmes ?', r: 'Pendant le lancement, toutes les formules sont gratuites pendant au moins deux mois. Ensuite, Premium sera à 4 500 FCFA par mois et restera gratuit pour les femmes.' },
+    { q: 'Le Premium est-il gratuit pour les femmes ?', r: `Pendant le lancement, toutes les formules sont gratuites pendant au moins deux mois. Ensuite, Premium sera à ${new Intl.NumberFormat('fr-FR').format(catalogPrices.premium)} FCFA par mois et restera gratuit pour les femmes.` },
     { q: 'Qu\'est-ce que la formule Elite ?', r: 'La formule Elite donne accès aux avantages les plus complets, dont les événements VIP, l’incognito et le support prioritaire.' },
     { q: 'Mes données sont-elles protégées ?', r: 'Absolument. Vos informations personnelles restent confidentielles et ne sont jamais partagées sans votre accord.' },
   ];
@@ -138,8 +146,7 @@ export default function TarifsPage() {
               <p className="mx-auto mt-4 max-w-[720px] text-[15px] leading-7 text-[#756960] lg:mx-0">
                 Vous cherchez l&apos;amour mais préférez rester discret ? Remplissez un formulaire confidentiel : notre équipe recherche pour vous et vous recontacte en privé, sans profil visible ni photo en ligne.
               </p>
-              <p className="mx-auto mt-4 max-w-[720px] text-[14px] leading-7 text-[#9a8b82] lg:mx-0">
-              </p>
+              <p className="mx-auto mt-4 max-w-[720px] text-[14px] leading-7 text-[#9a8b82] lg:mx-0"><span className="line-through">{new Intl.NumberFormat('fr-FR').format(catalogPrices.golden)} FCFA</span> · Gratuit actuellement</p>
             </div>
 
             <div className="grid gap-5 sm:grid-cols-2">
