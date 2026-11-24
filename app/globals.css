@@ -130,6 +130,26 @@ html.dark .admin-console [class*="border-[#f3e9dc]"] { border-color: #38343e !im
 html.dark .admin-console [class*="text-[#1a6b68]"] { color: #70c7b5 !important; }
 html.dark .admin-console [class*="text-[#8c5d12]"] { color: #f0c36e !important; }
 
+/* Garde les pages admin dans la largeur du viewport, y compris les tableaux et formulaires. */
+.admin-console { width: 100%; min-width: 0; max-width: 100%; }
+.admin-console > div,
+.admin-console section,
+.admin-console article,
+.admin-console form { min-width: 0; }
+.admin-console [class*="overflow-x-auto"] { max-width: 100%; }
+
+/* iOS Safari zoome les champs dont la police est inférieure à 16 px au focus. */
+@media (max-width: 767px) {
+  .admin-console :is(input, select, textarea, [contenteditable="true"]) {
+    font-size: 16px !important;
+  }
+
+  .admin-console [role="dialog"] {
+    max-height: calc(100dvh - 1rem);
+    overscroll-behavior: contain;
+  }
+}
+
 .auth-phone-input {
   --react-international-phone-height: 46px;
   --react-international-phone-border-radius: 0.75rem;

@@ -62,18 +62,18 @@ export function AdminDashboard({ stats, recentActivity, activityLoaded = true, a
 
   return (
     <div className="space-y-8">
-      <div className="flex items-center justify-between gap-3"><div><h2 className="font-display text-2xl">Vue d’ensemble</h2><p className="mt-1 text-sm text-[#9a8b82]">Indicateurs actuels et activité récente.</p></div><button type="button" onClick={onRefresh} disabled={statsLoading} className="rounded-full border border-[#e4e1eb] bg-white px-4 py-2.5 text-sm font-bold text-[#625852] disabled:opacity-50">{statsLoading ? 'Actualisation…' : 'Actualiser'}</button></div>
+      <div className="flex flex-wrap items-center justify-between gap-3"><div className="min-w-0"><h2 className="font-display text-2xl">Vue d’ensemble</h2><p className="mt-1 text-sm text-[#9a8b82]">Indicateurs actuels et activité récente.</p></div><button type="button" onClick={onRefresh} disabled={statsLoading} className="shrink-0 rounded-full border border-[#e4e1eb] bg-white px-4 py-2.5 text-sm font-bold text-[#625852] disabled:opacity-50">{statsLoading ? 'Actualisation…' : 'Actualiser'}</button></div>
       {statsError && <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800"><span>Les indicateurs n’ont pas été actualisés : {statsError}</span><button type="button" onClick={onRefresh} className="font-bold underline">Réessayer</button></div>}
       {/* KPI Cards */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+      <div className="grid grid-cols-2 gap-2 sm:gap-4 lg:grid-cols-5">
         {statCards.map((stat) => (
-          <div key={stat.label} className="rounded-[22px] bg-white p-5 shadow-[0_8px_30px_rgba(83,46,32,.05)] transition hover:shadow-[0_12px_40px_rgba(83,46,32,.08)]">
+          <div key={stat.label} className="min-w-0 rounded-[22px] bg-white p-3 shadow-[0_8px_30px_rgba(83,46,32,.05)] transition hover:shadow-[0_12px_40px_rgba(83,46,32,.08)] sm:p-5">
             <div className="flex items-center justify-between">
               <stat.icon size={20} className="text-[#756960]" style={{ color: stat.color }} />
               <span className="text-[10px] font-bold uppercase tracking-wider text-[#9a8b82]">Total</span>
             </div>
             {!statsLoaded ? (statsLoading ? <div className="mt-4 h-9 w-20 animate-pulse rounded-lg bg-[#f0eef3]" aria-label="Chargement" /> : <p className="mt-4 font-display text-3xl font-semibold">—</p>) : <p className="mt-4 font-display text-3xl font-semibold">{stat.value.toLocaleString('fr-FR')}</p>}
-            <p className="mt-1 text-xs font-bold uppercase tracking-wider text-[#9a8b82]">{stat.label}</p>
+            <p className="mt-1 break-words text-[10px] font-bold uppercase tracking-wide text-[#9a8b82] sm:text-xs sm:tracking-wider">{stat.label}</p>
           </div>
         ))}
       </div>

@@ -75,7 +75,7 @@ export function AdminAnalytics({ analytics, loading = false, loaded = true, erro
       {error && <p role="alert" className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">Les données affichées sont la dernière version chargée. L’actualisation a échoué : {error}</p>}
       {loading && <p role="status" className="text-xs text-[#9a8b82]">Actualisation en cours…</p>}
 
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid grid-cols-2 gap-2 sm:gap-4 sm:grid-cols-3">
         {[{ label: 'Nouveaux profils', value: total(dailySignups), color: '#ec3b78' }, { label: 'Messages', value: total(dailyMessages), color: '#1a6b68' }, { label: 'Matches', value: total(dailyMatches), color: '#d89b52' }].map((metric) => (
           <div key={metric.label} className="rounded-[22px] bg-white p-5 shadow-[0_8px_30px_rgba(83,46,32,.05)]"><p className="font-display text-3xl" style={{ color: metric.color }}>{metric.value}</p><p className="mt-1 text-xs font-bold uppercase tracking-wider text-[#9a8b82]">{metric.label} · {days} jours</p></div>
         ))}

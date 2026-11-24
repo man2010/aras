@@ -19,6 +19,7 @@ export const metadata: Metadata = {
     shortcut: '/aras-logo.jpeg',
     apple: '/aras-logo.jpeg',
   },
+  viewport: { width: 'device-width', initialScale: 1 },
 };
 
 export const dynamic = 'force-dynamic';

@@ -92,7 +92,7 @@ export function AdminFakeProfiles({ active = true }: { active?: boolean }) {
 
   return <section className="space-y-6">
     <header className="flex flex-wrap items-end justify-between gap-4"><div><p className="text-xs font-extrabold uppercase tracking-[.18em] text-[#ec3b78]">Contrôle des photos</p><h2 className="mt-1 font-display text-3xl">Profils à vérifier</h2><p className="mt-1 max-w-2xl text-sm text-[#8d817b]">Amazon Rekognition repère les photos qui pourraient être non conformes. Chaque résultat reste à confirmer par un administrateur.</p></div><div className="flex gap-2"><button type="button" onClick={() => void load()} disabled={loading || busy} className="rounded-full border bg-white p-3 text-[#625852] disabled:opacity-50" aria-label="Actualiser"><RefreshCw size={17}/></button><button type="button" onClick={() => void scanNow()} disabled={busy} className="rounded-full bg-[#ec3b78] px-5 py-3 text-sm font-extrabold text-white disabled:opacity-50"><ScanEye size={16} className="mr-2 inline"/>{busy ? 'Analyse…' : 'Analyser les photos'}</button></div></header>
-    <div className="grid gap-3 sm:grid-cols-3"><Metric title="À vérifier" value={pendingCount} icon={<ShieldAlert size={17}/>} tone="pink"/><Metric title="Photos signalées" value={items.length} icon={<AlertTriangle size={17}/>} tone="gold"/><Metric title="Dernier scan" value={lastScan?.finished_at ? new Date(lastScan.finished_at).toLocaleString('fr-FR') : 'Jamais'} icon={<Clock3 size={17}/>} tone="green"/></div>
+    <div className="grid grid-cols-2 gap-2 sm:gap-3 sm:grid-cols-3"><Metric title="À vérifier" value={pendingCount} icon={<ShieldAlert size={17}/>} tone="pink"/><Metric title="Photos signalées" value={items.length} icon={<AlertTriangle size={17}/>} tone="gold"/><Metric title="Dernier scan" value={lastScan?.finished_at ? new Date(lastScan.finished_at).toLocaleString('fr-FR') : 'Jamais'} icon={<Clock3 size={17}/>} tone="green"/></div>
     {lastScan && <p className="text-xs text-[#8d817b]">Dernière exécution : {lastScan.status === 'completed' ? 'terminée' : lastScan.status === 'running' ? 'en cours' : 'en échec'} · {lastScan.photos_scanned} photo(s) analysée(s) · {lastScan.error_count} erreur(s).</p>}
     {lastResult && <p className="rounded-xl bg-[#eaf5f1] p-3 text-sm text-[#1a6b68]">{message}</p>}
     {error && <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800">{error}</p>}
@@ -104,7 +104,7 @@ export function AdminFakeProfiles({ active = true }: { active?: boolean }) {
 
 function Metric({ title, value, icon, tone }: { title: string; value: number | string; icon: ReactNode; tone: 'pink' | 'gold' | 'green' }) {
   const colors = { pink: 'bg-[#fbe5ed]', gold: 'bg-[#fff0dc]', green: 'bg-[#e2f0e9]' };
-  return <div className={`${colors[tone]} rounded-2xl p-4`}><div className="flex items-center justify-between text-[#756960]"><span className="text-xs font-bold">{title}</span>{icon}</div><p className="mt-3 font-display text-2xl">{value}</p></div>;
+  return <div className={`${colors[tone]} min-w-0 rounded-2xl p-3 sm:p-4`}><div className="flex items-center justify-between gap-2 text-[#756960]"><span className="min-w-0 break-words text-xs font-bold">{title}</span>{icon}</div><p className="mt-3 break-words font-display text-base sm:text-2xl">{value}</p></div>;
 }
 function Status({ status }: { status: AuditItem['review_status'] }) {
   const label = { pending: 'À vérifier', warned: 'Averti', blocked: 'Bloqué', cleared: 'Classé conforme' }[status];
