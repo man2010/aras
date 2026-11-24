@@ -7,23 +7,26 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? process.env.SUPABASE
 const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? process.env.SUPABASE_ANON_KEY ?? '';
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 type Target = 'all' | 'incomplete' | 'member';
+let gmailTransporter: ReturnType<typeof nodemailer.createTransport> | null = null;
 
 function isIncomplete(profile: { onboarding_completed: boolean | null; profile_status: string | null }) {
   return profile.onboarding_completed !== true || profile.profile_status !== 'completed';
 }
 
-async function sendExternalMessage(user: { email?: string; phone?: string; app_metadata?: Record<string, unknown>; user_metadata?: Record<string, unknown> }, subject: string, body: string) {
+type ExternalDelivery = { status: 'sent' | 'failed' | 'skipped'; channel: 'email' | 'sms'; reason?: string };
+
+async function sendExternalMessage(user: { email?: string; phone?: string; app_metadata?: Record<string, unknown>; user_metadata?: Record<string, unknown> }, subject: string, body: string): Promise<ExternalDelivery> {
   const provider = String(user.app_metadata?.provider ?? '').toLowerCase();
   const method = user.user_metadata?.auth_method;
   const usesPhone = method === 'phone' || provider === 'phone' || (!user.email && Boolean(user.phone));
 
   if (usesPhone) {
-    if (!user.phone) return 'skipped' as const;
+    if (!user.phone) return { status: 'skipped', channel: 'sms', reason: 'phone_unavailable' };
     const accountSid = process.env.TWILIO_ACCOUNT_SID;
     const authToken = process.env.TWILIO_AUTH_TOKEN;
     const fromNumber = process.env.TWILIO_FROM_NUMBER;
     const messagingServiceSid = process.env.TWILIO_MESSAGING_SERVICE_SID;
-    if (!accountSid || !authToken || (!fromNumber && !messagingServiceSid)) return 'failed' as const;
+    if (!accountSid || !authToken || (!fromNumber && !messagingServiceSid)) return { status: 'failed', channel: 'sms', reason: 'sms_provider_unconfigured' };
     const sms = new URLSearchParams({ To: user.phone, Body: `${subject}\n\n${body}` });
     if (messagingServiceSid) sms.set('MessagingServiceSid', messagingServiceSid);
     else sms.set('From', fromNumber!);
@@ -32,37 +35,60 @@ async function sendExternalMessage(user: { email?: string; phone?: string; app_m
       headers: { Authorization: `Basic ${Buffer.from(`${accountSid}:${authToken}`).toString('base64')}`, 'Content-Type': 'application/x-www-form-urlencoded' },
       body: sms.toString(),
     }).catch(() => null);
-    return response?.ok ? 'sent' as const : 'failed' as const;
+    if (!response) return { status: 'failed', channel: 'sms', reason: 'sms_network_error' };
+    if (response.ok) return { status: 'sent', channel: 'sms' };
+    const providerError = await response.json().catch(() => null) as { code?: number } | null;
+    const code = String(providerError?.code ?? '');
+    const reason = code === '20003' ? 'sms_auth_failed'
+      : code === '21211' ? 'sms_invalid_phone'
+        : code === '21608' ? 'sms_trial_recipient_unverified'
+          : code === '21408' ? 'sms_country_not_enabled'
+            : code === '21606' ? 'sms_sender_invalid' : 'sms_delivery_failed';
+    console.error('[admin-announcements] SMS provider rejected a delivery:', code || response.status);
+    return { status: 'failed', channel: 'sms', reason };
   }
 
-  if (!user.email) return 'skipped' as const;
+  if (!user.email) return { status: 'skipped', channel: 'email', reason: 'email_unavailable' };
+  const gmailEmail = process.env.GMAIL_EMAIL?.trim();
+  // Google affiche souvent la clé d’application sous la forme « xxxx xxxx xxxx xxxx ».
+  const gmailPassword = process.env.GMAIL_APP_PASSWORD?.replace(/\s+/g, '');
+  if (gmailEmail && gmailPassword) {
+    try {
+      gmailTransporter ??= nodemailer.createTransport({ service: 'gmail', auth: { user: gmailEmail, pass: gmailPassword }, pool: true, maxConnections: 2, maxMessages: 100 });
+      await gmailTransporter.sendMail({
+        from: { name: 'ARAS', address: gmailEmail },
+        to: user.email,
+        subject,
+        text: `Bonjour ${String(user.user_metadata?.full_name ?? 'membre ARAS')},\n\n${body}\n\nARAS`,
+      });
+      return { status: 'sent', channel: 'email' };
+    } catch (error) {
+      const code = error && typeof error === 'object' && 'code' in error ? String(error.code) : 'unknown';
+      console.error('[admin-announcements] Gmail SMTP delivery failed:', code);
+      return { status: 'failed', channel: 'email', reason: code === 'EAUTH' ? 'email_gmail_auth_failed' : 'email_smtp_failed' };
+    }
+  }
   if (process.env.RESEND_API_KEY) {
+    const sender = process.env.RESEND_FROM_EMAIL?.trim() || process.env.CONTACT_FROM_EMAIL?.trim();
+    if (!sender) return { status: 'failed', channel: 'email', reason: 'email_sender_unconfigured' };
+    if (/@gmail\.com\b/i.test(sender)) return { status: 'failed', channel: 'email', reason: 'email_gmail_sender_requires_smtp' };
     const response = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        from: process.env.CONTACT_FROM_EMAIL || 'ARAS <onboarding@resend.dev>',
+        from: sender,
         to: [user.email],
         subject,
         text: `Bonjour ${String(user.user_metadata?.full_name ?? 'membre ARAS')},\n\n${body}\n\nARAS`,
       }),
     }).catch(() => null);
-    return response?.ok ? 'sent' as const : 'failed' as const;
+    if (!response) return { status: 'failed', channel: 'email', reason: 'email_network_error' };
+    if (response.ok) return { status: 'sent', channel: 'email' };
+    const providerError = await response.json().catch(() => null) as { message?: string; name?: string } | null;
+    console.error('[admin-announcements] Resend rejected a delivery:', response.status, providerError?.name || 'provider_error');
+    return { status: 'failed', channel: 'email', reason: response.status === 403 || response.status === 422 ? 'email_sender_not_verified' : 'email_delivery_failed' };
   }
-  if (!process.env.GMAIL_EMAIL || !process.env.GMAIL_APP_PASSWORD) return 'failed' as const;
-  try {
-    const transporter = nodemailer.createTransport({ service: 'gmail', auth: { user: process.env.GMAIL_EMAIL, pass: process.env.GMAIL_APP_PASSWORD } });
-    await transporter.sendMail({
-      from: { name: 'ARAS', address: process.env.CONTACT_FROM_EMAIL?.trim() || process.env.GMAIL_EMAIL },
-      to: user.email,
-      subject,
-      text: `Bonjour ${String(user.user_metadata?.full_name ?? 'membre ARAS')},\n\n${body}\n\nARAS`,
-    });
-    return 'sent' as const;
-  } catch (error) {
-    console.error('[admin-announcements] Email delivery failed:', error);
-    return 'failed' as const;
-  }
+  return { status: 'failed', channel: 'email', reason: 'email_provider_unconfigured' };
 }
 
 export async function POST(request: Request) {
@@ -124,22 +150,24 @@ export async function POST(request: Request) {
   let externalSent = 0;
   let externalFailed = 0;
   let externalSkipped = 0;
+  const deliveryIssueCounts: Record<string, number> = {};
   for (let offset = 0; offset < recipientIdsToContact.length; offset += 8) {
     const batch = recipientIdsToContact.slice(offset, offset + 8);
     const results = await Promise.all(batch.map(async (id) => {
       const { data, error } = await admin.auth.admin.getUserById(id);
-      if (error || !data.user) return 'skipped' as const;
+      if (error || !data.user) return { status: 'skipped', channel: 'email', reason: 'auth_user_unavailable' } satisfies ExternalDelivery;
       return sendExternalMessage(data.user, title, body);
     }));
     for (const result of results) {
-      if (result === 'sent') externalSent += 1;
-      else if (result === 'skipped') externalSkipped += 1;
+      if (result.status === 'sent') externalSent += 1;
+      else if (result.status === 'skipped') externalSkipped += 1;
       else externalFailed += 1;
+      if (result.reason) deliveryIssueCounts[result.reason] = (deliveryIssueCounts[result.reason] ?? 0) + 1;
     }
   }
 
   const deliveredCount = Number(announcement.recipient_count ?? 0) + externalSent;
   const { error: updateError } = await admin.from('moderator_announcements').update({ recipient_count: deliveredCount }).eq('id', announcement.announcement_id);
   if (updateError) console.error('[admin-announcements] Could not update delivery count:', updateError);
-  return NextResponse.json({ appCount: announcement.recipient_count ?? 0, externalSent, externalFailed, externalSkipped });
+  return NextResponse.json({ appCount: announcement.recipient_count ?? 0, externalSent, externalFailed, externalSkipped, deliveryIssueCounts });
 }

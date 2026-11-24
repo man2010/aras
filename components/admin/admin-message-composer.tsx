@@ -8,6 +8,28 @@ type NoticeRow = { id: string; title: string; body: string; recipient_count: num
 type SearchMember = { id: string; full_name: string | null; gender: string | null; birthdate: string | null; city: string | null; profession: string | null; avatar_urls: string[] | null; onboarding_completed?: boolean | null; profile_status?: string | null };
 type Target = 'all' | 'incomplete' | 'member';
 
+const deliveryIssueLabels: Record<string, string> = {
+  phone_unavailable: 'Numéro de téléphone absent dans le compte.',
+  email_unavailable: 'Adresse e-mail absente dans le compte.',
+  auth_user_unavailable: 'Compte de connexion introuvable.',
+  sms_provider_unconfigured: 'SMS : configure TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN et TWILIO_FROM_NUMBER ou TWILIO_MESSAGING_SERVICE_SID dans Amplify.',
+  sms_auth_failed: 'SMS : Twilio refuse les identifiants configurés.',
+  sms_invalid_phone: 'SMS : numéro invalide ; le numéro doit être au format international (+221…).',
+  sms_trial_recipient_unverified: 'SMS : avec un compte d’essai Twilio, le numéro destinataire doit être vérifié dans Twilio.',
+  sms_country_not_enabled: 'SMS : active le Sénégal dans les pays autorisés pour l’envoi Twilio.',
+  sms_sender_invalid: 'SMS : le numéro expéditeur ou le Messaging Service Twilio est invalide.',
+  sms_network_error: 'SMS : Twilio est momentanément injoignable.',
+  sms_delivery_failed: 'SMS : Twilio a refusé l’envoi ; consulte les journaux Amplify pour le code fournisseur.',
+  email_provider_unconfigured: 'E-mail : configure GMAIL_EMAIL et GMAIL_APP_PASSWORD, ou Resend avec un expéditeur vérifié.',
+  email_gmail_auth_failed: 'E-mail : Gmail refuse le mot de passe d’application. Vérifie le compte et le mot de passe stockés dans Amplify.',
+  email_smtp_failed: 'E-mail : l’envoi SMTP Gmail a échoué ; consulte les journaux Amplify.',
+  email_sender_unconfigured: 'E-mail : définis CONTACT_FROM_EMAIL ou RESEND_FROM_EMAIL.',
+  email_gmail_sender_requires_smtp: 'Resend ne peut pas envoyer depuis une adresse Gmail. Configure GMAIL_EMAIL et GMAIL_APP_PASSWORD pour utiliser Gmail SMTP.',
+  email_sender_not_verified: 'E-mail : l’adresse expéditeur doit être vérifiée dans Resend.',
+  email_network_error: 'E-mail : le fournisseur est momentanément injoignable.',
+  email_delivery_failed: 'E-mail : le fournisseur a refusé l’envoi ; consulte les journaux Amplify.',
+};
+
 export function AdminMessageComposer({ active = true }: { active?: boolean }) {
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
@@ -102,9 +124,10 @@ export function AdminMessageComposer({ active = true }: { active?: boolean }) {
       }),
     }).catch(() => null);
     setBusy(false);
-    const result = await response?.json().catch(() => null) as { error?: string; appCount?: number; externalSent?: number; externalFailed?: number; externalSkipped?: number } | null;
+    const result = await response?.json().catch(() => null) as { error?: string; appCount?: number; externalSent?: number; externalFailed?: number; externalSkipped?: number; deliveryIssueCounts?: Record<string, number> } | null;
     if (!response?.ok || !result) { setError(result?.error || 'L’envoi du message a échoué.'); return; }
-    setNotice(`Envoyé : ${result.appCount ?? 0} notification(s) dans l’application, ${result.externalSent ?? 0} e-mail/SMS aux comptes en onboarding${result.externalFailed ? `, ${result.externalFailed} échec(s)` : ''}${result.externalSkipped ? `, ${result.externalSkipped} contact(s) indisponible(s)` : ''}.`);
+    const issues = Object.entries(result.deliveryIssueCounts ?? {}).map(([reason, count]) => `${count} · ${deliveryIssueLabels[reason] || reason}`);
+    setNotice(`Envoyé : ${result.appCount ?? 0} notification(s) dans l’application, ${result.externalSent ?? 0} e-mail/SMS aux comptes en onboarding${result.externalFailed ? `, ${result.externalFailed} échec(s)` : ''}${result.externalSkipped ? `, ${result.externalSkipped} contact(s) indisponible(s)` : ''}.${issues.length ? ` Détails : ${issues.join(' ')}` : ''}`);
     setTitle(''); setBody(''); setTarget('all'); clearSelection(); setRecipientSearch(''); setGenderFilter('all'); setIncompleteOnly(false); void loadHistory();
   }
 
