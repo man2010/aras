@@ -88,7 +88,7 @@ export async function POST(request: Request) {
   if (!title || title.length > 120 || !body || body.length > 2000 || !['all', 'incomplete', 'member'].includes(target)) {
     return NextResponse.json({ error: 'Le titre, le message ou le destinataire est invalide.' }, { status: 400 });
   }
-  if ((target === 'member' && (recipientIds.length !== 1 || recipientIds.length > 500)) || (target !== 'member' && recipientIds.length > 0)) {
+  if ((target === 'member' && (recipientIds.length === 0 || recipientIds.length > 500)) || (target !== 'member' && recipientIds.length > 0)) {
     return NextResponse.json({ error: 'La sélection des destinataires est invalide.' }, { status: 400 });
   }
   const admin = getSupabaseAdmin();
