@@ -1,7 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
-import { scanProfilePhotos } from '@/lib/profile-photo-audit';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? process.env.SUPABASE_URL ?? '';
 const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? process.env.SUPABASE_ANON_KEY ?? '';
@@ -36,8 +35,7 @@ export async function GET(request: Request) {
   if (profileError) return NextResponse.json({ error: 'Informations des profils indisponibles.' }, { status: 503 });
   const profileMap = new Map((profiles ?? []).map((profile) => [profile.id, profile]));
   const items = (audits ?? []).map((audit) => ({ ...audit, profile: profileMap.get(audit.profile_id) ?? null }));
-  const { data: lastScan } = await admin.from('profile_photo_audit_runs').select('status,profiles_scanned,photos_scanned,flagged_count,error_count,started_at,finished_at').order('started_at', { ascending: false }).limit(1).maybeSingle();
-  return NextResponse.json({ items, lastScan }, { headers: { 'Cache-Control': 'private, no-store' } });
+  return NextResponse.json({ items }, { headers: { 'Cache-Control': 'private, no-store' } });
 }
 
 export async function POST(request: Request) {
@@ -48,13 +46,7 @@ export async function POST(request: Request) {
   let payload: { action?: unknown; auditId?: unknown };
   try { payload = await request.json(); } catch { return NextResponse.json({ error: 'Requête invalide.' }, { status: 400 }); }
   if (payload.action === 'scan') {
-    try {
-      const result = await scanProfilePhotos(admin);
-      return NextResponse.json(result);
-    } catch (error) {
-      console.error('[fake-profiles] Scan failed:', error);
-      return NextResponse.json({ error: error instanceof Error ? error.message : 'Analyse des photos impossible.' }, { status: 503 });
-    }
+    return NextResponse.json({ error: 'L’analyse automatique des photos est désactivée.' }, { status: 410 });
   }
   if (typeof payload.auditId !== 'string' || !/^[0-9a-f-]{36}$/i.test(payload.auditId)) {
     return NextResponse.json({ error: 'Profil à traiter invalide.' }, { status: 400 });

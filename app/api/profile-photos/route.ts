@@ -1,11 +1,5 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import {
-  DetectLabelsCommand,
-  DetectModerationLabelsCommand,
-  RekognitionClient,
-  RecognizeCelebritiesCommand,
-} from '@aws-sdk/client-rekognition';
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
 
 export const runtime = 'nodejs';
@@ -17,26 +11,6 @@ function hasValidImageSignature(bytes: Uint8Array, type: string) {
   if (type === 'image/jpeg') return bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;
   if (type === 'image/png') return bytes.length >= 8 && bytes.slice(0, 8).every((byte, index) => byte === [137, 80, 78, 71, 13, 10, 26, 10][index]);
   return false;
-}
-
-function moderationMessage(reason: string) {
-  if (reason === 'not_a_person') return 'La photo doit montrer une personne. Les objets, chaussures et accessoires seuls ne sont pas acceptés.';
-  if (reason === 'not_a_photo') return 'Les illustrations, personnages dessinés et images artificielles ne sont pas acceptés.';
-  if (reason === 'public_figure') return 'Les photos de célébrités ou de personnages connus ne sont pas acceptées. Ajoute une photo personnelle.';
-  return 'La photo n’a pas pu être validée. Choisis une photo personnelle nette où une personne est clairement visible.';
-}
-
-async function withRekognitionRetry<T>(operation: () => Promise<T>, attempts = 3): Promise<T> {
-  for (let attempt = 0; ; attempt += 1) {
-    try {
-      return await operation();
-    } catch (error) {
-      const name = error && typeof error === 'object' && 'name' in error ? String(error.name) : '';
-      const retryable = name === 'ThrottlingException' || name === 'ProvisionedThroughputExceededException' || name === 'InternalServerError';
-      if (!retryable || attempt >= attempts - 1) throw error;
-      await new Promise((resolve) => setTimeout(resolve, 250 * (2 ** attempt)));
-    }
-  }
 }
 
 export async function POST(request: Request) {
@@ -68,54 +42,8 @@ export async function POST(request: Request) {
   const bytes = new Uint8Array(await photo.arrayBuffer());
   if (!hasValidImageSignature(bytes, photo.type)) return NextResponse.json({ error: 'Le fichier envoyé n’est pas une image JPG ou PNG valide.' }, { status: 415 });
 
-  const rekognition = new RekognitionClient({
-    region: 'us-east-1',
-    // In production Amplify supplies temporary credentials through its SSR Compute role.
-    // Locally, the AWS SDK reads the standard AWS profile/credential chain.
-  });
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 25000);
-
-  let rejectedReason: string | null = null;
-  try {
-    const image = { Bytes: Buffer.from(bytes) };
-    const options = { abortSignal: controller.signal };
-    const [celebrityResult, labelResult, moderationResult] = await Promise.all([
-      withRekognitionRetry(() => rekognition.send(new RecognizeCelebritiesCommand({ Image: image }), options)),
-      withRekognitionRetry(() => rekognition.send(new DetectLabelsCommand({ Image: image, MaxLabels: 30, MinConfidence: 65 }), options)),
-      withRekognitionRetry(() => rekognition.send(new DetectModerationLabelsCommand({ Image: image, MinConfidence: 75 }), options)),
-    ]);
-
-    const labels = labelResult.Labels ?? [];
-    const labelNames = labels.map((label) => (label.Name ?? '').toLocaleLowerCase('en'));
-    const hasPersonLabel = labels.some((label) => /^(person|human)$/.test((label.Name ?? '').toLocaleLowerCase('en')) && (label.Confidence ?? 0) >= 75);
-    const hasFace = Boolean(celebrityResult.UnrecognizedFaces?.length || celebrityResult.CelebrityFaces?.length);
-    // Rekognition only puts recognized public figures in CelebrityFaces; reject any match
-    // to avoid letting a real celebrity photo through because of a locally chosen threshold.
-    const isCelebrity = (celebrityResult.CelebrityFaces ?? []).length > 0;
-    const isIllustration = labelNames.some((name) => /cartoon|drawing|illustration|animation|comic|fictional character/.test(name));
-    const unsafeImage = (moderationResult.ModerationLabels ?? []).some((label) => {
-      const name = `${label.Name ?? ''} ${label.ParentName ?? ''}`.toLocaleLowerCase('en');
-      return /explicit nudity|sexual activity|graphic violence|violent activities|visually disturbing/.test(name) && (label.Confidence ?? 0) >= 80;
-    });
-
-    if (isCelebrity) rejectedReason = 'public_figure';
-    else if (isIllustration) rejectedReason = 'not_a_photo';
-    else if (!hasFace || !hasPersonLabel) rejectedReason = 'not_a_person';
-    else if (unsafeImage) rejectedReason = 'unclear';
-  } catch (error) {
-    const name = error && typeof error === 'object' && 'name' in error ? String(error.name) : 'UnknownError';
-    console.error('[profile-photos] Rekognition moderation failed:', name);
-    return NextResponse.json(
-      { error: 'La vérification des photos est momentanément indisponible. Réessaie dans quelques instants.' },
-      { status: 503 },
-    );
-  } finally {
-    clearTimeout(timeout);
-  }
-
-  if (rejectedReason) return NextResponse.json({ error: moderationMessage(rejectedReason), reason: rejectedReason }, { status: 422 });
-
+  // No paid image-recognition call here: only validate file type, signature and size.
+  // Profile photo moderation is handled by human review until a replacement is selected.
   const fileExtension = photo.type === 'image/png' ? 'png' : 'jpg';
   const filePath = `${authData.user.id}/profile-${crypto.randomUUID()}.${fileExtension}`;
   const { error: uploadError } = await admin.storage.from('avatars').upload(filePath, bytes, {
