@@ -25,8 +25,12 @@ Consignes de réponse :
 - Ne révèle jamais de données sensibles.
 `.trim();
 
-function fallbackAnswer(message: string) {
+function fallbackAnswer(message: string, distressFallback = '') {
   const lower = message.toLowerCase();
+
+  if (distressFallback.trim() && /suicid|me faire du mal|me tuer|violence|abus|danger immédiat|en danger|agression/.test(lower)) {
+    return distressFallback.trim();
+  }
 
   if (lower.includes('tarif') || lower.includes('prix')) {
     return "ARAS propose plusieurs formules selon le niveau d'accès souhaité. Si vous le souhaitez, je peux vous présenter les différences entre Gratuit, Premium et Elite de manière simple et claire.";
@@ -58,15 +62,47 @@ export async function POST(request: Request) {
     }
 
     let configuredPrompt = systemPrompt;
+    let configuredDistressFallback = '';
+    let configuredDaily = { free: 5, premium: 20, elite: 50 };
+    let userId: string | null = null;
     const admin = getSupabaseAdmin();
     if (admin) {
-      const { data: settings } = await admin.from('settings').select('key,value').in('key', ['sara_enabled', 'sara_system_instructions']);
+      const token = request.headers.get('authorization')?.replace(/^Bearer\s+/i, '');
+      if (token) {
+        const { data: authData } = await admin.auth.getUser(token);
+        userId = authData.user?.id ?? null;
+      }
+      const { data: settings } = await admin.from('settings').select('key,value').in('key', ['sara_enabled', 'sara_system_instructions', 'sara_distress_fallback', 'sara_daily_free', 'sara_daily_premium', 'sara_daily_elite']);
       const values = Object.fromEntries((settings ?? []).map((row) => [row.key, row.value]));
       if (values.sara_enabled === 'false') {
-        await recordUsage(admin, 'disabled', null, startedAt);
+        await recordUsage(admin, 'disabled', null, startedAt, userId);
         return NextResponse.json({ answer: 'SARA est momentanément indisponible. Vous pouvez contacter l’équipe ARAS depuis la page Contact.' });
       }
       if (values.sara_system_instructions?.trim()) configuredPrompt = `${systemPrompt}\n\nInstructions complémentaires de l’équipe ARAS :\n${values.sara_system_instructions.trim()}`;
+      configuredDistressFallback = values.sara_distress_fallback || '';
+      if (values.sara_distress_fallback?.trim()) configuredPrompt += `\n\nEn cas de détresse exprimée par la personne, réponds avec tact et utilise ce message de soutien défini par l’équipe :\n${values.sara_distress_fallback.trim()}`;
+      configuredDaily = {
+        free: readDailyLimit(values.sara_daily_free, 5),
+        premium: readDailyLimit(values.sara_daily_premium, 20),
+        elite: readDailyLimit(values.sara_daily_elite, 50),
+      };
+      if (userId) {
+        const now = new Date();
+        const dayStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())).toISOString();
+        const [{ data: subscription }, { count, error: quotaError }] = await Promise.all([
+          admin.from('user_subscriptions').select('plan_code').eq('user_id', userId).eq('status', 'active').or(`ends_at.is.null,ends_at.gt.${now.toISOString()}`).or(`starts_at.is.null,starts_at.lte.${now.toISOString()}`).order('created_at', { ascending: false }).limit(1).maybeSingle(),
+          admin.from('sara_usage_events').select('id', { count: 'exact', head: true }).eq('user_id', userId).in('outcome', ['answered', 'fallback']).gte('created_at', dayStart),
+        ]);
+        if (quotaError) console.error('[sarah] Could not check daily quota:', quotaError.message);
+        else {
+          const planCode = subscription?.plan_code;
+          const tier = planCode === 'premium' ? 'premium' : ['elite', 'golden'].includes(planCode ?? '') ? 'elite' : 'free';
+          if ((count ?? 0) >= configuredDaily[tier]) {
+            await recordUsage(admin, 'disabled', null, startedAt, userId);
+            return NextResponse.json({ answer: 'Tu as atteint ta limite de messages SARA pour aujourd’hui. Elle sera réinitialisée demain.' }, { status: 429 });
+          }
+        }
+      }
     }
 
     const usesCloud = Boolean(process.env.OLLAMA_API_KEY);
@@ -100,10 +136,10 @@ export async function POST(request: Request) {
 
       if (!response.ok) {
         const errorText = await response.text();
-        await recordUsage(admin, 'fallback', model, startedAt);
+        await recordUsage(admin, 'fallback', model, startedAt, userId);
         return NextResponse.json(
           {
-            answer: fallbackAnswer(message),
+            answer: fallbackAnswer(message, configuredDistressFallback),
             warning: `SARA utilise une réponse de secours : Ollama a répondu avec le statut ${response.status}.`,
             details: errorText,
           },
@@ -116,13 +152,13 @@ export async function POST(request: Request) {
         response?: string;
       };
 
-      const answer = data.message?.content || data.response || fallbackAnswer(message);
-      await recordUsage(admin, 'answered', model, startedAt);
+      const answer = data.message?.content || data.response || fallbackAnswer(message, configuredDistressFallback);
+      await recordUsage(admin, 'answered', model, startedAt, userId);
       return NextResponse.json({ answer });
     } catch {
-      await recordUsage(admin, 'fallback', model, startedAt);
+      await recordUsage(admin, 'fallback', model, startedAt, userId);
       return NextResponse.json({
-        answer: fallbackAnswer(message),
+        answer: fallbackAnswer(message, configuredDistressFallback),
         warning:
           "SARA utilise une réponse de secours car le service Ollama n'est pas joignable. Vérifiez qu'Ollama est lancé, que OLLAMA_BASE_URL est correct, et que le modèle existe.",
       });
@@ -135,8 +171,13 @@ export async function POST(request: Request) {
   }
 }
 
-async function recordUsage(admin: ReturnType<typeof getSupabaseAdmin>, outcome: 'answered' | 'fallback' | 'disabled' | 'error', model: string | null, startedAt: number) {
+function readDailyLimit(value: string | undefined, fallback: number) {
+  const parsed = Number.parseInt(value ?? '', 10);
+  return Number.isFinite(parsed) ? Math.max(0, Math.min(500, parsed)) : fallback;
+}
+
+async function recordUsage(admin: ReturnType<typeof getSupabaseAdmin>, outcome: 'answered' | 'fallback' | 'disabled' | 'error', model: string | null, startedAt: number, userId: string | null = null) {
   if (!admin) return;
-  const { error } = await admin.from('sara_usage_events').insert({ outcome, model, elapsed_ms: Math.max(0, Date.now() - startedAt) });
+  const { error } = await admin.from('sara_usage_events').insert({ outcome, model, elapsed_ms: Math.max(0, Date.now() - startedAt), user_id: userId });
   if (error) console.error('[sarah] Could not record aggregate usage:', error.message);
 }

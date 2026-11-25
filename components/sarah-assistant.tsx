@@ -119,9 +119,13 @@ export function SarahAssistant() {
     setLoading(true);
 
     try {
+      const { data: sessionData } = await supabase.auth.getSession();
       const response = await fetch('/api/sarah', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(sessionData.session?.access_token ? { Authorization: `Bearer ${sessionData.session.access_token}` } : {}),
+        },
         body: JSON.stringify({
           message: trimmed,
           history: history.slice(-6),
@@ -131,7 +135,7 @@ export function SarahAssistant() {
       const data = (await response.json()) as { answer?: string; error?: string; warning?: string };
 
       if (!response.ok) {
-        setError(data.error || 'SARA rencontre un souci temporaire.');
+        setError(data.answer || data.error || 'SARA rencontre un souci temporaire.');
         return;
       }
 

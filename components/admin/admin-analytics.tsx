@@ -51,13 +51,13 @@ export function AdminAnalytics({ analytics, loading = false, loaded = true, erro
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div><h2 className="font-display text-2xl">Analytics</h2><p className="mt-1 text-sm text-[#9a8b82]">Synthèse calculée côté base, sans limite de lignes navigateur.</p></div>
-        <div className="flex gap-2">
+      <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0"><h2 className="font-display text-2xl">Analytics</h2><p className="mt-1 text-sm text-[#9a8b82]">Synthèse calculée côté base, sans limite de lignes navigateur.</p></div>
+        <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-wrap">
           <select
             value={timeRange}
             onChange={(e) => { const value = e.target.value as '7d' | '30d' | '90d'; setTimeRange(value); onRangeChange?.(Number.parseInt(value, 10)); }}
-            className="rounded-xl border border-[#dfd2c6] bg-[#f8f9fd] px-4 py-2.5 text-sm outline-none focus:border-[#ec3b78]"
+            className="col-span-2 min-w-0 rounded-xl border border-[#dfd2c6] bg-[#f8f9fd] px-4 py-2.5 text-sm outline-none focus:border-[#ec3b78] sm:col-span-1"
           >
             <option value="7d">7 jours</option>
             <option value="30d">30 jours</option>
@@ -65,11 +65,11 @@ export function AdminAnalytics({ analytics, loading = false, loaded = true, erro
           </select>
           <button
             onClick={handleExport}
-            className="flex items-center gap-2 rounded-full bg-[#1a6b68] px-4 py-2.5 text-xs font-extrabold text-white transition hover:bg-[#125552]"
+            className="flex min-w-0 items-center justify-center gap-2 rounded-full bg-[#1a6b68] px-3 py-2.5 text-xs font-extrabold text-white transition hover:bg-[#125552] sm:px-4"
           >
             <Download size={14} /> Exporter
           </button>
-          <button type="button" onClick={onRefresh} disabled={loading} className="rounded-full border border-[#dfd2c6] bg-white px-4 py-2 text-xs font-extrabold disabled:opacity-50">{loading ? 'Actualisation…' : 'Actualiser'}</button>
+          <button type="button" onClick={onRefresh} disabled={loading} className="min-w-0 rounded-full border border-[#dfd2c6] bg-white px-3 py-2 text-xs font-extrabold disabled:opacity-50 sm:px-4">{loading ? 'Actualisation…' : 'Actualiser'}</button>
         </div>
       </div>
       {error && <p role="alert" className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">Les données affichées sont la dernière version chargée. L’actualisation a échoué : {error}</p>}
@@ -77,14 +77,14 @@ export function AdminAnalytics({ analytics, loading = false, loaded = true, erro
 
       <div className="grid grid-cols-2 gap-2 sm:gap-4 sm:grid-cols-3">
         {[{ label: 'Nouveaux profils', value: total(dailySignups), color: '#ec3b78' }, { label: 'Messages', value: total(dailyMessages), color: '#1a6b68' }, { label: 'Matches', value: total(dailyMatches), color: '#d89b52' }].map((metric) => (
-          <div key={metric.label} className="rounded-[22px] bg-white p-5 shadow-[0_8px_30px_rgba(83,46,32,.05)]"><p className="font-display text-3xl" style={{ color: metric.color }}>{metric.value}</p><p className="mt-1 text-xs font-bold uppercase tracking-wider text-[#9a8b82]">{metric.label} · {days} jours</p></div>
+          <div key={metric.label} className="min-w-0 rounded-[22px] bg-white p-3 shadow-[0_8px_30px_rgba(83,46,32,.05)] sm:p-5"><p className="font-display text-2xl sm:text-3xl" style={{ color: metric.color }}>{metric.value}</p><p className="mt-1 break-words text-[10px] font-bold uppercase tracking-wide text-[#9a8b82] sm:text-xs sm:tracking-wider">{metric.label} · {days} jours</p></div>
         ))}
       </div>
 
       {/* Charts Grid */}
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Daily Signups */}
-        <div className="rounded-[26px] bg-white p-6 shadow-[0_8px_30pxrgba(83,46,32,.05)]">
+        <div className="min-w-0 rounded-[26px] bg-white p-4 shadow-[0_8px_30pxrgba(83,46,32,.05)] sm:p-6">
           <div className="mb-4 flex items-center justify-between">
             <h3 className="font-display text-lg">Inscriptions quotidiennes</h3>
             <Users size={20} className="text-[#ec3b78]" />
@@ -106,7 +106,7 @@ export function AdminAnalytics({ analytics, loading = false, loaded = true, erro
         </div>
 
         {/* Daily Messages */}
-        <div className="rounded-[26px] bg-white p-6 shadow-[0_8px_30pxrgba(83,46,32,.05)]">
+        <div className="min-w-0 rounded-[26px] bg-white p-4 shadow-[0_8px_30pxrgba(83,46,32,.05)] sm:p-6">
           <div className="mb-4 flex items-center justify-between">
             <h3 className="font-display text-lg">Messages quotidiens</h3>
             <MessageSquare size={20} className="text-[#1a6b68]" />
@@ -128,7 +128,7 @@ export function AdminAnalytics({ analytics, loading = false, loaded = true, erro
         </div>
 
         {/* Daily Matches */}
-        <div className="rounded-[26px] bg-white p-6 shadow-[0_8px_30pxrgba(83,46,32,.05)]">
+        <div className="min-w-0 rounded-[26px] bg-white p-4 shadow-[0_8px_30pxrgba(83,46,32,.05)] sm:p-6">
           <div className="mb-4 flex items-center justify-between">
             <h3 className="font-display text-lg">Matches quotidiens</h3>
             <Heart size={20} className="text-[#d89b52]" />
@@ -150,7 +150,7 @@ export function AdminAnalytics({ analytics, loading = false, loaded = true, erro
         </div>
 
         {/* User Demographics */}
-        <div className="rounded-[26px] bg-white p-6 shadow-[0_8px_30pxrgba(83,46,32,.05)]">
+        <div className="min-w-0 rounded-[26px] bg-white p-4 shadow-[0_8px_30pxrgba(83,46,32,.05)] sm:p-6">
           <div className="mb-4 flex items-center justify-between">
             <h3 className="font-display text-lg">Répartition par ville</h3>
             <Calendar size={20} className="text-[#ec3b78]" />
@@ -158,7 +158,7 @@ export function AdminAnalytics({ analytics, loading = false, loaded = true, erro
           <div className="space-y-3">
             {analytics.userDemographics.slice(0, 6).map((item, index) => (
               <div key={index} className="flex items-center gap-3">
-                <p className="w-24 text-sm text-[#756960]">{item.city}</p>
+                <p className="w-20 shrink-0 truncate text-xs text-[#756960] sm:w-24 sm:text-sm" title={item.city}>{item.city}</p>
                 <div className="flex-1 h-4 rounded-full bg-[#f8f9fd]">
                   <div
                     className="h-full rounded-full bg-[#ec3b78] transition hover:bg-[#c92e63]"
@@ -174,7 +174,7 @@ export function AdminAnalytics({ analytics, loading = false, loaded = true, erro
       </div>
 
       {/* Top Profiles */}
-      <div className="rounded-[26px] bg-white p-6 shadow-[0_8px_30pxrgba(83,46,32,.05)]">
+      <div className="min-w-0 rounded-[26px] bg-white p-4 shadow-[0_8px_30pxrgba(83,46,32,.05)] sm:p-6">
         <h3 className="mb-4 font-display text-lg">Profils les plus populaires</h3>
         <div className="overflow-x-auto">
           <table className="w-full">
@@ -192,7 +192,7 @@ export function AdminAnalytics({ analytics, loading = false, loaded = true, erro
                       <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#ec3b78] text-xs font-extrabold text-white">
                         {index + 1}
                       </span>
-                      <p className="text-sm font-bold text-[#241c18]">{profile.profileName}</p>
+                      <p className="break-words text-sm font-bold text-[#241c18]">{profile.profileName}</p>
                     </div>
                   </td>
                   <td className="px-4 py-3 text-sm text-[#756960]">{profile.likes}</td>

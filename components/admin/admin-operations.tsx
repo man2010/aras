@@ -25,7 +25,7 @@ export function AdminOperations({ tab, active = true }: { tab: Extract<AdminTab,
   const [saraUsage30, setSaraUsage30] = useState(0);
   const [teamContact, setTeamContact] = useState('');
   const [teamRole, setTeamRole] = useState<'admin' | 'moderator'>('moderator');
-  const [saraSettings, setSaraSettings] = useState({ enabled: false, dailyFree: '5', dailyPremium: '20', dailyElite: '50', systemInstructions: '', fallback: '' });
+  const [saraSettings, setSaraSettings] = useState({ enabled: true, dailyFree: '5', dailyPremium: '20', dailyElite: '50', systemInstructions: '', fallback: '' });
   const [statusFilter, setStatusFilter] = useState('new');
   const [search, setSearch] = useState('');
   const [loadedSections, setLoadedSections] = useState<Record<string, boolean>>({});
@@ -78,11 +78,18 @@ export function AdminOperations({ tab, active = true }: { tab: Extract<AdminTab,
       supabase.from('settings').select('key,value').in('key', ['sara_enabled', 'sara_daily_free', 'sara_daily_premium', 'sara_daily_elite', 'sara_system_instructions', 'sara_distress_fallback']),
       supabase.from('sara_usage_events').select('*', { count: 'exact', head: true }).gte('created_at', since),
     ]);
-    if (queryError) { setError(queryError.message); return; }
+    if (queryError || usage.error) { setError(queryError?.message || usage.error?.message || 'Chargement des données SARA impossible.'); return; }
     const values = Object.fromEntries((data ?? []).map((row) => [row.key, row.value]));
     setSaraUsage30(usage.count ?? 0);
-    setSaraSettings({ enabled: values.sara_enabled === 'true', dailyFree: values.sara_daily_free || '5', dailyPremium: values.sara_daily_premium || '20', dailyElite: values.sara_daily_elite || '50', systemInstructions: values.sara_system_instructions || '', fallback: values.sara_distress_fallback || '' });
+    setSaraSettings({ enabled: values.sara_enabled === undefined ? true : values.sara_enabled === 'true', dailyFree: values.sara_daily_free || '5', dailyPremium: values.sara_daily_premium || '20', dailyElite: values.sara_daily_elite || '50', systemInstructions: values.sara_system_instructions || '', fallback: values.sara_distress_fallback || '' });
     setLoadedSections((current) => ({ ...current, sara: true }));
+  }, []);
+
+  const refreshSaraUsage = useCallback(async () => {
+    const since = new Date(Date.now() - 30 * 86400000).toISOString();
+    const { count, error: usageError } = await supabase.from('sara_usage_events').select('id', { count: 'exact', head: true }).gte('created_at', since);
+    if (usageError) setError(usageError.message);
+    else setSaraUsage30(count ?? 0);
   }, []);
 
   useEffect(() => {
@@ -93,6 +100,12 @@ export function AdminOperations({ tab, active = true }: { tab: Extract<AdminTab,
     if (tab === 'team') void loadTeam();
     if (tab === 'sara') void loadSara();
   }, [active, tab, loadPayments, loadGolden, loadTeam, loadSara]);
+
+  useEffect(() => {
+    if (!active || tab !== 'sara') return;
+    const timer = window.setInterval(() => { void refreshSaraUsage(); }, 30_000);
+    return () => window.clearInterval(timer);
+  }, [active, tab, refreshSaraUsage]);
 
   async function savePlans() {
     setBusy(true); setError(''); setNotice('');
@@ -121,7 +134,7 @@ export function AdminOperations({ tab, active = true }: { tab: Extract<AdminTab,
     const failed = results.find((result) => result.error);
     setBusy(false);
     if (failed?.error) setError(failed.error.message);
-    else setNotice('Paramètres SARA enregistrés.');
+    else { setNotice('Paramètres SARA enregistrés.'); void loadSara(); }
   }
 
   async function changeStaff(method: 'POST' | 'DELETE', body: Record<string, string>) {
@@ -162,9 +175,9 @@ export function AdminOperations({ tab, active = true }: { tab: Extract<AdminTab,
     <section className={card}><h2 className="mb-4 font-display text-xl">Membres de l’équipe · {loadedSections.team ? staff.length : '—'}</h2><div className="space-y-3">{staff.map((member) => <div key={member.user_id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#efedf2] p-4"><div><p className="font-bold">{member.email || member.phone || member.user_id}</p><p className="text-sm text-gray-500">{member.role === 'admin' ? 'Administrateur' : 'Modérateur'} · Dernière connexion : {member.last_sign_in_at ? new Date(member.last_sign_in_at).toLocaleDateString('fr-FR') : 'inconnue'}</p></div><button disabled={busy} onClick={() => void changeStaff('DELETE', { userId: member.user_id })} className="rounded-full border border-rose-200 px-4 py-2 text-sm font-bold text-rose-700">Retirer l’accès</button></div>)}</div><div className="mt-5 rounded-xl bg-[#f8f9fc] p-4 text-sm"><strong>Matrice actuelle :</strong> les droits sont définis par rôle dans les politiques Supabase. Les rôles « gestionnaire Golden » et « développeur », ainsi qu’une MFA obligatoire, ne sont pas présents dans le schéma actuel.</div></section>
   </div>;
 
-  return <div className="space-y-5"><Header icon={Bot} title="SARA Coach IA" description="Réglages fonctionnels du coach, sans lecture des conversations privées." /><Feedback error={error} notice={notice}/>
-    <section className={card}><div className="mb-5 flex items-center justify-between gap-4"><div><h2 className="font-display text-xl">Activation du service</h2><p className="text-sm text-gray-600">Le réglage est enregistré dans la table des paramètres.</p></div><button type="button" aria-pressed={saraSettings.enabled} onClick={() => setSaraSettings((current) => ({ ...current, enabled: !current.enabled }))} className={`h-7 w-14 rounded-full p-1 ${saraSettings.enabled ? 'bg-emerald-600' : 'bg-gray-300'}`}><span className={`block h-5 w-5 rounded-full bg-white transition-transform ${saraSettings.enabled ? 'translate-x-7' : ''}`}/></button></div><div className="grid gap-4 sm:grid-cols-3">{(['dailyFree','dailyPremium','dailyElite'] as const).map((key) => <label key={key} className="text-sm font-semibold">Messages quotidiens · {key.replace('daily','')}<input className={`${input} mt-2 block w-full`} type="number" min="0" max="500" value={saraSettings[key]} onChange={(e) => setSaraSettings((current) => ({ ...current, [key]: e.target.value }))}/></label>)}</div><label className="mt-5 block text-sm font-semibold">Instructions système<textarea rows={5} maxLength={6000} className={`${input} mt-2 block w-full`} value={saraSettings.systemInstructions} onChange={(e) => setSaraSettings((current) => ({ ...current, systemInstructions: e.target.value }))}/></label><label className="mt-5 block text-sm font-semibold">Réponse de repli en cas de détresse<textarea rows={3} maxLength={1000} className={`${input} mt-2 block w-full`} value={saraSettings.fallback} onChange={(e) => setSaraSettings((current) => ({ ...current, fallback: e.target.value }))}/></label><button disabled={busy} onClick={() => void saveSara()} className="mt-5 rounded-full bg-[#ec3b78] px-5 py-3 text-sm font-bold text-white"><Save size={15} className="mr-2 inline"/>Enregistrer</button></section>
-    <section className={card}><h2 className="font-display text-xl">Statistiques et confidentialité</h2><div className="mt-4 grid gap-3 sm:grid-cols-2"><Metric label="Appels SARA · 30 jours" value={loadedSections.sara ? saraUsage30 : '—'}/><div className="rounded-[24px] bg-[#f8f9fc] p-5"><p className="font-display text-xl">Non disponible</p><p className="mt-1 text-xs font-bold uppercase tracking-wide text-[#817783]">Coût fournisseur</p></div></div><p className="mt-3 text-sm leading-6 text-gray-600">Seul le nombre d’appels, leur résultat et leur durée sont enregistrés, sans le contenu des conversations. Le fournisseur ne renvoie pas de coût exploitable. Les limites par formule sont enregistrées mais ne sont pas encore appliquées par l’API SARA.</p></section>
+  return <div className="space-y-5"><Header icon={Bot} title="SARA Coach IA" description="Réglages fonctionnels du coach, sans lecture des conversations privées." onRefresh={loadSara}/><Feedback error={error} notice={notice}/>
+    <section className={card}><div className="mb-5 flex flex-wrap items-center justify-between gap-4"><div><h2 className="font-display text-xl">Activation du service</h2><p className="text-sm text-gray-600">{saraSettings.enabled ? 'SARA est activée' : 'SARA est désactivée'} · Enregistrer pour appliquer les changements.</p></div><button type="button" aria-label={saraSettings.enabled ? 'Désactiver SARA' : 'Activer SARA'} aria-pressed={saraSettings.enabled} onClick={() => setSaraSettings((current) => ({ ...current, enabled: !current.enabled }))} className={`h-7 w-14 shrink-0 rounded-full p-1 ${saraSettings.enabled ? 'bg-emerald-600' : 'bg-gray-300'}`}><span className={`block h-5 w-5 rounded-full bg-white transition-transform ${saraSettings.enabled ? 'translate-x-7' : ''}`}/></button></div><div className="grid gap-4 sm:grid-cols-3">{(['dailyFree','dailyPremium','dailyElite'] as const).map((key) => <label key={key} className="text-sm font-semibold">Messages par jour · {key.replace('daily','')}<input className={`${input} mt-2 block w-full`} type="number" min="0" max="500" value={saraSettings[key]} onChange={(e) => setSaraSettings((current) => ({ ...current, [key]: e.target.value }))}/></label>)}</div><label className="mt-5 block text-sm font-semibold">Instructions système<textarea rows={5} maxLength={6000} className={`${input} mt-2 block w-full`} value={saraSettings.systemInstructions} onChange={(e) => setSaraSettings((current) => ({ ...current, systemInstructions: e.target.value }))}/></label><label className="mt-5 block text-sm font-semibold">Réponse de repli en cas de détresse<textarea rows={3} maxLength={1000} className={`${input} mt-2 block w-full`} value={saraSettings.fallback} onChange={(e) => setSaraSettings((current) => ({ ...current, fallback: e.target.value }))}/></label><button disabled={busy} onClick={() => void saveSara()} className="mt-5 rounded-full bg-[#ec3b78] px-5 py-3 text-sm font-bold text-white"><Save size={15} className="mr-2 inline"/>Enregistrer</button></section>
+    <section className={card}><h2 className="font-display text-xl">Statistiques et confidentialité</h2><div className="mt-4 grid gap-3 sm:grid-cols-2"><Metric label="Appels SARA · 30 jours" value={loadedSections.sara ? saraUsage30 : '—'}/><div className="rounded-[24px] bg-[#f8f9fc] p-5"><p className="font-display text-xl">Non disponible</p><p className="mt-1 text-xs font-bold uppercase tracking-wide text-[#817783]">Coût fournisseur</p></div></div><p className="mt-3 text-sm leading-6 text-gray-600">Seul le nombre d’appels, leur résultat et leur durée sont enregistrés, sans le contenu des conversations. Le fournisseur ne renvoie pas de coût exploitable. Les réglages sont relus automatiquement toutes les 30 secondes.</p></section>
   </div>;
 }
 
