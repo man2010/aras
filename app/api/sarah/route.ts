@@ -135,13 +135,11 @@ export async function POST(request: Request) {
       clearTimeout(timeout);
 
       if (!response.ok) {
-        const errorText = await response.text();
+        await response.text();
         await recordUsage(admin, 'fallback', model, startedAt, userId);
         return NextResponse.json(
           {
             answer: fallbackAnswer(message, configuredDistressFallback),
-            warning: `SARA utilise une réponse de secours : Ollama a répondu avec le statut ${response.status}.`,
-            details: errorText,
           },
           { status: 200 }
         );
@@ -159,8 +157,6 @@ export async function POST(request: Request) {
       await recordUsage(admin, 'fallback', model, startedAt, userId);
       return NextResponse.json({
         answer: fallbackAnswer(message, configuredDistressFallback),
-        warning:
-          "SARA utilise une réponse de secours car le service Ollama n'est pas joignable. Vérifiez qu'Ollama est lancé, que OLLAMA_BASE_URL est correct, et que le modèle existe.",
       });
     }
   } catch (error) {

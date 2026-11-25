@@ -3,6 +3,7 @@
 import Image from 'next/image';
 import { useMemo, useState } from 'react';
 import { X, SendHorizonal } from 'lucide-react';
+import { supabase } from '@/lib/supabase';
 
 type ChatItem = {
   role: 'user' | 'assistant';
@@ -132,18 +133,14 @@ export function SarahAssistant() {
         }),
       });
 
-      const data = (await response.json()) as { answer?: string; error?: string; warning?: string };
+      const data = (await response.json()) as { answer?: string; error?: string };
 
       if (!response.ok) {
         setError(data.answer || data.error || 'SARA rencontre un souci temporaire.');
         return;
       }
 
-      if (data.warning) {
-        setError(data.warning);
-      } else {
-        setError('');
-      }
+      setError('');
 
       setMessages((prev) => [...prev, { role: 'assistant', content: data.answer || 'Je vous écoute.' }]);
     } catch {
