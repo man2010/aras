@@ -5,6 +5,11 @@ import { Download, MonitorDown, Share, Smartphone, X } from 'lucide-react';
 
 type InstallChoice = { outcome: 'accepted' | 'dismissed'; platform: string };
 type InstallPromptEvent = Event & { prompt: () => Promise<void>; userChoice: Promise<InstallChoice> };
+const INSTALL_DISMISSED_KEY = 'aras:pwa-install-dismissed:v1';
+
+function rememberInstalledOnDevice() {
+  try { window.localStorage.setItem(INSTALL_DISMISSED_KEY, '1'); } catch { /* Keep install prompt functional if storage is unavailable. */ }
+}
 
 export function PwaInstallButton({ compact = false }: { compact?: boolean }) {
   const [promptEvent, setPromptEvent] = useState<InstallPromptEvent | null>(null);
@@ -13,12 +18,14 @@ export function PwaInstallButton({ compact = false }: { compact?: boolean }) {
 
   useEffect(() => {
     const standalone = window.matchMedia('(display-mode: standalone)').matches || Boolean((navigator as Navigator & { standalone?: boolean }).standalone);
-    setInstalled(standalone);
+    let wasDismissed = false;
+    try { wasDismissed = window.localStorage.getItem(INSTALL_DISMISSED_KEY) === '1'; } catch { /* Storage can be disabled. */ }
+    setInstalled(standalone || wasDismissed);
     const onBeforeInstall = (event: Event) => {
       event.preventDefault();
       setPromptEvent(event as InstallPromptEvent);
     };
-    const onInstalled = () => { setInstalled(true); setPromptEvent(null); setHelpOpen(false); };
+    const onInstalled = () => { rememberInstalledOnDevice(); setInstalled(true); setPromptEvent(null); setHelpOpen(false); };
     window.addEventListener('beforeinstallprompt', onBeforeInstall);
     window.addEventListener('appinstalled', onInstalled);
     return () => {
@@ -35,10 +42,26 @@ export function PwaInstallButton({ compact = false }: { compact?: boolean }) {
   }, [helpOpen]);
 
   async function install() {
-    if (!promptEvent) { setHelpOpen(true); return; }
-    await promptEvent.prompt();
-    const choice = await promptEvent.userChoice;
-    if (choice.outcome === 'accepted') setPromptEvent(null);
+    if (!promptEvent) {
+      // iOS and some desktop browsers use manual installation steps and do not
+      // expose an install prompt event. The click should still dismiss the CTA
+      // so users are not asked to "download" the app repeatedly.
+      rememberInstalledOnDevice();
+      setInstalled(true);
+      setHelpOpen(true);
+      return;
+    }
+    try {
+      await promptEvent.prompt();
+      const choice = await promptEvent.userChoice;
+      if (choice.outcome === 'accepted') {
+        rememberInstalledOnDevice();
+        setInstalled(true);
+        setPromptEvent(null);
+      }
+    } catch (error) {
+      console.error('[PWA] Install prompt failed.', error);
+    }
   }
 
   if (installed) return null;
