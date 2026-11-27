@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
-import { useEffect, useRef, useState, type MouseEvent } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Menu, X, Heart, LogOut, LayoutDashboard, Bell, Moon, Sun, MessageCircle, CalendarDays, ChevronRight, Settings, User, SlidersHorizontal, MapPin, Megaphone } from 'lucide-react';
 import { useTheme } from 'next-themes';
@@ -57,6 +57,7 @@ export function Navbar({ isAdminMode = false, isModeratorMode = false }: { isAdm
   const [isModerator, setIsModerator] = useState(isModeratorMode);
   const [mounted, setMounted] = useState(false);
   const [notificationOpen, setNotificationOpen] = useState(false);
+  const [expandedNotificationGroup, setExpandedNotificationGroup] = useState<NotificationPreview['type'] | null>(null);
   const desktopNotificationRef = useRef<HTMLDivElement>(null);
   const mobileNotificationRef = useRef<HTMLDivElement>(null);
   const mobileNotificationPanelRef = useRef<HTMLDivElement>(null);
@@ -410,43 +411,32 @@ export function Navbar({ isAdminMode = false, isModeratorMode = false }: { isAdm
     return unread ? `${unread} rappel${unread > 1 ? 's' : ''} à consulter` : 'Dates et rappels à venir';
   };
 
-  const scrollToNotificationGroup = (type: NotificationPreview['type'], event: MouseEvent<HTMLButtonElement>) => {
-    const panel = event.currentTarget.closest<HTMLElement>('[data-notification-panel]');
-    const scroller = panel?.querySelector<HTMLElement>('[data-notification-scroll]');
-    const section = scroller?.querySelector<HTMLElement>(`[data-notification-group="${type}"]`);
-    if (!scroller || !section) return;
-    const scrollTop = scroller.scrollTop + section.getBoundingClientRect().top - scroller.getBoundingClientRect().top;
-    scroller.scrollTo({ top: Math.max(0, scrollTop - 10), behavior: 'smooth' });
-  };
-
   const renderNotificationGroups = () => (
     <div data-notification-scroll className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-4 pt-3 [scrollbar-width:thin]" style={{ WebkitOverflowScrolling: 'touch' }}>
-      <div className="mb-5 space-y-2" aria-label="Rubriques de notifications">
+      <div className="space-y-2" aria-label="Rubriques de notifications">
         {notificationGroups.map(({ type, label, Icon, items }) => {
           const unread = items.filter((item) => item.unread).length;
           const color = type === 'like' || type === 'match' ? 'text-[#d92e70] bg-[#fce6ef]' : type === 'message' ? 'text-sky-600 bg-sky-50 dark:text-sky-300 dark:bg-sky-500/15' : 'text-amber-600 bg-amber-50 dark:text-amber-300 dark:bg-amber-500/15';
-          return <button key={type} type="button" onClick={(event) => scrollToNotificationGroup(type, event)} aria-label={`Afficher la rubrique ${label}, ${items.length} notification${items.length === 1 ? '' : 's'}`} className="group flex min-h-[58px] w-full items-center gap-3 rounded-2xl border border-[#eceaf0] bg-white px-3 py-2 text-left shadow-[0_3px_12px_rgba(35,38,55,.035)] transition hover:-translate-y-0.5 hover:border-[#f2bed1] hover:shadow-[0_8px_22px_rgba(35,38,55,.08)] focus:outline-none focus:ring-2 focus:ring-[#ec3b78] dark:border-white/10 dark:bg-[#222128] dark:hover:border-[#ec3b78]/40 sm:min-h-[68px] sm:gap-4 sm:px-4 sm:py-2.5">
-            <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full sm:h-12 sm:w-12 ${color}`}><Icon size={20}/></span>
-            <span className="min-w-0 flex-1"><span className="block truncate text-sm font-extrabold text-[#252532] dark:text-white sm:text-[15px]">{label}</span><span className="mt-0.5 block truncate text-xs text-[#777985] dark:text-white/55">{notificationGroupSummary(type, items)}</span></span>
-            <span className="flex shrink-0 items-center gap-2"><span className={`min-w-7 rounded-full px-2 py-1 text-center text-[11px] font-extrabold ${unread ? 'bg-[#ec3b78] text-white' : 'bg-[#f0f1f5] text-[#626779] dark:bg-white/10 dark:text-white/65'}`}>{items.length}</span><ChevronRight size={17} className="text-[#a1a2ad] transition group-hover:translate-x-0.5 group-hover:text-[#ec3b78]"/></span>
-          </button>;
+          const expanded = expandedNotificationGroup === type;
+          return <section key={type} className="overflow-hidden rounded-2xl border border-[#eceaf0] bg-white shadow-[0_3px_12px_rgba(35,38,55,.035)] dark:border-white/10 dark:bg-[#222128]">
+            <button type="button" onClick={() => setExpandedNotificationGroup((current) => current === type ? null : type)} aria-label={`${expanded ? 'Réduire' : 'Afficher'} la rubrique ${label}, ${items.length} notification${items.length === 1 ? '' : 's'}`} aria-expanded={expanded} aria-controls={`notification-group-${type}`} className="group flex min-h-[58px] w-full items-center gap-3 px-3 py-2 text-left transition hover:bg-[#fdfbfc] focus:outline-none focus:ring-2 focus:ring-inset focus:ring-[#ec3b78] dark:hover:bg-white/[.03] sm:min-h-[68px] sm:gap-4 sm:px-4 sm:py-2.5">
+              <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full sm:h-12 sm:w-12 ${color}`}><Icon size={20}/></span>
+              <span className="min-w-0 flex-1"><span className="block truncate text-sm font-extrabold text-[#252532] dark:text-white sm:text-[15px]">{label}</span><span className="mt-0.5 block truncate text-xs text-[#777985] dark:text-white/55">{notificationGroupSummary(type, items)}</span></span>
+              <span className="flex shrink-0 items-center gap-2"><span className={`min-w-7 rounded-full px-2 py-1 text-center text-[11px] font-extrabold ${unread ? 'bg-[#ec3b78] text-white' : 'bg-[#f0f1f5] text-[#626779] dark:bg-white/10 dark:text-white/65'}`}>{items.length}</span><ChevronRight size={17} className={`text-[#a1a2ad] transition group-hover:text-[#ec3b78] ${expanded ? 'rotate-90' : ''}`}/></span>
+            </button>
+            {expanded && <div id={`notification-group-${type}`} className="border-t border-[#eceaf0] px-2 py-1 dark:border-white/10">{items.length ? items.map((notification) => (
+              <button key={notification.id} type="button" onClick={() => void handleNotificationClick(notification)} className={`flex min-h-[64px] w-full items-center gap-3 rounded-xl px-2.5 py-3 text-left transition hover:bg-[#f1f2f7] dark:hover:bg-white/5 ${notification.unread ? 'bg-[#fdf0f6] dark:bg-[#ec3b78]/10' : ''}`}>
+                <div className={`relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full ${type === 'like' || type === 'match' ? 'bg-[#fce6ef] text-[#ec3b78]' : type === 'message' ? 'bg-sky-50 text-sky-600 dark:bg-sky-500/15 dark:text-sky-300' : 'bg-amber-50 text-amber-600 dark:bg-amber-500/15 dark:text-amber-300'}`}>
+                  {notification.avatarUrl ? <img src={notification.avatarUrl} alt="" className="h-full w-full object-cover" /> : <Icon size={17} />}
+                  {notification.unread && <span className="absolute right-0 top-0 h-2.5 w-2.5 rounded-full border-2 border-white bg-[#ec3b78] dark:border-[#1c1b21]" />}
+                </div>
+                <div className="min-w-0 flex-1"><p className="truncate text-xs font-extrabold text-[#252532] dark:text-white">{notification.title}</p><p className="mt-0.5 line-clamp-2 break-words text-xs leading-4 text-[#626779] dark:text-white/65">{notification.message}</p></div>
+                <ChevronRight size={15} className="shrink-0 text-[#85899a] dark:text-white/45" />
+              </button>
+            )) : <p className="px-2 py-4 text-xs text-[#85899a] dark:text-white/45">Aucune notification dans cette rubrique.</p>}</div>}
+          </section>;
         })}
       </div>
-      {notificationGroups.map(({ type, label, Icon, items }) => (
-        <section key={type} data-notification-group={type} aria-label={label} className="mb-5 scroll-mt-3 last:mb-0">
-          <h3 className="flex items-center gap-2 border-b border-[#eceaf0] px-1 pb-2 text-xs font-extrabold text-[#343441] dark:border-white/10 dark:text-white"><Icon size={15} className={type === 'like' || type === 'match' ? 'text-[#ec3b78]' : type === 'message' ? 'text-sky-500' : 'text-amber-500'}/>{label}<span className="ml-auto rounded-full bg-[#eef0f5] px-2 py-0.5 text-[10px] text-[#515565] dark:bg-white/10 dark:text-white/70">{items.length}</span></h3>
-          {items.length ? <div className="pt-1">{items.map((notification) => (
-            <button key={notification.id} type="button" onClick={() => void handleNotificationClick(notification)} className={`flex min-h-[64px] w-full items-center gap-3 rounded-xl px-2.5 py-3 text-left transition hover:bg-[#f1f2f7] dark:hover:bg-white/5 ${notification.unread ? 'bg-[#fdf0f6] dark:bg-[#ec3b78]/10' : ''}`}>
-              <div className={`relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full ${type === 'like' || type === 'match' ? 'bg-[#fce6ef] text-[#ec3b78]' : type === 'message' ? 'bg-sky-50 text-sky-600 dark:bg-sky-500/15 dark:text-sky-300' : 'bg-amber-50 text-amber-600 dark:bg-amber-500/15 dark:text-amber-300'}`}>
-                {notification.avatarUrl ? <img src={notification.avatarUrl} alt="" className="h-full w-full object-cover" /> : <Icon size={17} />}
-                {notification.unread && <span className="absolute right-0 top-0 h-2.5 w-2.5 rounded-full border-2 border-white bg-[#ec3b78] dark:border-[#1c1b21]" />}
-              </div>
-              <div className="min-w-0 flex-1"><p className="truncate text-xs font-extrabold text-[#252532] dark:text-white">{notification.title}</p><p className="mt-0.5 line-clamp-2 break-words text-xs leading-4 text-[#626779] dark:text-white/65">{notification.message}</p></div>
-              <ChevronRight size={15} className="shrink-0 text-[#85899a] dark:text-white/45" />
-            </button>
-          ))}</div> : <p className="px-2 py-4 text-xs text-[#85899a] dark:text-white/45">Aucune notification dans cette rubrique.</p>}
-        </section>
-      ))}
     </div>
   );
 
