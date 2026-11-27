@@ -9,6 +9,7 @@ import { Menu, X, Heart, LogOut, LayoutDashboard, Bell, Moon, Sun, MessageCircle
 import { useTheme } from 'next-themes';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
+import { PwaInstallButton } from '@/components/pwa-install-button';
 
 type NotificationPreview = {
   id: string;
@@ -501,6 +502,7 @@ export function Navbar({ isAdminMode = false, isModeratorMode = false }: { isAdm
 
         <div className="hidden items-center gap-3 md:flex">
           {isConnected && appTab === 'decouverte' && <button type="button" aria-label="Filtres de recherche" onClick={() => window.dispatchEvent(new Event('aras:open-discovery-filters'))} className="rounded-full border border-[#dfd2c6] p-2.5 text-[#625852] transition hover:border-[#ec3b78] hover:text-[#ec3b78]"><SlidersHorizontal size={16} /></button>}
+          <PwaInstallButton />
           <button onClick={() => setTheme(isDark ? 'light' : 'dark')} aria-label={isDark ? 'Activer le mode clair' : 'Activer le mode sombre'} className="rounded-full border border-[#dfd2c6] p-2.5 text-[#625852] transition hover:border-[#ec3b78] hover:text-[#ec3b78]">
             {isDark ? <Sun size={16} /> : <Moon size={16} />}
           </button>
@@ -540,6 +542,7 @@ export function Navbar({ isAdminMode = false, isModeratorMode = false }: { isAdm
 
         <div className="flex items-center gap-1 md:hidden">
           {isConnected && appTab === 'decouverte' && <button type="button" aria-label="Filtres de recherche" onClick={() => window.dispatchEvent(new Event('aras:open-discovery-filters'))} className="rounded-full border border-[#dfd2c6] p-2.5 text-[#625852] transition hover:border-[#ec3b78] hover:text-[#ec3b78]"><SlidersHorizontal size={18} /></button>}
+          <PwaInstallButton compact />
           {isConnected && !isAdmin && (
             <div ref={mobileNotificationRef} className="relative">
               <button
