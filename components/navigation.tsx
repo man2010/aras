@@ -4,6 +4,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useRef, useState, type MouseEvent } from 'react';
+import { createPortal } from 'react-dom';
 import { Menu, X, Heart, LogOut, LayoutDashboard, Bell, Moon, Sun, MessageCircle, CalendarDays, ChevronRight, Settings, User, SlidersHorizontal, MapPin, Megaphone } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { supabase } from '@/lib/supabase';
@@ -58,6 +59,7 @@ export function Navbar({ isAdminMode = false, isModeratorMode = false }: { isAdm
   const [notificationOpen, setNotificationOpen] = useState(false);
   const desktopNotificationRef = useRef<HTMLDivElement>(null);
   const mobileNotificationRef = useRef<HTMLDivElement>(null);
+  const mobileNotificationPanelRef = useRef<HTMLDivElement>(null);
   const [notificationPreferences, setNotificationPreferences] = useState({ notif_messages: true, notif_likes: true, notif_matches: true, notif_events: true });
   const [notifications, setNotifications] = useState<NotificationPreview[]>([]);
   const [unreadEventCount, setUnreadEventCount] = useState(0);
@@ -82,7 +84,7 @@ export function Navbar({ isAdminMode = false, isModeratorMode = false }: { isAdm
     const handleOutsidePointer = (event: PointerEvent) => {
       const target = event.target;
       if (!(target instanceof Node)) return;
-      if (desktopNotificationRef.current?.contains(target) || mobileNotificationRef.current?.contains(target)) return;
+      if (desktopNotificationRef.current?.contains(target) || mobileNotificationRef.current?.contains(target) || mobileNotificationPanelRef.current?.contains(target)) return;
       setNotificationOpen(false);
     };
     const handleEscape = (event: KeyboardEvent) => {
@@ -449,7 +451,7 @@ export function Navbar({ isAdminMode = false, isModeratorMode = false }: { isAdm
   );
 
   const renderNotificationPanel = (placement: 'desktop' | 'mobile') => (
-    <div data-notification-panel className={`fixed z-50 flex flex-col overflow-hidden rounded-2xl border border-[#e1e3eb] bg-[#fbfbfd] text-[#252532] shadow-[0_18px_50px_rgba(35,38,55,.16)] dark:border-white/10 dark:bg-[#1c1b21] dark:text-white dark:shadow-[0_18px_50px_rgba(0,0,0,.45)] ${placement === 'mobile' ? 'left-2 right-2 top-[calc(68px+env(safe-area-inset-top))] bottom-[calc(10px+env(safe-area-inset-bottom))] md:hidden' : 'md:absolute md:left-auto md:right-0 md:top-full md:mt-2 md:max-h-[min(78dvh,720px)] md:w-[min(420px,calc(100vw-2rem))] md:rounded-2xl'}`}>
+    <div ref={placement === 'mobile' ? mobileNotificationPanelRef : undefined} data-notification-panel className={`fixed z-50 flex flex-col overflow-hidden rounded-2xl border border-[#e1e3eb] bg-[#fbfbfd] text-[#252532] shadow-[0_18px_50px_rgba(35,38,55,.16)] dark:border-white/10 dark:bg-[#1c1b21] dark:text-white dark:shadow-[0_18px_50px_rgba(0,0,0,.45)] ${placement === 'mobile' ? 'left-2 right-2 top-[calc(68px+env(safe-area-inset-top))] bottom-[calc(10px+env(safe-area-inset-bottom))] md:hidden' : 'md:absolute md:left-auto md:right-0 md:top-full md:mt-2 md:max-h-[min(78dvh,720px)] md:w-[min(420px,calc(100vw-2rem))] md:rounded-2xl'}`}>
       <div className="flex shrink-0 items-center justify-between border-b border-[#e8eaf0] bg-white px-4 py-3 dark:border-white/10 dark:bg-[#202027] sm:px-5"><div><p className="text-sm font-extrabold text-[#252532] dark:text-white">Notifications</p><p className="mt-0.5 text-[11px] text-[#777985] dark:text-white/50">{notifications.length ? `${notifications.length} au total · ${visibleUnreadCount} non lue${visibleUnreadCount === 1 ? '' : 's'}` : 'Tout est à jour.'}</p></div><button type="button" onClick={() => setNotificationOpen(false)} aria-label="Fermer les notifications" className="flex h-9 w-9 items-center justify-center rounded-full text-[#777985] transition hover:bg-[#f1f2f7] hover:text-[#ec3b78] dark:hover:bg-white/10"><X size={18}/></button></div>
       {notifications.length === 0 ? <div className="px-4 py-8 text-center"><Bell size={22} className="mx-auto text-[#85899a] dark:text-white/40"/><p className="mt-3 text-sm font-bold text-[#4f5362] dark:text-white/75">Aucune notification</p><p className="mt-1 text-xs text-[#747888] dark:text-white/50">Tout est à jour.</p></div> : renderNotificationGroups()}
     </div>
@@ -560,9 +562,9 @@ export function Navbar({ isAdminMode = false, isModeratorMode = false }: { isAdm
                 <Bell size={18} />
                 {visibleUnreadCount > 0 && <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-[#ec3b78] px-1 text-[10px] font-extrabold text-white">{visibleUnreadCount > 9 ? '9+' : visibleUnreadCount}</span>}
               </button>
-              {notificationOpen && renderNotificationPanel('mobile')}
             </div>
           )}
+          {notificationOpen && typeof document !== 'undefined' && createPortal(renderNotificationPanel('mobile'), document.body)}
           {isConnected && isAdmin ? <>
             <button type="button" onClick={() => setTheme(isDark ? 'light' : 'dark')} aria-label={isDark ? 'Activer le mode clair' : 'Activer le mode sombre'} className="rounded-full border border-[#dfd2c6] p-2.5 text-[#625852]"><Sun size={18} className={isDark ? '' : 'hidden'} /><Moon size={18} className={isDark ? 'hidden' : ''} /></button>
             <button onClick={handleSignOut} aria-label="Déconnexion" className="rounded-full border border-[#dfd2c6] px-3 py-2 text-xs font-bold text-[#625852]">Sortir</button>
