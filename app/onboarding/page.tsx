@@ -477,7 +477,7 @@ export default function OnboardingPage() {
     }
 
     try { window.localStorage.removeItem(`aras:onboarding-draft:${user.id}`); } catch { /* Ignore unavailable storage. */ }
-    router.push('/decouverte');
+    router.push('/espace?welcome=1');
   };
 
   const nextStep = () => {

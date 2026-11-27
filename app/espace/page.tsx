@@ -10,6 +10,7 @@ import { useAuth } from '@/lib/auth-context';
 import type { Profile, Conversation, Message, Story } from '@/lib/types';
 import { toConversation, toEvent, toMessage, toProfile, toStory, type EventRow, type MatchRow, type MessageRow, type ProfileRow, type StoryRow } from '@/lib/adapters';
 import { AppSidebar, type EspaceTab } from '@/components/app-sidebar';
+import { OnboardingSpaceTour } from '@/components/onboarding-space-tour';
 import { Slider } from '@/components/ui/slider';
 
 type Tab = EspaceTab;
@@ -1929,6 +1930,7 @@ export default function EspacePage() {
 
   return (
     <main className="aras-espace min-h-screen bg-[#f8f9fd] pt-[60px] transition-colors dark:bg-[#101014]">
+      {user && profile && <OnboardingSpaceTour userId={user.id} displayName={profile.display_name} />}
       <div className="flex min-h-[calc(100vh-60px)] w-full items-stretch">
         <AppSidebar
           active={tab}

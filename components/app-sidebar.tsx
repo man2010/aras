@@ -67,6 +67,7 @@ export function AppSidebar({ active, onChange }: AppSidebarProps) {
               <button
                 key={item.id}
                 type="button"
+                data-tour={item.id === 'decouverte' ? 'discovery' : item.id === 'events' ? 'events' : item.id === 'likes' ? 'likes' : item.id === 'profile' ? 'profile' : item.id === 'messages' ? 'messages' : undefined}
                 onClick={() => onChange(item.id)}
                 title={collapsed ? item.label : undefined}
                 className={`group relative flex w-full items-center gap-3 rounded-2xl px-3.5 py-3 text-sm font-bold transition-all duration-200 ${
@@ -94,6 +95,7 @@ export function AppSidebar({ active, onChange }: AppSidebarProps) {
               <button
                 key={item.id}
                 type="button"
+                data-tour={item.id === 'decouverte' ? 'discovery' : item.id === 'events' ? 'events' : item.id === 'likes' ? 'likes' : item.id === 'profile' ? 'profile' : item.id === 'messages' ? 'messages' : undefined}
                 onClick={() => onChange(item.id)}
                 aria-label={item.label}
                 aria-current={isActive ? 'page' : undefined}
