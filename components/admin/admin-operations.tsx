@@ -8,7 +8,8 @@ import { Bot, Crown, CreditCard, Shield, Save, Search, RefreshCw } from 'lucide-
 type Plan = { code: string; name: string; price_fcfa: number; billing_period: string; is_active: boolean };
 type Subscription = { id: string; user_id: string; plan_code: string; status: string; starts_at: string | null; ends_at: string | null; payment_provider: string | null; provider_reference: string | null; created_at: string };
 type GoldenRequest = { id: string; name: string; gender: string; birthdate: string; location: string; marital_status: string; religion: string | null; age_range: string | null; preferred_location: string | null; expectations: string | null; contact: string; preferred_contact: string; status: string; private_notes: string | null; suggested_match_id: string | null; proposed_event_id: string | null; created_at: string };
-type StaffMember = { user_id: string; role: 'admin' | 'moderator'; email: string | null; phone: string | null; last_sign_in_at: string | null; created_at: string };
+type StaffMember = { user_id: string; role: 'admin' | 'moderator'; email: string | null; phone: string | null; last_sign_in_at: string | null; created_at: string; mfa_enabled: boolean; invited_at: string | null; email_confirmed_at: string | null };
+type TeamAction = { id: number; actor_id: string | null; actor_contact: string; target_user_id: string | null; target_contact: string; action: 'invited' | 'role_assigned' | 'role_changed' | 'access_removed'; old_role: string | null; new_role: string | null; created_at: string };
 
 const card = 'rounded-[24px] bg-white p-5 shadow-[0_8px_30px_rgba(38,31,48,.045)]';
 const input = 'rounded-xl border border-[#e4e1eb] bg-[#f8f9fc] px-3 py-2.5 text-sm outline-none focus:border-[#ec3b78]';
@@ -22,6 +23,11 @@ export function AdminOperations({ tab, active = true }: { tab: Extract<AdminTab,
   const [goldenEvents, setGoldenEvents] = useState<{ id: string; title: string; date: string }[]>([]);
   const [selectedGolden, setSelectedGolden] = useState<GoldenRequest | null>(null);
   const [staff, setStaff] = useState<StaffMember[]>([]);
+  const [teamActions, setTeamActions] = useState<TeamAction[]>([]);
+  const [teamActionsHasMore, setTeamActionsHasMore] = useState(false);
+  const [teamActionsTotal, setTeamActionsTotal] = useState(0);
+  const [teamActionsLoading, setTeamActionsLoading] = useState(false);
+  const [selectedTeamAction, setSelectedTeamAction] = useState<TeamAction | null>(null);
   const [saraUsage30, setSaraUsage30] = useState(0);
   const [teamContact, setTeamContact] = useState('');
   const [teamRole, setTeamRole] = useState<'admin' | 'moderator'>('moderator');
@@ -66,11 +72,31 @@ export function AdminOperations({ tab, active = true }: { tab: Extract<AdminTab,
 
   const loadTeam = useCallback(async () => {
     const { data: sessionData } = await supabase.auth.getSession();
-    const response = await fetch('/api/admin/team', { headers: { Authorization: `Bearer ${sessionData.session?.access_token ?? ''}` }, cache: 'no-store' });
-    const result = await response.json() as { members?: StaffMember[]; error?: string };
+    const response = await fetch('/api/admin/team?actionsOffset=0', { headers: { Authorization: `Bearer ${sessionData.session?.access_token ?? ''}` }, cache: 'no-store' });
+    const result = await response.json() as { members?: StaffMember[]; actions?: TeamAction[]; hasMoreActions?: boolean; totalActions?: number; error?: string };
     if (!response.ok) setError(result.error || 'Chargement de l’équipe impossible.');
-    else { setStaff(result.members ?? []); setLoadedSections((current) => ({ ...current, team: true })); }
+    else { setStaff(result.members ?? []); setTeamActions(result.actions ?? []); setTeamActionsHasMore(result.hasMoreActions ?? false); setTeamActionsTotal(result.totalActions ?? 0); setLoadedSections((current) => ({ ...current, team: true })); }
   }, []);
+
+  const loadMoreTeamActions = useCallback(async () => {
+    if (teamActionsLoading || !teamActionsHasMore) return;
+    setTeamActionsLoading(true);
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const response = await fetch(`/api/admin/team?actionsOffset=${teamActions.length}`, { headers: { Authorization: `Bearer ${sessionData.session?.access_token ?? ''}` }, cache: 'no-store' });
+      const result = await response.json() as { actions?: TeamAction[]; hasMoreActions?: boolean; totalActions?: number; error?: string };
+      if (!response.ok) setError(result.error || 'Chargement des actions suivantes impossible.');
+      else {
+        setTeamActions((current) => [...current, ...(result.actions ?? [])]);
+        setTeamActionsHasMore(result.hasMoreActions ?? false);
+        setTeamActionsTotal(result.totalActions ?? 0);
+      }
+    } catch {
+      setError('Chargement des actions suivantes impossible. Vérifie ta connexion puis réessaie.');
+    } finally {
+      setTeamActionsLoading(false);
+    }
+  }, [teamActions.length, teamActionsHasMore, teamActionsLoading]);
 
   const loadSara = useCallback(async () => {
     const since = new Date(Date.now() - 30 * 86400000).toISOString();
@@ -141,10 +167,10 @@ export function AdminOperations({ tab, active = true }: { tab: Extract<AdminTab,
     setBusy(true); setError(''); setNotice('');
     const { data } = await supabase.auth.getSession();
     const response = await fetch('/api/admin/team', { method, headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${data.session?.access_token ?? ''}` }, body: JSON.stringify(body) });
-    const result = await response.json() as { error?: string };
+    const result = await response.json() as { error?: string; invited?: boolean };
     setBusy(false);
     if (!response.ok) { setError(result.error || 'Action impossible.'); return; }
-    setTeamContact(''); setNotice(method === 'POST' ? 'Accès d’équipe mis à jour.' : 'Accès retiré.'); void loadTeam();
+    setTeamContact(''); setNotice(method === 'POST' ? (result.invited ? 'Invitation envoyée par e-mail et rôle attribué.' : 'Rôle de l’équipe mis à jour.') : 'Accès retiré.'); void loadTeam();
   }
 
   if (tab === 'payments') {
@@ -170,14 +196,57 @@ export function AdminOperations({ tab, active = true }: { tab: Extract<AdminTab,
     </div>;
   }
 
-  if (tab === 'team') return <div className="space-y-5"><Header icon={Shield} title="Équipe & accès" description="Rôles réellement pris en charge par la base : administrateur et modérateur." onRefresh={loadTeam}/><Feedback error={error} notice={notice}/>
-    <section className={card}><h2 className="font-display text-xl">Ajouter ou modifier un accès</h2><p className="mt-1 text-sm text-gray-600">Le compte doit déjà exister dans ARAS. Recherche par adresse e-mail ou téléphone.</p><form className="mt-4 flex flex-wrap gap-3" onSubmit={(e) => { e.preventDefault(); void changeStaff('POST', { contact: teamContact, role: teamRole }); }}><input required className={`${input} min-w-56 flex-1`} value={teamContact} onChange={(e) => setTeamContact(e.target.value)} placeholder="E-mail ou téléphone"/><select className={input} value={teamRole} onChange={(e) => setTeamRole(e.target.value as 'admin' | 'moderator')}><option value="moderator">Modérateur</option><option value="admin">Administrateur</option></select><button disabled={busy} className="rounded-full bg-[#ec3b78] px-5 py-2.5 text-sm font-bold text-white">Attribuer le rôle</button></form></section>
-    <section className={card}><h2 className="mb-4 font-display text-xl">Membres de l’équipe · {loadedSections.team ? staff.length : '—'}</h2><div className="space-y-3">{staff.map((member) => <div key={member.user_id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#efedf2] p-4"><div><p className="font-bold">{member.email || member.phone || member.user_id}</p><p className="text-sm text-gray-500">{member.role === 'admin' ? 'Administrateur' : 'Modérateur'} · Dernière connexion : {member.last_sign_in_at ? new Date(member.last_sign_in_at).toLocaleDateString('fr-FR') : 'inconnue'}</p></div><button disabled={busy} onClick={() => void changeStaff('DELETE', { userId: member.user_id })} className="rounded-full border border-rose-200 px-4 py-2 text-sm font-bold text-rose-700">Retirer l’accès</button></div>)}</div><div className="mt-5 rounded-xl bg-[#f8f9fc] p-4 text-sm"><strong>Matrice actuelle :</strong> les droits sont définis par rôle dans les politiques Supabase. Les rôles « gestionnaire Golden » et « développeur », ainsi qu’une MFA obligatoire, ne sont pas présents dans le schéma actuel.</div></section>
-  </div>;
+  if (tab === 'team') {
+    const admins = staff.filter((member) => member.role === 'admin').length;
+    const moderators = staff.filter((member) => member.role === 'moderator').length;
+    return <div className="space-y-5"><Header icon={Shield} title="Équipe & accès" description="Invitations, rôles, authentification et suivi des actions d’accès." onRefresh={loadTeam}/><Feedback error={error} notice={notice}/>
+      <div className="grid gap-3 sm:grid-cols-3"><Metric label="Personnes avec accès" value={loadedSections.team ? staff.length : '—'}/><Metric label="Administrateurs" value={loadedSections.team ? admins : '—'}/><Metric label="Modérateurs" value={loadedSections.team ? moderators : '—'}/></div>
+      <section className={card}><div className="flex flex-wrap items-start justify-between gap-3"><div><h2 className="font-display text-xl">Inviter une personne</h2><p className="mt-1 text-sm text-gray-600">Un nouveau membre reçoit son invitation par e-mail. Pour un compte existant, l’accès est attribué immédiatement; son téléphone peut être utilisé.</p></div></div><form className="mt-4 flex flex-wrap gap-3" onSubmit={(e) => { e.preventDefault(); void changeStaff('POST', { contact: teamContact, role: teamRole }); }}><input required type="text" autoComplete="email" className={`${input} min-w-56 flex-1`} value={teamContact} onChange={(e) => setTeamContact(e.target.value)} placeholder="E-mail ou téléphone d’un compte existant"/><select aria-label="Rôle à attribuer" className={input} value={teamRole} onChange={(e) => setTeamRole(e.target.value as 'admin' | 'moderator')}><option value="moderator">Modérateur</option><option value="admin">Administrateur</option></select><button disabled={busy} className="rounded-full bg-[#ec3b78] px-5 py-2.5 text-sm font-bold text-white disabled:opacity-50">Inviter / attribuer l’accès</button></form></section>
+      <section className={card}><div className="mb-4 flex flex-wrap items-center justify-between gap-2"><div><h2 className="font-display text-xl">Qui voit quoi</h2><p className="mt-1 text-sm text-gray-600">Droits appliqués par les accès de l’application et les politiques Supabase.</p></div><span className="rounded-full bg-[#fce8ef] px-3 py-1 text-xs font-bold text-[#bd2c60]">{loadedSections.team ? `${staff.length} personne(s)` : 'Chargement…'}</span></div><div className="overflow-x-auto"><table className="w-full min-w-[720px] text-left text-sm"><thead><tr className="border-b border-[#efedf2] text-xs uppercase tracking-wide text-gray-500"><th className="p-3">Personne</th><th className="p-3">Rôle</th><th className="p-3">Dernière connexion</th><th className="p-3">Double authentification</th><th className="p-3">Statut</th><th className="p-3">Accès</th></tr></thead><tbody>{staff.map((member) => { const contact = member.email || member.phone || member.user_id; const pending = Boolean(member.invited_at && !member.last_sign_in_at && !member.email_confirmed_at); const protectedLastAdmin = member.role === 'admin' && admins <= 1; return <tr key={member.user_id} className="border-b border-[#f2f0f4] last:border-0"><td className="p-3 font-semibold">{contact}</td><td className="p-3"><select aria-label={`Rôle de ${contact}`} disabled={busy || protectedLastAdmin} value={member.role} onChange={(event) => void changeStaff('POST', { contact, role: event.target.value })} className={`rounded-full border-0 px-3 py-1.5 text-xs font-bold outline-none ${member.role === 'admin' ? 'bg-[#fce8ef] text-[#bd2c60]' : 'bg-[#e7f2ef] text-[#246d62]'}`}><option value="admin">Administrateur</option><option value="moderator">Modérateur</option></select></td><td className="p-3 text-gray-600">{member.last_sign_in_at ? new Date(member.last_sign_in_at).toLocaleString('fr-FR') : 'Jamais connecté'}</td><td className="p-3"><span className={member.mfa_enabled ? 'text-emerald-700' : 'text-gray-500'}>{member.mfa_enabled ? 'Activée' : 'Non activée'}</span></td><td className="p-3"><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${pending ? 'bg-amber-50 text-amber-800' : 'bg-emerald-50 text-emerald-800'}`}>{pending ? 'Invitation envoyée' : 'Actif'}</span></td><td className="p-3"><button disabled={busy || protectedLastAdmin} title={protectedLastAdmin ? 'Le dernier administrateur est protégé' : 'Retirer cet accès'} onClick={() => { if (window.confirm(`Retirer l’accès de ${contact} ?`)) void changeStaff('DELETE', { userId: member.user_id }); }} className="rounded-full border border-rose-200 px-3 py-1.5 text-xs font-bold text-rose-700 disabled:cursor-not-allowed disabled:opacity-40">Retirer</button></td></tr>; })}</tbody></table>{loadedSections.team && !staff.length && <p className="py-8 text-center text-sm text-gray-500">Aucun accès d’équipe configuré.</p>}</div><p className="mt-3 text-xs text-gray-500">La double authentification est affichée selon les facteurs MFA vérifiés dans Supabase. Elle n’est pas imposée par la configuration actuelle.</p></section>
+      <section className={card}><div className="mb-4"><h2 className="font-display text-xl">Rôles et droits</h2><p className="mt-1 text-sm text-gray-600">Matrice des deux rôles actuellement pris en charge par la base.</p></div><div className="overflow-x-auto"><table className="w-full min-w-[600px] text-left text-sm"><thead className="text-xs uppercase tracking-wide text-gray-500"><tr className="border-b border-[#efedf2]"><th className="p-3">Rubrique</th><th className="p-3">Administrateur</th><th className="p-3">Modérateur</th></tr></thead><tbody>{[
+        ['Vue d’ensemble', 'Complet', '—'], ['Modération', 'Complet', 'Complet'], ['Utilisateurs', 'Complet', '—'], ['Paiements et abonnements', 'Complet', '—'], ['Membres Golden', 'Complet', '—'], ['Événements', 'Complet', '—'], ['Messages ARAS', 'Complet', 'Envoi et suivi'], ['SARA Coach IA', 'Complet', '—'], ['Équipe et accès', 'Complet', '—'], ['Paramètres', 'Complet', '—'],
+      ].map(([section, adminRight, moderatorRight]) => <tr key={section} className="border-b border-[#f2f0f4] last:border-0"><td className="p-3 font-semibold">{section}</td><td className="p-3 text-gray-700">{adminRight}</td><td className="p-3 text-gray-700">{moderatorRight}</td></tr>)}</tbody></table></div><p className="mt-3 text-xs text-gray-500">Les droits du modérateur s’appliquent à son espace de modération dédié, pas à l’ouverture du tableau de bord administrateur.</p></section>
+      <section className={card}>
+        <div className="mb-4 flex flex-wrap items-end justify-between gap-2"><div><h2 className="font-display text-xl">Journal des actions</h2><p className="mt-1 text-sm text-gray-600">Toutes les actions sont accessibles par pages. Sélectionne une ligne pour consulter ses détails.</p></div><span className="text-xs text-gray-500">{teamActions.length.toLocaleString('fr-FR')} affichée(s) sur {teamActionsTotal.toLocaleString('fr-FR')}</span></div>
+        <div className="space-y-2">{teamActions.map((action) => <button key={action.id} type="button" onClick={() => setSelectedTeamAction(action)} className="block w-full rounded-xl bg-[#f8f9fc] p-4 text-left transition hover:bg-[#f2f3f8] focus:outline-none focus:ring-2 focus:ring-[#ec3b78]"><span className="block font-semibold">{teamActionLabel(action)}</span><span className="mt-1 block break-all text-sm text-gray-600">{action.actor_contact} · {new Date(action.created_at).toLocaleString('fr-FR')}</span></button>)}{loadedSections.team && !teamActions.length && <p className="rounded-xl bg-[#f8f9fc] py-8 text-center text-sm text-gray-500">Aucune action d’accès enregistrée pour le moment.</p>}</div>
+        {teamActionsHasMore && <div className="mt-4 text-center"><button type="button" disabled={teamActionsLoading} onClick={() => void loadMoreTeamActions()} className="rounded-full border border-[#e4e1eb] px-5 py-2.5 text-sm font-bold text-[#554b54] disabled:opacity-50">{teamActionsLoading ? 'Chargement…' : `Charger les ${Math.min(50, teamActionsTotal - teamActions.length)} suivantes`}</button></div>}
+      </section>
+      {selectedTeamAction && <TeamActionDetail value={selectedTeamAction} onClose={() => setSelectedTeamAction(null)}/>}
+    </div>;
+  }
 
   return <div className="space-y-5"><Header icon={Bot} title="SARA Coach IA" description="Réglages fonctionnels du coach, sans lecture des conversations privées." onRefresh={loadSara}/><Feedback error={error} notice={notice}/>
     <section className={card}><div className="mb-5 flex flex-wrap items-center justify-between gap-4"><div><h2 className="font-display text-xl">Activation du service</h2><p className="text-sm text-gray-600">{saraSettings.enabled ? 'SARA est activée' : 'SARA est désactivée'} · Enregistrer pour appliquer les changements.</p></div><button type="button" aria-label={saraSettings.enabled ? 'Désactiver SARA' : 'Activer SARA'} aria-pressed={saraSettings.enabled} onClick={() => setSaraSettings((current) => ({ ...current, enabled: !current.enabled }))} className={`h-7 w-14 shrink-0 rounded-full p-1 ${saraSettings.enabled ? 'bg-emerald-600' : 'bg-gray-300'}`}><span className={`block h-5 w-5 rounded-full bg-white transition-transform ${saraSettings.enabled ? 'translate-x-7' : ''}`}/></button></div><div className="grid gap-4 sm:grid-cols-3">{(['dailyFree','dailyPremium','dailyElite'] as const).map((key) => <label key={key} className="text-sm font-semibold">Messages par jour · {key.replace('daily','')}<input className={`${input} mt-2 block w-full`} type="number" min="0" max="500" value={saraSettings[key]} onChange={(e) => setSaraSettings((current) => ({ ...current, [key]: e.target.value }))}/></label>)}</div><label className="mt-5 block text-sm font-semibold">Instructions système<textarea rows={5} maxLength={6000} className={`${input} mt-2 block w-full`} value={saraSettings.systemInstructions} onChange={(e) => setSaraSettings((current) => ({ ...current, systemInstructions: e.target.value }))}/></label><label className="mt-5 block text-sm font-semibold">Réponse de repli en cas de détresse<textarea rows={3} maxLength={1000} className={`${input} mt-2 block w-full`} value={saraSettings.fallback} onChange={(e) => setSaraSettings((current) => ({ ...current, fallback: e.target.value }))}/></label><button disabled={busy} onClick={() => void saveSara()} className="mt-5 rounded-full bg-[#ec3b78] px-5 py-3 text-sm font-bold text-white"><Save size={15} className="mr-2 inline"/>Enregistrer</button></section>
     <section className={card}><h2 className="font-display text-xl">Statistiques et confidentialité</h2><div className="mt-4 grid gap-3 sm:grid-cols-2"><Metric label="Appels SARA · 30 jours" value={loadedSections.sara ? saraUsage30 : '—'}/><div className="rounded-[24px] bg-[#f8f9fc] p-5"><p className="font-display text-xl">Non disponible</p><p className="mt-1 text-xs font-bold uppercase tracking-wide text-[#817783]">Coût fournisseur</p></div></div><p className="mt-3 text-sm leading-6 text-gray-600">Seul le nombre d’appels, leur résultat et leur durée sont enregistrés, sans le contenu des conversations. Le fournisseur ne renvoie pas de coût exploitable. Les réglages sont relus automatiquement toutes les 30 secondes.</p></section>
+  </div>;
+}
+
+function teamActionLabel(action: TeamAction) {
+  if (action.action === 'invited') return `${action.actor_contact} a invité ${action.target_contact} comme ${action.new_role === 'admin' ? 'administrateur' : 'modérateur'}.`;
+  if (action.action === 'role_changed') return `${action.actor_contact} a changé le rôle de ${action.target_contact} (${action.old_role === 'admin' ? 'administrateur' : 'modérateur'} → ${action.new_role === 'admin' ? 'administrateur' : 'modérateur'}).`;
+  if (action.action === 'access_removed') return `${action.actor_contact} a retiré l’accès de ${action.target_contact} (${action.old_role === 'admin' ? 'administrateur' : 'modérateur'}).`;
+  return `${action.actor_contact} a attribué le rôle ${action.new_role === 'admin' ? 'administrateur' : 'modérateur'} à ${action.target_contact}.`;
+}
+
+function TeamActionDetail({ value, onClose }: { value: TeamAction; onClose: () => void }) {
+  const roleName = (role: string | null) => role === 'admin' ? 'Administrateur' : role === 'moderator' ? 'Modérateur' : 'Aucun rôle';
+  const details: [string, string][] = [
+    ['Action', teamActionLabel(value)],
+    ['Date et heure', new Date(value.created_at).toLocaleString('fr-FR', { dateStyle: 'long', timeStyle: 'medium' })],
+    ['Effectuée par', value.actor_contact],
+    ['Compte de l’auteur', value.actor_id || 'Compte supprimé'],
+    ['Compte concerné', value.target_contact],
+    ['Identifiant du compte concerné', value.target_user_id || 'Compte supprimé'],
+    ['Rôle avant', roleName(value.old_role)],
+    ['Rôle après', roleName(value.new_role)],
+    ['Référence du journal', String(value.id)],
+  ];
+  return <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/50 p-4" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
+    <section role="dialog" aria-modal="true" aria-labelledby="team-action-detail-title" className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-3xl bg-white p-6 text-[#241c18] shadow-2xl">
+      <div className="flex items-start justify-between gap-4"><div><p className="text-xs font-bold uppercase tracking-widest text-[#ec3b78]">Journal des actions</p><h2 id="team-action-detail-title" className="mt-2 font-display text-2xl">Détails de l’action</h2></div><button type="button" aria-label="Fermer les détails" onClick={onClose} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#f4f3f7] text-xl">×</button></div>
+      <dl className="mt-5 grid gap-3 sm:grid-cols-2">{details.map(([label, detail]) => <div key={label} className="min-w-0 rounded-xl bg-[#f8f9fc] p-4"><dt className="text-[11px] font-bold uppercase tracking-wide text-gray-500">{label}</dt><dd className="mt-1 break-words text-sm font-medium">{detail}</dd></div>)}</dl>
+      <div className="mt-5 flex justify-end"><button type="button" onClick={onClose} className="rounded-full bg-[#ec3b78] px-5 py-2.5 text-sm font-bold text-white">Fermer</button></div>
+    </section>
   </div>;
 }
 

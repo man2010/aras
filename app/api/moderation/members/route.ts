@@ -17,6 +17,17 @@ type ProfileRow = {
   onboarding_completed: boolean | null;
 };
 
+type ContactMethod = 'email' | 'phone' | null;
+
+function getLoginContact(user: { email?: string; phone?: string; app_metadata?: Record<string, unknown>; user_metadata?: Record<string, unknown>; identities?: { provider?: string }[] }) {
+  const provider = String(user.app_metadata?.provider ?? user.identities?.[0]?.provider ?? '').toLowerCase();
+  const usesPhone = user.user_metadata?.auth_method === 'phone' || provider === 'phone' || (!user.email && Boolean(user.phone));
+  if (usesPhone) return { authContact: user.phone ?? null, authContactMethod: user.phone ? 'phone' as ContactMethod : null };
+  if (user.email) return { authContact: user.email, authContactMethod: 'email' as ContactMethod };
+  if (user.phone) return { authContact: user.phone, authContactMethod: 'phone' as ContactMethod };
+  return { authContact: null, authContactMethod: null as ContactMethod };
+}
+
 function matchesContact(user: { email?: string; phone?: string }, query: string) {
   return `${user.email ?? ''} ${user.phone ?? ''}`.toLocaleLowerCase('fr').includes(query);
 }
@@ -34,11 +45,12 @@ export async function POST(request: Request) {
   const { data: role, error: roleError } = await userClient.rpc('current_staff_role');
   if (roleError || (role !== 'admin' && role !== 'moderator')) return NextResponse.json({ error: 'Accès non autorisé.' }, { status: 403 });
 
-  let body: { query?: unknown; gender?: unknown; incompleteOnly?: unknown };
+  let body: { query?: unknown; gender?: unknown; incompleteOnly?: unknown; contactMethod?: unknown };
   try { body = await request.json(); } catch { return NextResponse.json({ error: 'Requête invalide.' }, { status: 400 }); }
   const query = typeof body.query === 'string' ? body.query.trim().slice(0, 120).toLocaleLowerCase('fr') : '';
   const gender = body.gender === 'Homme' || body.gender === 'Femme' ? body.gender : null;
   const incompleteOnly = body.incompleteOnly === true;
+  const contactMethod: ContactMethod | 'all' = body.contactMethod === 'email' || body.contactMethod === 'phone' ? body.contactMethod : 'all';
   const admin = getSupabaseAdmin();
   if (!admin) return NextResponse.json({ error: 'Recherche de membres indisponible.' }, { status: 503 });
 
@@ -76,5 +88,11 @@ export async function POST(request: Request) {
   }
 
   const rows = Array.from(profileById.values()).slice(0, 30);
-  return NextResponse.json({ members: rows }, { headers: { 'Cache-Control': 'private, no-store' } });
+  const members = await Promise.all(rows.map(async (profile) => {
+    const { data } = await admin.auth.admin.getUserById(profile.id);
+    const contact = data.user ? getLoginContact(data.user) : { authContact: null, authContactMethod: null as ContactMethod };
+    return { ...profile, ...contact };
+  }));
+  const filteredMembers = contactMethod === 'all' ? members : members.filter((member) => member.authContactMethod === contactMethod);
+  return NextResponse.json({ members: filteredMembers }, { headers: { 'Cache-Control': 'private, no-store' } });
 }

@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState, type MouseEvent } from 'react';
 import { Menu, X, Heart, LogOut, LayoutDashboard, Bell, Moon, Sun, MessageCircle, CalendarDays, ChevronRight, Settings, User, SlidersHorizontal, MapPin, Megaphone } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { supabase } from '@/lib/supabase';
@@ -56,6 +56,8 @@ export function Navbar({ isAdminMode = false, isModeratorMode = false }: { isAdm
   const [isModerator, setIsModerator] = useState(isModeratorMode);
   const [mounted, setMounted] = useState(false);
   const [notificationOpen, setNotificationOpen] = useState(false);
+  const desktopNotificationRef = useRef<HTMLDivElement>(null);
+  const mobileNotificationRef = useRef<HTMLDivElement>(null);
   const [notificationPreferences, setNotificationPreferences] = useState({ notif_messages: true, notif_likes: true, notif_matches: true, notif_events: true });
   const [notifications, setNotifications] = useState<NotificationPreview[]>([]);
   const [unreadEventCount, setUnreadEventCount] = useState(0);
@@ -74,6 +76,25 @@ export function Navbar({ isAdminMode = false, isModeratorMode = false }: { isAdm
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  useEffect(() => {
+    if (!notificationOpen) return;
+    const handleOutsidePointer = (event: PointerEvent) => {
+      const target = event.target;
+      if (!(target instanceof Node)) return;
+      if (desktopNotificationRef.current?.contains(target) || mobileNotificationRef.current?.contains(target)) return;
+      setNotificationOpen(false);
+    };
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setNotificationOpen(false);
+    };
+    document.addEventListener('pointerdown', handleOutsidePointer);
+    document.addEventListener('keydown', handleEscape);
+    return () => {
+      document.removeEventListener('pointerdown', handleOutsidePointer);
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, [notificationOpen]);
 
   useEffect(() => {
     const onAppTab = (event: Event) => setAppTab((event as CustomEvent<string>).detail ?? '');
@@ -378,30 +399,59 @@ export function Navbar({ isAdminMode = false, isModeratorMode = false }: { isAdm
     { type: 'event' as const, label: 'Événements à venir', Icon: CalendarDays },
   ].map((group) => ({ ...group, items: notifications.filter((notification) => notification.type === group.type) }));
 
+  const notificationGroupSummary = (type: NotificationPreview['type'], items: NotificationPreview[]) => {
+    const unread = items.filter((item) => item.unread).length;
+    if (type === 'like') return unread ? `${unread} nouveau${unread > 1 ? 'x' : ''} like${unread > 1 ? 's' : ''}` : 'Aucun nouveau like';
+    if (type === 'message') return unread ? `${unread} nouveau${unread > 1 ? 'x' : ''} message${unread > 1 ? 's' : ''}` : 'Tous vos messages sont lus';
+    if (type === 'match') return unread ? `${unread} nouveau${unread > 1 ? 'x' : ''} match${unread > 1 ? 's' : ''}` : 'Vos nouveaux matches';
+    if (type === 'announcement') return unread ? `${unread} nouvelle${unread > 1 ? 's' : ''} information${unread > 1 ? 's' : ''}` : 'Informations de l’équipe ARAS';
+    return unread ? `${unread} rappel${unread > 1 ? 's' : ''} à consulter` : 'Dates et rappels à venir';
+  };
+
+  const scrollToNotificationGroup = (type: NotificationPreview['type'], event: MouseEvent<HTMLButtonElement>) => {
+    const panel = event.currentTarget.closest<HTMLElement>('[data-notification-panel]');
+    const scroller = panel?.querySelector<HTMLElement>('[data-notification-scroll]');
+    const section = scroller?.querySelector<HTMLElement>(`[data-notification-group="${type}"]`);
+    if (!scroller || !section) return;
+    const scrollTop = scroller.scrollTop + section.getBoundingClientRect().top - scroller.getBoundingClientRect().top;
+    scroller.scrollTo({ top: Math.max(0, scrollTop - 10), behavior: 'smooth' });
+  };
+
   const renderNotificationGroups = () => (
-    <div className="max-h-[calc(100dvh-160px)] overflow-y-auto p-2 md:max-h-[min(440px,70vh)]">
-      {notificationGroups.filter((group) => group.items.length > 0).map(({ type, label, Icon, items }) => (
-        <section key={type} aria-label={label} className="mb-2 last:mb-0">
-          <h3 className="flex items-center gap-2 px-3 pb-1 pt-2 text-[10px] font-extrabold uppercase tracking-[.12em] text-[#747888] dark:text-white/50">
-            <Icon size={13} className={type === 'like' || type === 'match' ? 'text-[#ec3b78]' : type === 'message' ? 'text-sky-500' : 'text-amber-500'} />
-            {label}
-            <span className="ml-auto rounded-full bg-[#eef0f5] px-2 py-0.5 text-[10px] text-[#515565] dark:bg-white/10 dark:text-white/70">{items.length}</span>
-          </h3>
-          {items.map((notification) => (
-            <button key={notification.id} type="button" onClick={() => void handleNotificationClick(notification)} className={`flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left transition hover:bg-[#f1f2f7] dark:hover:bg-white/5 ${notification.unread ? 'bg-[#fdf0f6] dark:bg-[#ec3b78]/10' : ''}`}>
+    <div data-notification-scroll className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-4 pt-3 [scrollbar-width:thin]" style={{ WebkitOverflowScrolling: 'touch' }}>
+      <div className="mb-5 space-y-2" aria-label="Rubriques de notifications">
+        {notificationGroups.map(({ type, label, Icon, items }) => {
+          const unread = items.filter((item) => item.unread).length;
+          const color = type === 'like' || type === 'match' ? 'text-[#d92e70] bg-[#fce6ef]' : type === 'message' ? 'text-sky-600 bg-sky-50 dark:text-sky-300 dark:bg-sky-500/15' : 'text-amber-600 bg-amber-50 dark:text-amber-300 dark:bg-amber-500/15';
+          return <button key={type} type="button" onClick={(event) => scrollToNotificationGroup(type, event)} aria-label={`Afficher la rubrique ${label}, ${items.length} notification${items.length === 1 ? '' : 's'}`} className="group flex min-h-[68px] w-full items-center gap-3 rounded-2xl border border-[#eceaf0] bg-white px-3 py-2.5 text-left shadow-[0_3px_12px_rgba(35,38,55,.035)] transition hover:-translate-y-0.5 hover:border-[#f2bed1] hover:shadow-[0_8px_22px_rgba(35,38,55,.08)] focus:outline-none focus:ring-2 focus:ring-[#ec3b78] dark:border-white/10 dark:bg-[#222128] dark:hover:border-[#ec3b78]/40 sm:gap-4 sm:px-4">
+            <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full sm:h-12 sm:w-12 ${color}`}><Icon size={20}/></span>
+            <span className="min-w-0 flex-1"><span className="block truncate text-sm font-extrabold text-[#252532] dark:text-white sm:text-[15px]">{label}</span><span className="mt-0.5 block truncate text-xs text-[#777985] dark:text-white/55">{notificationGroupSummary(type, items)}</span></span>
+            <span className="flex shrink-0 items-center gap-2"><span className={`min-w-7 rounded-full px-2 py-1 text-center text-[11px] font-extrabold ${unread ? 'bg-[#ec3b78] text-white' : 'bg-[#f0f1f5] text-[#626779] dark:bg-white/10 dark:text-white/65'}`}>{items.length}</span><ChevronRight size={17} className="text-[#a1a2ad] transition group-hover:translate-x-0.5 group-hover:text-[#ec3b78]"/></span>
+          </button>;
+        })}
+      </div>
+      {notificationGroups.map(({ type, label, Icon, items }) => (
+        <section key={type} data-notification-group={type} aria-label={label} className="mb-5 scroll-mt-3 last:mb-0">
+          <h3 className="flex items-center gap-2 border-b border-[#eceaf0] px-1 pb-2 text-xs font-extrabold text-[#343441] dark:border-white/10 dark:text-white"><Icon size={15} className={type === 'like' || type === 'match' ? 'text-[#ec3b78]' : type === 'message' ? 'text-sky-500' : 'text-amber-500'}/>{label}<span className="ml-auto rounded-full bg-[#eef0f5] px-2 py-0.5 text-[10px] text-[#515565] dark:bg-white/10 dark:text-white/70">{items.length}</span></h3>
+          {items.length ? <div className="pt-1">{items.map((notification) => (
+            <button key={notification.id} type="button" onClick={() => void handleNotificationClick(notification)} className={`flex min-h-[64px] w-full items-center gap-3 rounded-xl px-2.5 py-3 text-left transition hover:bg-[#f1f2f7] dark:hover:bg-white/5 ${notification.unread ? 'bg-[#fdf0f6] dark:bg-[#ec3b78]/10' : ''}`}>
               <div className={`relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full ${type === 'like' || type === 'match' ? 'bg-[#fce6ef] text-[#ec3b78]' : type === 'message' ? 'bg-sky-50 text-sky-600 dark:bg-sky-500/15 dark:text-sky-300' : 'bg-amber-50 text-amber-600 dark:bg-amber-500/15 dark:text-amber-300'}`}>
                 {notification.avatarUrl ? <img src={notification.avatarUrl} alt="" className="h-full w-full object-cover" /> : <Icon size={17} />}
                 {notification.unread && <span className="absolute right-0 top-0 h-2.5 w-2.5 rounded-full border-2 border-white bg-[#ec3b78] dark:border-[#1c1b21]" />}
               </div>
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-xs font-extrabold text-[#252532] dark:text-white">{notification.title}</p>
-                <p className="mt-0.5 line-clamp-2 break-words text-xs leading-4 text-[#626779] dark:text-white/65">{notification.message}</p>
-              </div>
+              <div className="min-w-0 flex-1"><p className="truncate text-xs font-extrabold text-[#252532] dark:text-white">{notification.title}</p><p className="mt-0.5 line-clamp-2 break-words text-xs leading-4 text-[#626779] dark:text-white/65">{notification.message}</p></div>
               <ChevronRight size={15} className="shrink-0 text-[#85899a] dark:text-white/45" />
             </button>
-          ))}
+          ))}</div> : <p className="px-2 py-4 text-xs text-[#85899a] dark:text-white/45">Aucune notification dans cette rubrique.</p>}
         </section>
       ))}
+    </div>
+  );
+
+  const renderNotificationPanel = (placement: 'desktop' | 'mobile') => (
+    <div data-notification-panel className={`fixed z-50 flex flex-col overflow-hidden rounded-2xl border border-[#e1e3eb] bg-[#fbfbfd] text-[#252532] shadow-[0_18px_50px_rgba(35,38,55,.16)] dark:border-white/10 dark:bg-[#1c1b21] dark:text-white dark:shadow-[0_18px_50px_rgba(0,0,0,.45)] ${placement === 'mobile' ? 'left-2 right-2 top-[calc(68px+env(safe-area-inset-top))] bottom-[calc(10px+env(safe-area-inset-bottom))] md:hidden' : 'hidden md:absolute md:left-auto md:right-0 md:top-full md:mt-2 md:max-h-[min(78dvh,720px)] md:w-[min(420px,calc(100vw-2rem))] md:rounded-2xl'}`}>
+      <div className="flex shrink-0 items-center justify-between border-b border-[#e8eaf0] bg-white px-4 py-3 dark:border-white/10 dark:bg-[#202027] sm:px-5"><div><p className="text-sm font-extrabold text-[#252532] dark:text-white">Notifications</p><p className="mt-0.5 text-[11px] text-[#777985] dark:text-white/50">{notifications.length ? `${notifications.length} au total · ${visibleUnreadCount} non lue${visibleUnreadCount === 1 ? '' : 's'}` : 'Tout est à jour.'}</p></div><button type="button" onClick={() => setNotificationOpen(false)} aria-label="Fermer les notifications" className="flex h-9 w-9 items-center justify-center rounded-full text-[#777985] transition hover:bg-[#f1f2f7] hover:text-[#ec3b78] dark:hover:bg-white/10"><X size={18}/></button></div>
+      {notifications.length === 0 ? <div className="px-4 py-8 text-center"><Bell size={22} className="mx-auto text-[#85899a] dark:text-white/40"/><p className="mt-3 text-sm font-bold text-[#4f5362] dark:text-white/75">Aucune notification</p><p className="mt-1 text-xs text-[#747888] dark:text-white/50">Tout est à jour.</p></div> : renderNotificationGroups()}
     </div>
   );
 
@@ -450,6 +500,7 @@ export function Navbar({ isAdminMode = false, isModeratorMode = false }: { isAdm
               <Link href="/evenements" className="transition hover:text-[#ec3b78]">Événements</Link>
               <Link href="/#how-it-works" className="transition hover:text-[#ec3b78]">Comment ça marche</Link>
               <Link href="/tarifs" className="transition hover:text-[#ec3b78]">Tarifs</Link>
+              <Link href="/golden" className="transition hover:text-[#ec3b78]">Rencontre Discrète</Link>
               <Link href="/faq" className="transition hover:text-[#ec3b78]">FAQ</Link>
               <Link href="/contact" className="transition hover:text-[#ec3b78]">Contact</Link>
             </>
@@ -465,7 +516,7 @@ export function Navbar({ isAdminMode = false, isModeratorMode = false }: { isAdm
             <button onClick={handleSignOut} className="rounded-full bg-[#ec3b78] px-5 py-2.5 text-[13px] font-bold text-white transition hover:bg-[#c92e63]">Déconnexion</button>
           ) : isConnected ? (
             <>
-                <div className="relative">
+                <div ref={desktopNotificationRef} className="relative">
                   <button
                     type="button"
                     onClick={() => setNotificationOpen((openState) => !openState)}
@@ -481,27 +532,7 @@ export function Navbar({ isAdminMode = false, isModeratorMode = false }: { isAdm
                     )}
                   </button>
 
-                  {notificationOpen && (
-                    <div className="fixed left-3 right-3 top-[72px] z-50 max-h-[calc(100dvh-88px)] overflow-hidden rounded-2xl border border-[#e1e3eb] bg-white text-[#252532] shadow-[0_18px_50px_rgba(35,38,55,.16)] dark:border-white/10 dark:bg-[#1c1b21] dark:text-white dark:shadow-[0_18px_50px_rgba(0,0,0,.45)] md:absolute md:left-auto md:right-0 md:top-full md:mt-2 md:max-h-none md:w-[min(360px,calc(100vw-2rem))]">
-                      <div className="flex items-center justify-between border-b border-[#e8eaf0] px-4 py-3 dark:border-white/10">
-                        <p className="text-sm font-extrabold text-[#252532] dark:text-white">Notifications</p>
-                        {visibleUnreadCount > 0 && (
-                          <span className="text-[10px] font-extrabold uppercase tracking-[.12em] text-[#ec3b78]">
-                            {visibleUnreadCount} nouvelle{visibleUnreadCount > 1 ? 's' : ''}
-                          </span>
-                        )}
-                      </div>
-                      {notifications.length === 0 ? (
-                        <div className="px-4 py-8 text-center">
-                          <Bell size={22} className="mx-auto text-[#85899a] dark:text-white/40" />
-                          <p className="mt-3 text-sm font-bold text-[#4f5362] dark:text-white/75">Aucune notification</p>
-                          <p className="mt-1 text-xs text-[#747888] dark:text-white/50">Tout est à jour.</p>
-                        </div>
-                      ) : (
-                        renderNotificationGroups()
-                      )}
-                    </div>
-                  )}
+                  {notificationOpen && renderNotificationPanel('desktop')}
                 </div>
 
             </>
@@ -518,7 +549,7 @@ export function Navbar({ isAdminMode = false, isModeratorMode = false }: { isAdm
         <div className="flex items-center gap-1 md:hidden">
           {isConnected && appTab === 'decouverte' && <button type="button" aria-label="Filtres de recherche" onClick={() => window.dispatchEvent(new Event('aras:open-discovery-filters'))} className="rounded-full border border-[#dfd2c6] p-2.5 text-[#625852] transition hover:border-[#ec3b78] hover:text-[#ec3b78]"><SlidersHorizontal size={18} /></button>}
           {isConnected && !isAdmin && (
-            <div className="relative">
+            <div ref={mobileNotificationRef} className="relative">
               <button
                 type="button"
                 onClick={() => setNotificationOpen((openState) => !openState)}
@@ -529,12 +560,7 @@ export function Navbar({ isAdminMode = false, isModeratorMode = false }: { isAdm
                 <Bell size={18} />
                 {visibleUnreadCount > 0 && <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-[#ec3b78] px-1 text-[10px] font-extrabold text-white">{visibleUnreadCount > 9 ? '9+' : visibleUnreadCount}</span>}
               </button>
-              {notificationOpen && (
-                <div className="fixed left-3 right-3 top-[72px] z-50 max-h-[calc(100dvh-88px)] overflow-hidden rounded-2xl border border-[#e1e3eb] bg-white text-[#252532] shadow-[0_18px_50px_rgba(35,38,55,.16)] dark:border-white/10 dark:bg-[#1c1b21] dark:text-white dark:shadow-[0_18px_50px_rgba(0,0,0,.45)] md:absolute md:left-auto md:right-0 md:top-full md:mt-3 md:max-h-none md:w-[min(360px,calc(100vw-2rem))]">
-                  <div className="flex items-center justify-between border-b border-[#e8eaf0] px-4 py-3 dark:border-white/10"><p className="text-sm font-extrabold text-[#252532] dark:text-white">Notifications</p>{visibleUnreadCount > 0 && <span className="text-[10px] font-extrabold uppercase tracking-[.12em] text-[#ec3b78]">{visibleUnreadCount} nouvelle{visibleUnreadCount > 1 ? 's' : ''}</span>}</div>
-                  {notifications.length === 0 ? <div className="px-4 py-8 text-center"><Bell size={22} className="mx-auto text-[#85899a] dark:text-white/40" /><p className="mt-3 text-sm font-bold text-[#4f5362] dark:text-white/75">Aucune notification</p><p className="mt-1 text-xs text-[#747888] dark:text-white/50">Tout est à jour.</p></div> : renderNotificationGroups()}
-                </div>
-              )}
+              {notificationOpen && renderNotificationPanel('mobile')}
             </div>
           )}
           {isConnected && isAdmin ? <>
@@ -555,6 +581,7 @@ export function Navbar({ isAdminMode = false, isModeratorMode = false }: { isAdm
                 <Link href="/evenements" onClick={() => setOpen(false)} className="hover:text-[#ec3b78] transition-colors">Événements</Link>
                 <Link href="/#how-it-works" onClick={() => setOpen(false)} className="hover:text-[#ec3b78] transition-colors">Comment ça marche</Link>
                 <Link href="/tarifs" onClick={() => setOpen(false)} className="hover:text-[#ec3b78] transition-colors">Tarifs</Link>
+                <Link href="/golden" onClick={() => setOpen(false)} className="hover:text-[#ec3b78] transition-colors">Rencontre Discrète</Link>
                 <Link href="/faq" onClick={() => setOpen(false)} className="hover:text-[#ec3b78] transition-colors">FAQ</Link>
                 <Link href="/contact" onClick={() => setOpen(false)} className="hover:text-[#ec3b78] transition-colors">Contact</Link>
               </>

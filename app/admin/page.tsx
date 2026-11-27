@@ -16,6 +16,7 @@ import { AdminAnalytics } from '@/components/admin/admin-analytics';
 import { AdminSettings } from '@/components/admin/admin-settings';
 import { AdminOperations } from '@/components/admin/admin-operations';
 import { AdminFakeProfiles } from '@/components/admin/admin-fake-profiles';
+import { AdminSupport } from '@/components/admin/admin-support';
 
 type AdminActivity = { id: string; category: 'new_message' | 'new_signup' | 'new_login' | 'new_match' | 'new_event'; type: string; description: string; created_at: string; details: Record<string, string> };
 type AdminProfile = Profile & { adminLocation?: string | null; adminPlan?: string | null; authContact?: string | null; authContactMethod?: 'email' | 'phone' | null };
@@ -188,7 +189,7 @@ export default function AdminPage() {
 
   useEffect(() => {
     if (!isAdmin) return;
-    const validTabs: AdminTab[] = ['dashboard', 'users', 'reports', 'fake-profiles', 'events', 'messages', 'analytics', 'payments', 'golden', 'sara', 'team', 'settings'];
+    const validTabs: AdminTab[] = ['dashboard', 'users', 'reports', 'fake-profiles', 'events', 'messages', 'support', 'analytics', 'payments', 'golden', 'sara', 'team', 'settings'];
     try {
       const storedTab = window.localStorage.getItem('aras:admin-tab');
       if (storedTab && validTabs.includes(storedTab as AdminTab)) setTab(storedTab as AdminTab);
@@ -499,6 +500,10 @@ export default function AdminPage() {
 
       <div hidden={tab !== 'fake-profiles'}>
         <AdminFakeProfiles active={tab === 'fake-profiles'} />
+      </div>
+
+      <div hidden={tab !== 'support'}>
+        <AdminSupport active={tab === 'support'} />
       </div>
 
       <div hidden={tab !== 'events'}>

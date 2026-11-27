@@ -13,16 +13,12 @@ export default function ContactPage() {
     const form = new FormData(event.currentTarget);
     try {
       const response = await fetch('/api/contact', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(Object.fromEntries(form)) });
-      console.log('Response status:', response.status);
-      console.log('Response ok:', response.ok);
       const data = await response.json();
-      console.log('Response data:', data);
       if (!response.ok) throw new Error();
       setStatus('sent');
       if (formRef.current) formRef.current.reset();
       setMessage('');
     } catch (error) {
-      console.error('Erreur formulaire:', error);
       setStatus('error');
     }
   }
@@ -42,8 +38,9 @@ export default function ContactPage() {
         <form ref={formRef} onSubmit={submit} className="mt-7 space-y-5">
           <div className="grid gap-5 sm:grid-cols-2"><label className="text-sm font-bold text-[#4f4138]">Nom<input required name="name" className="mt-2 w-full rounded-xl border border-[#dfd2c6] bg-[#f8f9fd] px-4 py-3 font-normal outline-none focus:border-[#ec3b78]" /></label><label className="text-sm font-bold text-[#4f4138]">E-mail ou téléphone<input required type="text" name="email" autoComplete="email tel" maxLength={160} placeholder="Votre e-mail ou numéro de téléphone" className="mt-2 w-full rounded-xl border border-[#dfd2c6] bg-[#f8f9fd] px-4 py-3 font-normal outline-none focus:border-[#ec3b78]" /></label></div>
           <label className="block text-sm font-bold text-[#4f4138]">Sujet<input required name="subject" className="mt-2 w-full rounded-xl border border-[#dfd2c6] bg-[#f8f9fd] px-4 py-3 font-normal outline-none focus:border-[#ec3b78]" /></label>
+          <label className="block text-sm font-bold text-[#4f4138]">Type de demande<select required name="category" defaultValue="other" className="mt-2 w-full rounded-xl border border-[#dfd2c6] bg-[#f8f9fd] px-4 py-3 font-normal outline-none focus:border-[#ec3b78]"><option value="account">Compte et connexion</option><option value="technical">Problème technique</option><option value="billing">Paiement et abonnement</option><option value="moderation">Sécurité et modération</option><option value="events">Événement</option><option value="other">Autre demande</option></select></label>
           <label className="block text-sm font-bold text-[#4f4138]">Message<textarea required name="message" value={message} onChange={(e) => setMessage(e.target.value)} rows={6} className="mt-2 w-full resize-y rounded-xl border border-[#dfd2c6] bg-[#f8f9fd] px-4 py-3 font-normal outline-none focus:border-[#ec3b78]" /></label>
-          {status === 'sent' && <p className="flex items-center gap-2 text-sm font-bold text-[#1a6b68]"><CheckCircle2 size={18} /> Votre message a bien été envoyé.</p>}
+          {status === 'sent' && <p className="flex items-center gap-2 text-sm font-bold text-[#1a6b68]"><CheckCircle2 size={18} /> Votre demande a bien été enregistrée dans notre espace Support. L’équipe ARAS pourra la traiter.</p>}
           {status === 'error' && <p className="text-sm font-bold text-[#b32d58]">L’envoi est momentanément indisponible. Écrivez-nous à contact@aras.sn.</p>}
           <button disabled={status === 'sending'} className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-[#ec3b78] px-6 py-3.5 text-sm font-extrabold text-white transition hover:bg-[#c92e63] disabled:opacity-60"><Send size={17} />{status === 'sending' ? 'Envoi en cours…' : 'Envoyer le message'}</button>
         </form>

@@ -1,9 +1,9 @@
 'use client';
 
 import { ReactNode, useState } from 'react';
-import { TrendingUp, Users, AlertTriangle, Calendar, MessageSquare, BarChart3, Settings, CreditCard, Crown, Bot, Shield, LayoutDashboard, ChevronLeft, ChevronRight, ShieldAlert } from 'lucide-react';
+import { TrendingUp, Users, AlertTriangle, Calendar, MessageSquare, BarChart3, Settings, CreditCard, Crown, Bot, Shield, LayoutDashboard, ChevronLeft, ChevronRight, ShieldAlert, LifeBuoy } from 'lucide-react';
 
-export type AdminTab = 'dashboard' | 'users' | 'reports' | 'fake-profiles' | 'events' | 'messages' | 'analytics' | 'payments' | 'golden' | 'sara' | 'team' | 'settings';
+export type AdminTab = 'dashboard' | 'users' | 'reports' | 'fake-profiles' | 'events' | 'messages' | 'support' | 'analytics' | 'payments' | 'golden' | 'sara' | 'team' | 'settings';
 
 interface AdminLayoutProps {
   children: ReactNode;
@@ -22,6 +22,7 @@ export function AdminLayout({ children, tab, onTabChange }: AdminLayoutProps) {
     { id: 'golden', label: 'Membres Golden', icon: Crown },
     { id: 'events', label: 'Événements', icon: Calendar },
     { id: 'messages', label: 'Messages', icon: MessageSquare },
+    { id: 'support', label: 'Support', icon: LifeBuoy },
     { id: 'sara', label: 'SARA Coach IA', icon: Bot },
     { id: 'team', label: 'Équipe & accès', icon: Shield },
     { id: 'analytics', label: 'Analytics', icon: BarChart3 },

@@ -2,11 +2,12 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabase';
-import { BellRing, Check, Clock3, MapPin, RefreshCw, Search, Send, X } from 'lucide-react';
+import { BellRing, Check, Clock3, Mail, MapPin, Phone, RefreshCw, Search, Send, X } from 'lucide-react';
 
 type NoticeRow = { id: string; title: string; body: string; recipient_count: number; recipient_id: string | null; recipient_ids: string[] | null; target_incomplete_only: boolean | null; created_at: string };
-type SearchMember = { id: string; full_name: string | null; gender: string | null; birthdate: string | null; city: string | null; profession: string | null; avatar_urls: string[] | null; onboarding_completed?: boolean | null; profile_status?: string | null };
-type Target = 'all' | 'incomplete' | 'member';
+type SearchMember = { id: string; full_name: string | null; gender: string | null; birthdate: string | null; city: string | null; profession: string | null; avatar_urls: string[] | null; onboarding_completed?: boolean | null; profile_status?: string | null; authContact?: string | null; authContactMethod?: 'email' | 'phone' | null };
+type Target = 'all' | 'incomplete_email' | 'incomplete_phone' | 'member';
+type ContactFilter = 'all' | 'email' | 'phone';
 
 const deliveryIssueLabels: Record<string, string> = {
   phone_unavailable: 'Numéro de téléphone absent dans le compte.',
@@ -39,6 +40,7 @@ export function AdminMessageComposer({ active = true }: { active?: boolean }) {
   const [recipientSearch, setRecipientSearch] = useState('');
   const [genderFilter, setGenderFilter] = useState<'all' | 'Homme' | 'Femme'>('all');
   const [incompleteOnly, setIncompleteOnly] = useState(false);
+  const [contactFilter, setContactFilter] = useState<ContactFilter>('all');
   const [searchResults, setSearchResults] = useState<SearchMember[]>([]);
   const [searchLoading, setSearchLoading] = useState(false);
   const [history, setHistory] = useState<NoticeRow[]>([]);
@@ -63,7 +65,7 @@ export function AdminMessageComposer({ active = true }: { active?: boolean }) {
         const response = await fetch('/api/moderation/members', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${data.session?.access_token ?? ''}` },
-          body: JSON.stringify({ query: recipientSearch.trim(), gender: genderFilter, incompleteOnly }),
+          body: JSON.stringify({ query: recipientSearch.trim(), gender: genderFilter, incompleteOnly, contactMethod: incompleteOnly ? contactFilter : 'all' }),
         }).catch(() => null);
         const result = response?.ok ? await response.json().catch(() => null) as { members?: SearchMember[] } | null : null;
         if (!cancelled) {
@@ -73,7 +75,7 @@ export function AdminMessageComposer({ active = true }: { active?: boolean }) {
       })();
     }, recipientSearch.trim() ? 250 : 0);
     return () => { cancelled = true; window.clearTimeout(timer); };
-  }, [recipientSearch, genderFilter, incompleteOnly, target]);
+  }, [recipientSearch, genderFilter, incompleteOnly, contactFilter, target]);
 
   const allResultsSelected = searchResults.length > 0 && searchResults.every((member) => recipientIds.includes(member.id));
   const incompleteSelectionCount = selectedRecipients.filter(isIncomplete).length;
@@ -124,26 +126,28 @@ export function AdminMessageComposer({ active = true }: { active?: boolean }) {
       }),
     }).catch(() => null);
     setBusy(false);
-    const result = await response?.json().catch(() => null) as { error?: string; appCount?: number; externalSent?: number; externalFailed?: number; externalSkipped?: number; deliveryIssueCounts?: Record<string, number> } | null;
+    const result = await response?.json().catch(() => null) as { error?: string; appCount?: number; externalSent?: number; externalEmailSent?: number; externalSmsSent?: number; externalFailed?: number; externalSkipped?: number; deliveryIssueCounts?: Record<string, number> } | null;
     if (!response?.ok || !result) { setError(result?.error || 'L’envoi du message a échoué.'); return; }
     const issues = Object.entries(result.deliveryIssueCounts ?? {}).map(([reason, count]) => `${count} · ${deliveryIssueLabels[reason] || reason}`);
-    setNotice(`Envoyé : ${result.appCount ?? 0} notification(s) dans l’application, ${result.externalSent ?? 0} e-mail/SMS aux comptes en onboarding${result.externalFailed ? `, ${result.externalFailed} échec(s)` : ''}${result.externalSkipped ? `, ${result.externalSkipped} contact(s) indisponible(s)` : ''}.${issues.length ? ` Détails : ${issues.join(' ')}` : ''}`);
-    setTitle(''); setBody(''); setTarget('all'); clearSelection(); setRecipientSearch(''); setGenderFilter('all'); setIncompleteOnly(false); void loadHistory();
+    setNotice(`Envoyé : ${result.appCount ?? 0} notification(s) dans l’application, ${result.externalEmailSent ?? 0} e-mail(s) et ${result.externalSmsSent ?? 0} SMS aux comptes en onboarding${result.externalFailed ? `, ${result.externalFailed} échec(s)` : ''}${result.externalSkipped ? `, ${result.externalSkipped} contact(s) indisponible(s)` : ''}.${issues.length ? ` Détails : ${issues.join(' ')}` : ''}`);
+    setTitle(''); setBody(''); setTarget('all'); clearSelection(); setRecipientSearch(''); setGenderFilter('all'); setIncompleteOnly(false); setContactFilter('all'); void loadHistory();
   }
 
   return <div className="mb-6 space-y-4 rounded-[24px] bg-white p-5 shadow-[0_8px_30px_rgba(38,31,48,.045)] sm:p-6">
     <div className="flex items-center justify-between gap-3"><div className="flex min-w-0 items-center gap-3"><span className="shrink-0 rounded-xl bg-[#fce8ef] p-3 text-[#ec3b78]"><BellRing size={19}/></span><div className="min-w-0"><h2 className="font-display text-lg sm:text-xl">Envoyer une notification ARAS</h2><p className="text-xs text-gray-500">Application pour les profils finalisés, e-mail/SMS pour les comptes en onboarding.</p></div></div><button type="button" onClick={() => void loadHistory()} aria-label="Actualiser l’historique" className="shrink-0 rounded-full border p-2"><RefreshCw size={15}/></button></div>
     <form onSubmit={submit} className="grid min-w-0 gap-3 sm:grid-cols-2">
-      <select aria-label="Destinataires" className="min-w-0 rounded-xl border border-gray-200 bg-[#f8f9fc] px-3 py-2.5 text-sm sm:col-span-2" value={target} onChange={(event) => { setTarget(event.target.value as Target); clearSelection(); setError(''); }}><option value="all">Tous les membres</option><option value="incomplete">Tous les comptes à finaliser</option><option value="member">Sélectionner des profils</option></select>
+      <select aria-label="Destinataires" className="min-w-0 rounded-xl border border-gray-200 bg-[#f8f9fc] px-3 py-2.5 text-sm sm:col-span-2" value={target} onChange={(event) => { setTarget(event.target.value as Target); clearSelection(); setError(''); }}><option value="all">Tous les membres (notification dans l’application)</option><option value="incomplete_email">Comptes à finaliser · adresse e-mail</option><option value="incomplete_phone">Comptes à finaliser · numéro de téléphone (SMS)</option><option value="member">Sélectionner des profils</option></select>
+      {(target === 'incomplete_email' || target === 'incomplete_phone') && <p className="rounded-xl border border-sky-100 bg-sky-50 p-3 text-sm text-sky-900 sm:col-span-2">{target === 'incomplete_email' ? 'Seuls les comptes incomplets connectés par adresse e-mail seront contactés par e-mail.' : 'Seuls les comptes incomplets connectés par numéro de téléphone seront contactés par SMS.'}</p>}
       {target === 'member' && <div className="min-w-0 space-y-3 sm:col-span-2">
         <div className="grid min-w-0 gap-3 sm:grid-cols-2">
           <label className="block min-w-0 text-sm font-bold">Genre<select className="mt-1.5 block w-full min-w-0 rounded-xl border border-gray-200 bg-[#f8f9fc] px-3 py-2.5 font-normal" value={genderFilter} onChange={(event) => setGenderFilter(event.target.value as typeof genderFilter)}><option value="all">Tous les genres</option><option value="Homme">Hommes</option><option value="Femme">Femmes</option></select></label>
           <label className="flex min-w-0 cursor-pointer items-center gap-3 rounded-xl border border-gray-200 bg-[#f8f9fc] p-3 text-sm"><input type="checkbox" checked={incompleteOnly} onChange={(event) => setIncompleteOnly(event.target.checked)} className="h-4 w-4 shrink-0 accent-[#ec3b78]"/><span className="font-bold">Comptes à finaliser seulement</span></label>
+          {incompleteOnly && <label className="block min-w-0 text-sm font-bold sm:col-span-2">Canal de connexion<select className="mt-1.5 block w-full min-w-0 rounded-xl border border-gray-200 bg-[#f8f9fc] px-3 py-2.5 font-normal" value={contactFilter} onChange={(event) => setContactFilter(event.target.value as ContactFilter)}><option value="all">E-mail et téléphone</option><option value="email">Adresse e-mail seulement</option><option value="phone">Numéro de téléphone seulement</option></select></label>}
         </div>
         <label className="relative block min-w-0"><span className="mb-1.5 block text-sm font-bold">Nom, e-mail ou téléphone</span><Search size={17} className="absolute left-3 top-[2.6rem] -translate-y-1/2 text-gray-400"/><input className="w-full min-w-0 rounded-xl border border-gray-200 bg-[#f8f9fc] py-2.5 pl-10 pr-3 text-sm" value={recipientSearch} onChange={(event) => setRecipientSearch(event.target.value)} placeholder="Rechercher un membre…" /></label>
         {selectedRecipients.length > 0 && <div className="rounded-2xl border border-[#f2c5d5] bg-[#fffafd] p-3"><div className="mb-2 flex flex-wrap items-center justify-between gap-2"><p className="text-sm font-extrabold text-[#292832]">Sélection · {selectedRecipients.length} profil(s)</p><button type="button" onClick={clearSelection} className="text-xs font-extrabold text-[#c92e63]">Tout désélectionner</button></div><div className="flex flex-wrap gap-2">{selectedRecipients.map((member) => <span key={member.id} className="inline-flex max-w-full items-center gap-2 rounded-full bg-white px-3 py-1.5 text-xs font-bold text-[#3b3540] ring-1 ring-[#eadfe5]"><span className="truncate">{member.full_name || 'Membre ARAS'}</span><button type="button" onClick={() => toggleMember(member)} aria-label={`Retirer ${member.full_name || 'ce profil'}`} className="shrink-0 text-[#8d817b]"><X size={14}/></button></span>)}</div></div>}
         <div className="min-w-0 pt-1"><div className="mb-2 flex flex-wrap items-center justify-between gap-2"><p className="text-sm font-bold">Profils correspondants</p>{searchResults.length > 0 && <button type="button" onClick={toggleSearchResults} className="text-xs font-extrabold text-[#c92e63]">{allResultsSelected ? 'Désélectionner ces résultats' : `Sélectionner ces ${searchResults.length} résultats`}</button>}</div>{searchLoading ? <p className="rounded-xl bg-[#f8f9fc] p-4 text-sm text-[#756960]">Recherche des profils…</p> : searchResults.length === 0 ? <p className="rounded-xl bg-[#f8f9fc] p-4 text-sm text-[#756960]">Aucun membre trouvé avec ces critères.</p> : <div className="grid max-h-[340px] min-w-0 gap-2 overflow-y-auto overscroll-contain sm:grid-cols-2">{searchResults.map((member) => <MemberCard key={member.id} member={member} selected={recipientIds.includes(member.id)} onClick={() => toggleMember(member)}/>)}</div>}</div>
-        {recipientIds.length > 0 && <p className="text-xs font-semibold text-[#1a6b68]">{recipientIds.length} profil(s) sélectionné(s) · {incompleteSelectionCount} compte(s) en onboarding seront contactés par e-mail/SMS.</p>}
+        {recipientIds.length > 0 && <p className="text-xs font-semibold text-[#1a6b68]">{recipientIds.length} profil(s) sélectionné(s) · {incompleteSelectionCount} compte(s) en onboarding seront contactés sur leur canal de connexion (e-mail ou SMS).</p>}
       </div>}
       <input className="min-w-0 rounded-xl border border-gray-200 bg-[#f8f9fc] px-3 py-2.5 text-sm sm:col-span-2" maxLength={120} value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Titre de notification (facultatif)"/>
       <textarea required className="min-w-0 rounded-xl border border-gray-200 bg-[#f8f9fc] px-3 py-2.5 text-sm sm:col-span-2" rows={3} maxLength={2000} value={body} onChange={(event) => setBody(event.target.value)} placeholder="Écris le message pour les membres…"/>
@@ -164,6 +168,6 @@ function MemberCard({ member, selected, onClick }: { member: SearchMember; selec
   const incomplete = isIncomplete(member);
   return <button type="button" onClick={onClick} aria-pressed={selected} className={`flex min-w-0 items-center gap-3 rounded-2xl border p-3 text-left transition ${selected ? 'border-[#ec3b78] bg-[#fff1f6] ring-2 ring-[#ec3b78]/15' : 'border-[#e7e8ee] bg-white hover:border-[#f3a5c2] hover:bg-[#fffafd]'}`}>
     <span className="h-14 w-14 shrink-0 overflow-hidden rounded-xl bg-[#f8f9fd]">{photo ? <img src={photo} alt="" className="h-full w-full object-cover"/> : <span className="flex h-full w-full items-center justify-center text-lg font-extrabold text-[#ec3b78]">{member.full_name?.charAt(0).toUpperCase() || 'M'}</span>}</span>
-    <span className="min-w-0 flex-1"><span className="block truncate text-sm font-extrabold text-[#292832]">{member.full_name || 'Membre ARAS'}{age !== null ? `, ${age} ans` : ''}</span><span className="mt-1 block truncate text-xs text-[#756960]">{member.profession || 'Profession non renseignée'}</span><span className="mt-1 flex items-center gap-1 truncate text-xs text-[#8d8e99]">{member.city ? <><MapPin size={12} className="shrink-0"/>{member.city}</> : member.gender || 'Membre'}</span>{incomplete && <span className="mt-1 inline-flex rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-700">Compte à finaliser</span>}</span>{selected && <Check size={17} className="shrink-0 text-[#ec3b78]"/>}
+    <span className="min-w-0 flex-1"><span className="block truncate text-sm font-extrabold text-[#292832]">{member.full_name || 'Membre ARAS'}{age !== null ? `, ${age} ans` : ''}</span>{incomplete ? <span className="mt-1 flex min-w-0 items-center gap-1 truncate text-xs text-[#756960]">{member.authContactMethod === 'phone' ? <Phone size={12} className="shrink-0"/> : <Mail size={12} className="shrink-0"/>}<span className="truncate">{member.authContact || 'Contact de connexion non renseigné'}</span></span> : <span className="mt-1 block truncate text-xs text-[#756960]">{member.profession || 'Profession non renseignée'}</span>}<span className="mt-1 flex items-center gap-1 truncate text-xs text-[#8d8e99]">{member.city ? <><MapPin size={12} className="shrink-0"/>{member.city}</> : member.gender || 'Membre'}</span>{incomplete && <span className="mt-1 inline-flex rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-700">Compte à finaliser · {member.authContactMethod === 'phone' ? 'SMS' : member.authContactMethod === 'email' ? 'e-mail' : 'canal inconnu'}</span>}</span>{selected && <Check size={17} className="shrink-0 text-[#ec3b78]"/>}
   </button>;
 }

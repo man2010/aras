@@ -6,7 +6,7 @@ import { getSupabaseAdmin } from '@/lib/supabase-admin';
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? process.env.SUPABASE_URL ?? '';
 const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? process.env.SUPABASE_ANON_KEY ?? '';
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-type Target = 'all' | 'incomplete' | 'member';
+type Target = 'all' | 'incomplete_email' | 'incomplete_phone' | 'member';
 let gmailTransporter: ReturnType<typeof nodemailer.createTransport> | null = null;
 
 function isIncomplete(profile: { onboarding_completed: boolean | null; profile_status: string | null }) {
@@ -15,10 +15,8 @@ function isIncomplete(profile: { onboarding_completed: boolean | null; profile_s
 
 type ExternalDelivery = { status: 'sent' | 'failed' | 'skipped'; channel: 'email' | 'sms'; reason?: string };
 
-async function sendExternalMessage(user: { email?: string; phone?: string; app_metadata?: Record<string, unknown>; user_metadata?: Record<string, unknown> }, subject: string, body: string): Promise<ExternalDelivery> {
-  const provider = String(user.app_metadata?.provider ?? '').toLowerCase();
-  const method = user.user_metadata?.auth_method;
-  const usesPhone = method === 'phone' || provider === 'phone' || (!user.email && Boolean(user.phone));
+async function sendExternalMessage(user: { email?: string; phone?: string; app_metadata?: Record<string, unknown>; user_metadata?: Record<string, unknown>; identities?: { provider?: string }[] }, subject: string, body: string): Promise<ExternalDelivery> {
+  const usesPhone = usesPhoneLogin(user);
 
   if (usesPhone) {
     if (!user.phone) return { status: 'skipped', channel: 'sms', reason: 'phone_unavailable' };
@@ -91,6 +89,11 @@ async function sendExternalMessage(user: { email?: string; phone?: string; app_m
   return { status: 'failed', channel: 'email', reason: 'email_provider_unconfigured' };
 }
 
+function usesPhoneLogin(user: { email?: string; phone?: string; app_metadata?: Record<string, unknown>; user_metadata?: Record<string, unknown>; identities?: { provider?: string }[] }) {
+  const provider = String(user.app_metadata?.provider ?? user.identities?.[0]?.provider ?? '').toLowerCase();
+  return user.user_metadata?.auth_method === 'phone' || provider === 'phone' || (!user.email && Boolean(user.phone));
+}
+
 export async function POST(request: Request) {
   const accessToken = request.headers.get('authorization')?.replace(/^Bearer\s+/i, '').trim();
   if (!accessToken || !supabaseUrl || !anonKey) return NextResponse.json({ error: 'Session requise.' }, { status: 401 });
@@ -111,7 +114,7 @@ export async function POST(request: Request) {
   const recipientIds = Array.isArray(payload.recipientIds)
     ? Array.from(new Set(payload.recipientIds.filter((id): id is string => typeof id === 'string' && uuidPattern.test(id))))
     : [];
-  if (!title || title.length > 120 || !body || body.length > 2000 || !['all', 'incomplete', 'member'].includes(target)) {
+  if (!title || title.length > 120 || !body || body.length > 2000 || !['all', 'incomplete_email', 'incomplete_phone', 'member'].includes(target)) {
     return NextResponse.json({ error: 'Le titre, le message ou le destinataire est invalide.' }, { status: 400 });
   }
   if ((target === 'member' && (recipientIds.length === 0 || recipientIds.length > 500)) || (target !== 'member' && recipientIds.length > 0)) {
@@ -124,7 +127,7 @@ export async function POST(request: Request) {
     p_title: title,
     p_body: body,
     p_recipient_ids: recipientIds,
-    p_target_incomplete_only: target === 'incomplete',
+    p_target_incomplete_only: target === 'incomplete_email' || target === 'incomplete_phone',
     p_target_gender: null,
     p_send_to_all: target === 'all',
   });
@@ -133,7 +136,7 @@ export async function POST(request: Request) {
   if (!announcement?.announcement_id) return NextResponse.json({ error: 'Le message n’a pas pu être enregistré.' }, { status: 500 });
 
   let incompleteQuery = admin.from('profiles').select('id,onboarding_completed,profile_status').eq('is_active', true).eq('is_temporarily_deactivated', false);
-  if (target !== 'member') incompleteQuery = incompleteQuery.or('onboarding_completed.eq.false,onboarding_completed.is.null,profile_status.neq.completed,profile_status.is.null');
+  if (target === 'incomplete_email' || target === 'incomplete_phone') incompleteQuery = incompleteQuery.or('onboarding_completed.eq.false,onboarding_completed.is.null,profile_status.neq.completed,profile_status.is.null');
   if (target === 'member') incompleteQuery = incompleteQuery.in('id', recipientIds);
   const incompleteProfiles: Array<{ id: string; onboarding_completed: boolean | null; profile_status: string | null }> = [];
   for (let offset = 0; ; offset += 500) {
@@ -148,6 +151,8 @@ export async function POST(request: Request) {
   const staffIds = new Set((staffRows ?? []).map((entry) => entry.user_id as string));
   const recipientIdsToContact = incompleteProfiles.map((profile) => profile.id).filter((id) => !staffIds.has(id));
   let externalSent = 0;
+  let externalEmailSent = 0;
+  let externalSmsSent = 0;
   let externalFailed = 0;
   let externalSkipped = 0;
   const deliveryIssueCounts: Record<string, number> = {};
@@ -156,10 +161,15 @@ export async function POST(request: Request) {
     const results = await Promise.all(batch.map(async (id) => {
       const { data, error } = await admin.auth.admin.getUserById(id);
       if (error || !data.user) return { status: 'skipped', channel: 'email', reason: 'auth_user_unavailable' } satisfies ExternalDelivery;
+      if (target === 'incomplete_email' && usesPhoneLogin(data.user)) return null;
+      if (target === 'incomplete_phone' && !usesPhoneLogin(data.user)) return null;
       return sendExternalMessage(data.user, title, body);
     }));
     for (const result of results) {
+      if (!result) continue;
       if (result.status === 'sent') externalSent += 1;
+      if (result.status === 'sent' && result.channel === 'email') externalEmailSent += 1;
+      if (result.status === 'sent' && result.channel === 'sms') externalSmsSent += 1;
       else if (result.status === 'skipped') externalSkipped += 1;
       else externalFailed += 1;
       if (result.reason) deliveryIssueCounts[result.reason] = (deliveryIssueCounts[result.reason] ?? 0) + 1;
@@ -169,5 +179,5 @@ export async function POST(request: Request) {
   const deliveredCount = Number(announcement.recipient_count ?? 0) + externalSent;
   const { error: updateError } = await admin.from('moderator_announcements').update({ recipient_count: deliveredCount }).eq('id', announcement.announcement_id);
   if (updateError) console.error('[admin-announcements] Could not update delivery count:', updateError);
-  return NextResponse.json({ appCount: announcement.recipient_count ?? 0, externalSent, externalFailed, externalSkipped, deliveryIssueCounts });
+  return NextResponse.json({ appCount: announcement.recipient_count ?? 0, externalSent, externalEmailSent, externalSmsSent, externalFailed, externalSkipped, deliveryIssueCounts });
 }
