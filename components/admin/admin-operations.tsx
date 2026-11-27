@@ -8,7 +8,7 @@ import { Bot, Crown, CreditCard, Shield, Save, Search, RefreshCw, UserRound, Map
 type Plan = { code: string; name: string; price_fcfa: number; billing_period: string; is_active: boolean };
 type Subscription = { id: string; user_id: string; plan_code: string; status: string; starts_at: string | null; ends_at: string | null; payment_provider: string | null; provider_reference: string | null; created_at: string };
 type GoldenRequest = { id: string; name: string; gender: string; birthdate: string; location: string; marital_status: string; religion: string | null; age_range: string | null; preferred_location: string | null; expectations: string | null; contact: string; preferred_contact: string; status: string; private_notes: string | null; suggested_match_id: string | null; proposed_event_id: string | null; created_at: string };
-type GoldenProfile = { id: string; display_name: string | null; gender: string | null; birthdate: string | null; age?: number | null; city: string | null; zone?: string | null; profession?: string | null; bio?: string | null; interests?: string[] | null; avatar_urls?: string[] | null; photo_url?: string | null; is_active?: boolean | null; is_verified?: boolean | null; is_premium?: boolean | null; profile_status?: string | null; onboarding_completed?: boolean | null };
+type GoldenProfile = { id: string; display_name: string | null; full_name?: string | null; gender: string | null; birthdate: string | null; age?: number | null; city: string | null; zone?: string | null; profession?: string | null; bio?: string | null; interests?: string[] | null; avatar_urls?: string[] | null; photo_url?: string | null; is_active?: boolean | null; is_verified?: boolean | null; is_premium?: boolean | null; profile_status?: string | null; onboarding_completed?: boolean | null };
 type GoldenEvent = { id: string; title: string; date: string; description?: string | null; image_url?: string | null; location?: string | null; city?: string | null; total_places?: number | null; remaining_places?: number | null; price?: number | null; is_active?: boolean | null };
 type StaffMember = { user_id: string; role: 'admin' | 'moderator'; email: string | null; phone: string | null; last_sign_in_at: string | null; created_at: string; mfa_enabled: boolean; invited_at: string | null; email_confirmed_at: string | null };
 type TeamAction = { id: number; actor_id: string | null; actor_contact: string; target_user_id: string | null; target_contact: string; action: 'invited' | 'role_assigned' | 'role_changed' | 'access_removed'; old_role: string | null; new_role: string | null; created_at: string };
@@ -60,14 +60,26 @@ export function AdminOperations({ tab, active = true }: { tab: Extract<AdminTab,
   }, []);
 
   const loadGolden = useCallback(async () => {
-    const [{ data, error: queryError }, { data: profileRows }, { data: eventRows }] = await Promise.all([
+    const [{ data, error: queryError }, { data: eventRows, error: eventsError }] = await Promise.all([
       supabase.from('golden_requests').select('*').order('created_at', { ascending: false }),
-      supabase.from('profiles').select('id,display_name,gender,birthdate,age,city,zone,profession,bio,interests,avatar_urls,photo_url,is_active,is_verified,is_premium,profile_status,onboarding_completed').order('display_name').limit(1000),
       supabase.from('events').select('id,title,date,description,image_url,location,city,total_places,remaining_places,price,is_active').eq('is_active', true).gte('date', new Date().toISOString()).order('date').limit(100),
     ]);
+    const profileRows: GoldenProfile[] = [];
+    let profileOffset = 0;
+    let profilesError: string | null = null;
+    while (!profilesError) {
+      const result = await supabase.from('profiles').select('*').order('full_name').range(profileOffset, profileOffset + 499);
+      if (result.error) { profilesError = result.error.message; break; }
+      const page = (result.data ?? []).map((row) => ({ ...row, display_name: row.full_name ?? row.display_name ?? null, photo_url: row.avatar_urls?.[0] ?? row.photo_url ?? null })) as GoldenProfile[];
+      profileRows.push(...page);
+      if (page.length < 500) break;
+      profileOffset += 500;
+    }
     if (queryError) setError(`Demandes Golden indisponibles : ${queryError.message}. Applique la migration admin la plus récente.`);
     else setGoldenRequests((data ?? []) as GoldenRequest[]);
-    setGoldenProfiles(profileRows ?? []);
+    if (profilesError) setError(`Profils indisponibles pour la proposition Golden : ${profilesError}`);
+    else setGoldenProfiles(profileRows);
+    if (eventsError) setError(`Événements indisponibles : ${eventsError.message}`);
     setGoldenEvents(eventRows ?? []);
     if (!queryError) setLoadedSections((current) => ({ ...current, golden: true }));
   }, []);
@@ -259,7 +271,15 @@ function GoldenDetail({ value, profiles, events, onChange, onSave, busy, onClose
   const [profileSearch, setProfileSearch] = useState('');
   const [profileToView, setProfileToView] = useState<GoldenProfile | null>(null);
   const desiredGender = value.gender === 'Femme' ? 'Homme' : value.gender === 'Homme' ? 'Femme' : null;
-  const candidates = profiles.filter((profile) => profile.is_active !== false && (!desiredGender || profile.gender === desiredGender) && `${profile.display_name ?? ''} ${profile.city ?? ''} ${profile.profession ?? ''}`.toLowerCase().includes(profileSearch.toLowerCase()));
+  const normalizeSearch = (text: string) => text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLocaleLowerCase('fr');
+  const normalizeGender = (gender: string | null | undefined) => {
+    const normalized = normalizeSearch(gender ?? '');
+    if (['homme', 'male', 'man', 'masculin'].includes(normalized)) return 'Homme';
+    if (['femme', 'female', 'woman', 'feminin', 'féminin'].includes(normalized)) return 'Femme';
+    return null;
+  };
+  const query = normalizeSearch(profileSearch);
+  const candidates = profiles.filter((profile) => (!desiredGender || normalizeGender(profile.gender) === desiredGender) && normalizeSearch(`${profile.display_name ?? ''} ${profile.city ?? ''} ${profile.profession ?? ''}`).includes(query));
   const selectedProfile = profiles.find((profile) => profile.id === value.suggested_match_id);
   const selectedEvent = events.find((event) => event.id === value.proposed_event_id);
   const ageFor = (profile: GoldenProfile) => profile.birthdate ? Math.max(0, Math.floor((Date.now() - new Date(profile.birthdate).getTime()) / 31557600000)) : profile.age ?? null;
