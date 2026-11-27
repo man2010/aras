@@ -21,6 +21,15 @@ function parseClient(userAgent: string) {
   return { browser, operatingSystem, device };
 }
 
+function requestIp(request: Request) {
+  const forwardedFor = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim();
+  const ip = request.headers.get('cf-connecting-ip')
+    || request.headers.get('x-nf-client-connection-ip')
+    || request.headers.get('x-vercel-forwarded-for')?.split(',')[0]?.trim()
+    || forwardedFor;
+  return ip && ip.length <= 64 ? ip : null;
+}
+
 export async function POST(request: Request) {
   const accessToken = request.headers.get('authorization')?.replace(/^Bearer\s+/i, '').trim();
   if (!accessToken || !supabaseUrl || !anonKey) return NextResponse.json({ error: 'Session requise.' }, { status: 401 });
@@ -38,6 +47,9 @@ export async function POST(request: Request) {
   const admin = createClient(supabaseUrl, process.env.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
   const { error: insertError } = await admin.from('admin_activity_logs').insert({
     user_id: user.id,
+    actor_email: user.email ?? null,
+    actor_phone: user.phone ?? null,
+    ip_address: requestIp(request),
     kind: 'login',
     country,
     region,

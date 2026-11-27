@@ -12,6 +12,7 @@ type GoldenProfile = { id: string; display_name: string | null; full_name?: stri
 type GoldenEvent = { id: string; title: string; date: string; description?: string | null; image_url?: string | null; location?: string | null; city?: string | null; total_places?: number | null; remaining_places?: number | null; price?: number | null; is_active?: boolean | null };
 type StaffMember = { user_id: string; role: 'admin' | 'moderator'; email: string | null; phone: string | null; last_sign_in_at: string | null; created_at: string; mfa_enabled: boolean; invited_at: string | null; email_confirmed_at: string | null };
 type TeamAction = { id: number; actor_id: string | null; actor_contact: string; target_user_id: string | null; target_contact: string; action: 'invited' | 'role_assigned' | 'role_changed' | 'access_removed'; old_role: string | null; new_role: string | null; created_at: string };
+type ApplicationAudit = { id: string; actor_id: string | null; actor_email: string | null; actor_phone: string | null; action: 'login' | 'create' | 'update' | 'delete'; table_name: string; record_id: string | null; changed_fields: string[]; old_data: Record<string, unknown> | null; new_data: Record<string, unknown> | null; created_at: string };
 
 const card = 'rounded-[24px] bg-white p-5 shadow-[0_8px_30px_rgba(38,31,48,.045)]';
 const input = 'rounded-xl border border-[#e4e1eb] bg-[#f8f9fc] px-3 py-2.5 text-sm outline-none focus:border-[#ec3b78]';
@@ -30,6 +31,13 @@ export function AdminOperations({ tab, active = true }: { tab: Extract<AdminTab,
   const [teamActionsTotal, setTeamActionsTotal] = useState(0);
   const [teamActionsLoading, setTeamActionsLoading] = useState(false);
   const [selectedTeamAction, setSelectedTeamAction] = useState<TeamAction | null>(null);
+  const [applicationAudit, setApplicationAudit] = useState<ApplicationAudit[]>([]);
+  const [applicationAuditTotal, setApplicationAuditTotal] = useState(0);
+  const [applicationAuditPage, setApplicationAuditPage] = useState(1);
+  const [applicationAuditHasMore, setApplicationAuditHasMore] = useState(false);
+  const [applicationAuditLoading, setApplicationAuditLoading] = useState(false);
+  const [selectedApplicationAudit, setSelectedApplicationAudit] = useState<ApplicationAudit | null>(null);
+  const [applicationAuditFilter, setApplicationAuditFilter] = useState<'all' | ApplicationAudit['action']>('all');
   const [saraUsage30, setSaraUsage30] = useState(0);
   const [teamContact, setTeamContact] = useState('');
   const [teamRole, setTeamRole] = useState<'admin' | 'moderator'>('moderator');
@@ -83,6 +91,22 @@ export function AdminOperations({ tab, active = true }: { tab: Extract<AdminTab,
     setGoldenEvents(eventRows ?? []);
     if (!queryError) setLoadedSections((current) => ({ ...current, golden: true }));
   }, []);
+
+  const loadApplicationAudit = useCallback(async (page = 1) => {
+    setApplicationAuditLoading(true);
+    const offset = (page - 1) * 10;
+    let auditQuery = supabase.from('application_complete_audit_logs').select('*', { count: 'exact' });
+    if (applicationAuditFilter !== 'all') auditQuery = auditQuery.eq('action', applicationAuditFilter);
+    const { data, error: auditError, count } = await auditQuery.order('created_at', { ascending: false }).order('id', { ascending: false }).range(offset, offset + 9);
+    setApplicationAuditLoading(false);
+    if (auditError) { setError(`Journal complet indisponible : ${auditError.message}. Applique la migration application_audit_log.`); return; }
+    const rows = (data ?? []) as ApplicationAudit[];
+    setApplicationAudit(rows);
+    setApplicationAuditPage(page);
+    setApplicationAuditTotal(count ?? 0);
+    setApplicationAuditHasMore(offset + rows.length < (count ?? 0));
+    setSelectedApplicationAudit((current) => rows.find((row) => row.id === current?.id) ?? rows[0] ?? null);
+  }, [applicationAuditFilter]);
 
   const loadTeam = useCallback(async () => {
     const { data: sessionData } = await supabase.auth.getSession();
@@ -140,6 +164,10 @@ export function AdminOperations({ tab, active = true }: { tab: Extract<AdminTab,
     if (tab === 'team') void loadTeam();
     if (tab === 'sara') void loadSara();
   }, [active, tab, loadPayments, loadGolden, loadTeam, loadSara]);
+
+  useEffect(() => {
+    if (active && tab === 'team') void loadApplicationAudit(1);
+  }, [active, tab, loadApplicationAudit]);
 
   useEffect(() => {
     if (!active || tab !== 'sara') return;
@@ -221,11 +249,22 @@ export function AdminOperations({ tab, active = true }: { tab: Extract<AdminTab,
         ['Vue d’ensemble', 'Complet', '—'], ['Modération', 'Complet', 'Complet'], ['Utilisateurs', 'Complet', '—'], ['Paiements et abonnements', 'Complet', '—'], ['Membres Golden', 'Complet', '—'], ['Événements', 'Complet', '—'], ['Messages ARAS', 'Complet', 'Envoi et suivi'], ['SARA Coach IA', 'Complet', '—'], ['Équipe et accès', 'Complet', '—'], ['Paramètres', 'Complet', '—'],
       ].map(([section, adminRight, moderatorRight]) => <tr key={section} className="border-b border-[#f2f0f4] last:border-0"><td className="p-3 font-semibold">{section}</td><td className="p-3 text-gray-700">{adminRight}</td><td className="p-3 text-gray-700">{moderatorRight}</td></tr>)}</tbody></table></div><p className="mt-3 text-xs text-gray-500">Les droits du modérateur s’appliquent à son espace de modération dédié, pas à l’ouverture du tableau de bord administrateur.</p></section>
       <section className={card}>
-        <div className="mb-4 flex flex-wrap items-end justify-between gap-2"><div><h2 className="font-display text-xl">Journal des actions</h2><p className="mt-1 text-sm text-gray-600">Toutes les actions sont accessibles par pages. Sélectionne une ligne pour consulter ses détails.</p></div><span className="text-xs text-gray-500">{teamActions.length.toLocaleString('fr-FR')} affichée(s) sur {teamActionsTotal.toLocaleString('fr-FR')}</span></div>
+        <div className="mb-4 flex flex-wrap items-end justify-between gap-2"><div><h2 className="font-display text-xl">Journal des accès équipe</h2><p className="mt-1 text-sm text-gray-600">Invitations, changements de rôle et retraits d’accès.</p></div><span className="text-xs text-gray-500">{teamActions.length.toLocaleString('fr-FR')} affichée(s) sur {teamActionsTotal.toLocaleString('fr-FR')}</span></div>
         <div className="space-y-2">{teamActions.map((action) => <button key={action.id} type="button" onClick={() => setSelectedTeamAction(action)} className="block w-full rounded-xl bg-[#f8f9fc] p-4 text-left transition hover:bg-[#f2f3f8] focus:outline-none focus:ring-2 focus:ring-[#ec3b78]"><span className="block font-semibold">{teamActionLabel(action)}</span><span className="mt-1 block break-all text-sm text-gray-600">{action.actor_contact} · {new Date(action.created_at).toLocaleString('fr-FR')}</span></button>)}{loadedSections.team && !teamActions.length && <p className="rounded-xl bg-[#f8f9fc] py-8 text-center text-sm text-gray-500">Aucune action d’accès enregistrée pour le moment.</p>}</div>
         {teamActionsHasMore && <div className="mt-4 text-center"><button type="button" disabled={teamActionsLoading} onClick={() => void loadMoreTeamActions()} className="rounded-full border border-[#e4e1eb] px-5 py-2.5 text-sm font-bold text-[#554b54] disabled:opacity-50">{teamActionsLoading ? 'Chargement…' : `Charger les ${Math.min(50, teamActionsTotal - teamActions.length)} suivantes`}</button></div>}
       </section>
       {selectedTeamAction && <TeamActionDetail value={selectedTeamAction} onClose={() => setSelectedTeamAction(null)}/>}
+      <section className={card}>
+        <div className="mb-4 flex flex-wrap items-end justify-between gap-3"><div><h2 className="font-display text-xl">Journal complet de l’application</h2><p className="mt-1 max-w-3xl text-sm leading-6 text-gray-600">Connexions et opérations enregistrées. La localisation affichée est estimée à partir de l’adresse IP et des données fournies par l’hébergeur.</p></div><div className="flex flex-wrap items-center gap-2"><label className="text-xs font-bold text-[#625852]">Type d’action<select value={applicationAuditFilter} onChange={(event) => setApplicationAuditFilter(event.target.value as typeof applicationAuditFilter)} className="ml-2 rounded-xl border border-[#e4e1eb] bg-[#f8f9fc] px-3 py-2.5 text-sm font-normal text-[#241c18]"><option value="all">Toutes</option><option value="login">Connexions</option><option value="create">Créations</option><option value="update">Modifications</option><option value="delete">Suppressions</option></select></label><span className="text-xs text-gray-500">{applicationAuditTotal.toLocaleString('fr-FR')} action(s)</span></div></div>
+        <div className="grid min-w-0 items-start gap-4 lg:grid-cols-[minmax(0,.9fr)_minmax(0,1.1fr)]">
+          <section aria-label="Actions du journal" className="min-w-0 rounded-2xl border border-[#efedf2] p-3 sm:p-4">
+            <div className="mb-3 flex items-center justify-between gap-2"><h3 className="text-sm font-bold">Actions</h3><span className="text-xs text-gray-500">Page {applicationAuditPage} / {Math.max(1, Math.ceil(applicationAuditTotal / 10))}</span></div>
+            <div className="max-h-[650px] space-y-2 overflow-y-auto pr-1">{applicationAudit.map((entry) => <button key={entry.id} type="button" aria-pressed={selectedApplicationAudit?.id === entry.id} onClick={() => { setSelectedApplicationAudit(entry); if (window.matchMedia('(max-width: 1023px)').matches) window.setTimeout(() => document.getElementById('application-audit-details')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 0); }} className={`block w-full rounded-xl border p-3 text-left transition focus:outline-none focus:ring-2 focus:ring-[#ec3b78] ${selectedApplicationAudit?.id === entry.id ? 'border-[#ec3b78] bg-[#fff4f8]' : 'border-transparent bg-[#f8f9fc] hover:border-[#efedf2] hover:bg-[#f2f3f8]'}`}><span className="block font-semibold">{auditActionLabel(entry)} · {auditTableLabel(entry.table_name)}</span><span className="mt-1 block break-words text-xs text-gray-600">{auditActor(entry)}</span><span className="mt-1 block text-[11px] text-gray-500">{new Date(entry.created_at).toLocaleString('fr-FR')}</span></button>)}{loadedSections.team && !applicationAudit.length && !applicationAuditLoading && <p className="rounded-xl bg-[#f8f9fc] py-8 text-center text-sm text-gray-500">Aucune opération enregistrée. Applique la migration SQL du journal complet pour activer la collecte.</p>}{applicationAuditLoading && !applicationAudit.length && <p className="py-8 text-center text-sm text-gray-500">Chargement du journal…</p>}</div>
+            <div className="mt-3 flex items-center justify-between gap-2 border-t border-[#efedf2] pt-3"><button type="button" disabled={applicationAuditPage <= 1 || applicationAuditLoading} onClick={() => void loadApplicationAudit(applicationAuditPage - 1)} className="rounded-full border border-[#e4e1eb] px-4 py-2 text-xs font-bold disabled:opacity-40">Précédent</button><span className="text-xs text-gray-500">{applicationAudit.length} sur cette page</span><button type="button" disabled={!applicationAuditHasMore || applicationAuditLoading} onClick={() => void loadApplicationAudit(applicationAuditPage + 1)} className="rounded-full bg-[#ec3b78] px-4 py-2 text-xs font-bold text-white disabled:opacity-40">Suivant</button></div>
+          </section>
+          <div id="application-audit-details" className="min-w-0 scroll-mt-24">{selectedApplicationAudit ? <ApplicationAuditDetail value={selectedApplicationAudit}/> : <section className={`${card} py-16 text-center text-sm text-gray-500`}>Sélectionne une action pour voir ses détails ici.</section>}</div>
+        </div>
+      </section>
     </div>;
   }
 
@@ -240,6 +279,74 @@ function teamActionLabel(action: TeamAction) {
   if (action.action === 'role_changed') return `${action.actor_contact} a changé le rôle de ${action.target_contact} (${action.old_role === 'admin' ? 'administrateur' : 'modérateur'} → ${action.new_role === 'admin' ? 'administrateur' : 'modérateur'}).`;
   if (action.action === 'access_removed') return `${action.actor_contact} a retiré l’accès de ${action.target_contact} (${action.old_role === 'admin' ? 'administrateur' : 'modérateur'}).`;
   return `${action.actor_contact} a attribué le rôle ${action.new_role === 'admin' ? 'administrateur' : 'modérateur'} à ${action.target_contact}.`;
+}
+
+function auditActionLabel(action: ApplicationAudit) {
+  if (action.action === 'login') return 'Connexion';
+  if (action.action === 'create') return 'Création';
+  if (action.action === 'update') return 'Modification';
+  return 'Suppression';
+}
+
+function auditActor(action: ApplicationAudit) {
+  const contacts = [action.actor_email, action.actor_phone].filter(Boolean).join(' · ');
+  return contacts || (action.actor_id ? 'Compte ARAS · contact indisponible' : 'Système / tâche serveur');
+}
+
+const auditFieldLabels: Record<string, string> = {
+  id: 'Identifiant', display_name: 'Nom affiché', full_name: 'Nom complet', gender: 'Genre', birthdate: 'Date de naissance', age: 'Âge',
+  city: 'Ville', zone: 'Quartier / zone', profession: 'Profession', bio: 'À propos', interests: 'Centres d’intérêt', avatar_urls: 'Photos', photo_url: 'Photo',
+  is_active: 'Compte actif', is_verified: 'Profil vérifié', is_premium: 'Premium', onboarding_completed: 'Profil finalisé', profile_status: 'État du profil',
+  last_seen_at: 'Dernière activité', is_online: 'En ligne', created_at: 'Date de création', updated_at: 'Dernière modification', status: 'Statut',
+  priority: 'Priorité', category: 'Catégorie', subject: 'Sujet', name: 'Nom', contact: 'Coordonnée', title: 'Titre', description: 'Description',
+  date: 'Date', location: 'Lieu', price: 'Prix', plan_code: 'Formule', role: 'Rôle', user_id: 'Compte concerné',
+  swiper_id: 'Membre qui a agi', swiped_id: 'Profil ciblé', type: 'Type d’action sur le profil',
+  ip_address: 'Adresse IP de connexion', country: 'Pays estimé', region: 'Région estimée', browser: 'Navigateur',
+  operating_system: 'Système d’exploitation', device: 'Type d’appareil', page: 'Étape de connexion',
+};
+
+function auditFieldLabel(key: string) {
+  return auditFieldLabels[key] || key.replace(/_/g, ' ').replace(/^./, (letter) => letter.toUpperCase());
+}
+
+function auditValue(value: unknown): string {
+  if (value === null || value === undefined || value === '') return 'Non renseigné';
+  if (value === '[masqué]') return 'Masqué pour protéger les données privées';
+  if (typeof value === 'boolean') return value ? 'Oui' : 'Non';
+  if (Array.isArray(value)) return value.length ? value.map(auditValue).join(' · ') : 'Aucun';
+  if (typeof value === 'object') return 'Détail disponible dans le champ associé';
+  if (typeof value === 'string' && ['like', 'superlike', 'pass', 'dislike', 'nope'].includes(value.toLowerCase())) {
+    return ({ like: 'Like envoyé', superlike: 'Superlike envoyé', pass: 'Profil passé', dislike: 'Profil passé', nope: 'Profil passé' } as Record<string, string>)[value.toLowerCase()];
+  }
+  if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}T/.test(value)) {
+    const parsed = new Date(value);
+    if (!Number.isNaN(parsed.getTime())) return parsed.toLocaleString('fr-FR');
+  }
+  return String(value);
+}
+
+function auditTableLabel(table: string) {
+  const labels: Record<string, string> = { profiles: 'Profil membre', messages: 'Message', events: 'Événement', user_notifications: 'Notification', support_requests: 'Demande de support', golden_requests: 'Demande Golden', reports: 'Signalement', user_subscriptions: 'Abonnement', subscription_plans: 'Formule d’abonnement', moderator_announcements: 'Message ARAS', admin_roles: 'Accès équipe', swipes: 'Action sur un profil', Connexion: 'Connexion' };
+  return labels[table] || table.replace(/_/g, ' ');
+}
+
+function ApplicationAuditDetail({ value }: { value: ApplicationAudit }) {
+  const changes = value.action === 'login'
+    ? Object.entries(value.new_data ?? {}).map(([label, next]) => ({ label, previous: null, next }))
+    : (value.changed_fields ?? []).map((field) => ({ label: auditFieldLabel(field), previous: value.old_data?.[field], next: value.new_data?.[field] }));
+  const rows: [string, string][] = [
+    ['Action', auditActionLabel(value)], ['Élément concerné', auditTableLabel(value.table_name)],
+    ['E-mail de l’auteur', value.actor_email || 'Non disponible'], ['Téléphone de l’auteur', value.actor_phone || 'Non disponible'],
+    ['Date et heure', new Date(value.created_at).toLocaleString('fr-FR', { dateStyle: 'long', timeStyle: 'medium' })],
+  ];
+  return <section aria-labelledby="application-audit-title" className={`${card} min-w-0`}>
+      <div><p className="text-xs font-bold uppercase tracking-widest text-[#ec3b78]">Détails de l’action sélectionnée</p><h2 id="application-audit-title" className="mt-2 break-words font-display text-2xl">{auditActionLabel(value)} · {auditTableLabel(value.table_name)}</h2></div>
+      <dl className="mt-5 grid gap-3 sm:grid-cols-2">{rows.map(([label, detail]) => <div key={label} className="min-w-0 rounded-xl bg-[#f8f9fc] p-4"><dt className="text-[11px] font-bold uppercase tracking-wide text-gray-500">{label}</dt><dd className="mt-1 break-words text-sm font-medium">{detail}</dd></div>)}</dl>
+      <section className="mt-5"><h3 className="font-display text-xl">{value.action === 'login' ? 'Détails de la connexion' : 'Modifications effectuées'}</h3>{changes.length ? <div className="mt-3 space-y-2">{changes.map((change) => <div key={change.label} className="grid min-w-0 gap-2 rounded-2xl border border-[#efedf2] p-3 sm:grid-cols-[minmax(120px,.45fr)_1fr_1fr] sm:items-start"><p className="text-xs font-extrabold text-[#625852]">{change.label}</p>{value.action !== 'create' && <div className="min-w-0"><p className="text-[10px] font-bold uppercase tracking-wide text-[#9a8b82]">Avant</p><p className="mt-1 break-words text-sm text-[#625852]">{auditValue(change.previous)}</p></div>}<div className="min-w-0"><p className="text-[10px] font-bold uppercase tracking-wide text-[#1a6b68]">{value.action === 'delete' ? 'Valeur supprimée' : value.action === 'login' || value.action === 'create' ? 'Valeur' : 'Après'}</p><p className="mt-1 break-words text-sm font-semibold text-[#342a31]">{auditValue(value.action === 'delete' ? change.previous : change.next)}</p></div></div>)}</div> : <p className="mt-3 rounded-xl bg-[#f8f9fc] p-4 text-sm text-gray-600">Aucun détail de modification disponible.</p>}</section>
+      {value.actor_id && <p className="mt-4 break-all text-[11px] text-gray-400">Identifiant interne de l’auteur : {value.actor_id}</p>}
+      {value.record_id && value.action !== 'login' && <p className="mt-1 break-all text-[11px] text-gray-400">Référence interne : {value.record_id}</p>}
+      <p className="mt-3 text-xs leading-5 text-gray-500">La localisation est une estimation réseau (IP/hébergeur), pas la position GPS du téléphone. Les coordonnées et contenus privés masqués ne sont pas exposés.</p>
+    </section>;
 }
 
 function TeamActionDetail({ value, onClose }: { value: TeamAction; onClose: () => void }) {

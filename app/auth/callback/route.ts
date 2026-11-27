@@ -139,6 +139,9 @@ export async function GET(request: Request) {
     const operatingSystem = /Windows NT/.test(userAgent) ? 'Windows' : /Android/.test(userAgent) ? 'Android' : /iPhone|iPad|iPod/.test(userAgent) ? 'iOS' : /Mac OS X/.test(userAgent) ? 'macOS' : /Linux/.test(userAgent) ? 'Linux' : 'Système inconnu';
     await admin.from('admin_activity_logs').insert({
       user_id: user.id,
+      actor_email: user.email ?? null,
+      actor_phone: user.phone ?? null,
+      ip_address: request.headers.get('cf-connecting-ip') || request.headers.get('x-nf-client-connection-ip') || request.headers.get('x-vercel-forwarded-for')?.split(',')[0]?.trim() || request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || null,
       kind: 'login',
       country: request.headers.get('x-vercel-ip-country') || request.headers.get('cf-ipcountry') || request.headers.get('x-nf-geo-country-code'),
       region: request.headers.get('x-vercel-ip-country-region') || request.headers.get('x-nf-geo-region'),
