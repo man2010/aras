@@ -5,7 +5,7 @@ import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Menu, X, Heart, LogOut, LayoutDashboard, Bell, Moon, Sun, MessageCircle, CalendarDays, ChevronRight, Settings, User, SlidersHorizontal, MapPin, Megaphone } from 'lucide-react';
+import { Menu, X, Heart, LogOut, LayoutDashboard, Bell, Moon, Sun, MessageCircle, CalendarDays, ChevronRight, Settings, User, SlidersHorizontal, MapPin, Megaphone, Phone } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
@@ -625,6 +625,8 @@ export function Navbar({ isAdminMode = false, isModeratorMode = false }: { isAdm
 
 export function Footer() {
   const { user } = useAuth();
+  const supportPhone = process.env.NEXT_PUBLIC_SUPPORT_PHONE?.trim();
+  const supportTel = supportPhone?.replace(/[^\d+]/g, '');
 
   if (user) return null;
 
@@ -643,6 +645,7 @@ export function Footer() {
             <div className="mt-5 flex flex-col gap-3 text-sm text-white/60">
               <Link href="/decouverte" className="hover:text-white">Découverte</Link>
               <Link href="/evenements" className="hover:text-white">Événements</Link>
+              <Link href="/golden" className="hover:text-white">Rencontre discrète</Link>
               <Link href="/#how-it-works" className="hover:text-white">Comment ça marche</Link>
               <Link href="/tarifs" className="hover:text-white">Tarifs</Link>
               <Link href="/faq" className="hover:text-white">Questions fréquentes</Link>
@@ -661,6 +664,7 @@ export function Footer() {
             <p className="mt-5 text-sm leading-6 text-white/60">Notre équipe est là pour vous accompagner avec attention.</p>
             <Link href="/contact" className="mt-4 inline-block text-sm font-bold text-white hover:text-[#f4c27a]">Nous contacter</Link>
             <a href="mailto:contact@aras.sn" className="mt-2 block text-sm font-bold text-white hover:text-[#f4c27a]">contact@aras.sn</a>
+            {supportPhone && supportTel && <a href={`tel:${supportTel}`} className="mt-2 inline-flex items-center gap-2 text-sm font-bold text-white hover:text-[#f4c27a]"><Phone size={15}/>{supportPhone}</a>}
           </div>
         </div>
         <div className="flex flex-col justify-between gap-4 border-t border-white/10 pt-6 text-[11px] text-white/35 sm:flex-row sm:items-center">

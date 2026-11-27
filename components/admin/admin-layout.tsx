@@ -15,7 +15,7 @@ export function AdminLayout({ children, tab, onTabChange }: AdminLayoutProps) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const tabs: { id: AdminTab; label: string; icon: typeof TrendingUp }[] = [
     { id: 'dashboard', label: 'Vue d’ensemble', icon: LayoutDashboard },
-    { id: 'users', label: 'Utilisateurs', icon: Users },
+    { id: 'users', label: 'Membres', icon: Users },
     { id: 'reports', label: 'Modération', icon: AlertTriangle },
     { id: 'fake-profiles', label: 'Faux profils', icon: ShieldAlert },
     { id: 'payments', label: 'Paiements & abonnements', icon: CreditCard },
