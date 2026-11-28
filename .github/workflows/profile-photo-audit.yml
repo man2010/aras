@@ -8,18 +8,11 @@ on:
 jobs:
   audit:
     runs-on: ubuntu-latest
+    timeout-minutes: 360
     steps:
-      - name: Trigger the daily photo audit
+      - uses: actions/checkout@v4
+      - name: Scan profile photos with Google Vision
         env:
-          APPLICATION_URL: ${{ vars.APPLICATION_URL }}
-          PROFILE_AUDIT_CRON_SECRET: ${{ secrets.PROFILE_AUDIT_CRON_SECRET }}
-        run: |
-          if [ -z "$APPLICATION_URL" ] || [ -z "$PROFILE_AUDIT_CRON_SECRET" ]; then
-            echo "Configure the APPLICATION_URL variable and PROFILE_AUDIT_CRON_SECRET repository secret."
-            exit 1
-          fi
-          curl --fail-with-body --silent --show-error \
-            --request POST "${APPLICATION_URL%/}/api/cron/profile-photo-audit" \
-            --header "Authorization: Bearer $PROFILE_AUDIT_CRON_SECRET" \
-            --header "Content-Type: application/json" \
-            --data '{}'
+          ARAS_APPLICATION_URL: ${{ vars.ARAS_APPLICATION_URL }}
+          PHOTO_AUDIT_CRON_SECRET: ${{ secrets.PHOTO_AUDIT_CRON_SECRET }}
+        run: node scripts/run-profile-photo-audit.mjs
