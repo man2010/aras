@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
+import { analyzeProfilePhoto } from '@/lib/google-vision-moderation';
 
 export const runtime = 'nodejs';
 export const maxDuration = 45;
@@ -42,8 +43,22 @@ export async function POST(request: Request) {
   const bytes = new Uint8Array(await photo.arrayBuffer());
   if (!hasValidImageSignature(bytes, photo.type)) return NextResponse.json({ error: 'Le fichier envoyé n’est pas une image JPG ou PNG valide.' }, { status: 415 });
 
-  // No paid image-recognition call here: only validate file type, signature and size.
-  // Profile photo moderation is handled by human review until a replacement is selected.
+  let moderation;
+  try {
+    moderation = await analyzeProfilePhoto({ base64: Buffer.from(bytes).toString('base64'), includeWebDetection: true });
+  } catch (error) {
+    console.error('[profile-photos] Google Vision moderation unavailable:', error instanceof Error ? error.message : 'unknown error');
+    return NextResponse.json({ error: 'La vérification automatique est momentanément indisponible. Réessaie dans quelques instants.' }, { status: 503 });
+  }
+  if (moderation.flagged) {
+    const rejection = moderation.reason === 'aucune_personne_detectee'
+      ? 'La photo doit montrer clairement au moins une personne.'
+      : moderation.reason === 'contenu_inapproprie'
+        ? 'Cette photo ne respecte pas les règles de la communauté. Choisis une autre image.'
+        : 'Cette image semble déjà publiée sur le Web. Choisis une photo personnelle.';
+    return NextResponse.json({ error: rejection }, { status: 422 });
+  }
+
   const fileExtension = photo.type === 'image/png' ? 'png' : 'jpg';
   const filePath = `${authData.user.id}/profile-${crypto.randomUUID()}.${fileExtension}`;
   const { error: uploadError } = await admin.storage.from('avatars').upload(filePath, bytes, {
