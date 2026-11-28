@@ -114,7 +114,7 @@ export default function AdminPage() {
   const profileRequestId = useRef(0);
 
   useEffect(() => {
-    const timeout = window.setTimeout(() => setDebouncedUserSearchTerm(userSearchTerm.trim()), 400);
+    const timeout = window.setTimeout(() => setDebouncedUserSearchTerm(userSearchTerm.trim()), 250);
     return () => window.clearTimeout(timeout);
   }, [userSearchTerm]);
 

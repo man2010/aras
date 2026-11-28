@@ -142,7 +142,7 @@ export function AdminUsers({ profiles, searchTerm, onSearchTermChange, genderFil
         <div className="grid min-w-0 items-start gap-4 lg:grid-cols-[minmax(0,1.55fr)_minmax(320px,.8fr)]"><section className="min-w-0 overflow-hidden rounded-[26px] bg-white p-4 shadow-[0_8px_30pxrgba(83,46,32,.05)] sm:p-6">
           <div className="mb-4 flex items-center justify-between">
             <h2 className="font-display text-2xl">Membres inscrits</h2>
-            <p className="text-sm text-[#756960]">{loaded ? `${filteredProfiles.length} profil(s) affiché(s)` : 'Chargement…'}</p>
+            <p role={loaded ? undefined : 'status'} className="text-sm text-[#756960]">{loaded ? `${filteredProfiles.length} profil(s) affiché(s)` : searchTerm.trim() ? 'Recherche automatique…' : 'Chargement…'}</p>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full">

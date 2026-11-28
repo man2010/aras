@@ -38,20 +38,25 @@ export async function GET(request: Request) {
   const normalizedSearch = search.toLocaleLowerCase('fr').replace(/[\s()+.-]/g, '');
   const matchedContacts = new Map<string, AuthContact>();
   try {
-    for (let authPage = 1; ; authPage += 1) {
-      const { data, error } = await admin.auth.admin.listUsers({ page: authPage, perPage: PAGE_SIZE });
-      if (error) return NextResponse.json({ error: 'Recherche des contacts impossible.' }, { status: 502 });
-      for (const authUser of data.users) {
-        const provider = String(authUser.app_metadata?.provider ?? authUser.identities?.[0]?.provider ?? '').toLowerCase();
-        const usesPhone = provider === 'phone' || (!authUser.email && Boolean(authUser.phone));
-        const value = usesPhone ? authUser.phone ?? null : authUser.email ?? authUser.phone ?? null;
-        const searchable = (value ?? '').toLocaleLowerCase('fr');
-        const normalizedContact = searchable.replace(/[\s()+.-]/g, '');
-        if (searchable.includes(search.toLocaleLowerCase('fr')) || (normalizedSearch.length >= 4 && normalizedContact.includes(normalizedSearch))) {
-          matchedContacts.set(authUser.id, { value, method: usesPhone ? 'phone' : authUser.email ? 'email' : authUser.phone ? 'phone' : null });
+    const AUTH_PAGE_BATCH_SIZE = 4;
+    for (let firstPage = 1; ; firstPage += AUTH_PAGE_BATCH_SIZE) {
+      const pages = await Promise.all(Array.from({ length: AUTH_PAGE_BATCH_SIZE }, (_, index) =>
+        admin.auth.admin.listUsers({ page: firstPage + index, perPage: PAGE_SIZE })
+      ));
+      if (pages.some(({ error }) => error)) return NextResponse.json({ error: 'Recherche des contacts impossible.' }, { status: 502 });
+      for (const { data } of pages) {
+        for (const authUser of data.users) {
+          const provider = String(authUser.app_metadata?.provider ?? authUser.identities?.[0]?.provider ?? '').toLowerCase();
+          const usesPhone = provider === 'phone' || (!authUser.email && Boolean(authUser.phone));
+          const value = usesPhone ? authUser.phone ?? null : authUser.email ?? authUser.phone ?? null;
+          const searchable = (value ?? '').toLocaleLowerCase('fr');
+          const normalizedContact = searchable.replace(/[\s()+.-]/g, '');
+          if (searchable.includes(search.toLocaleLowerCase('fr')) || (normalizedSearch.length >= 4 && normalizedContact.includes(normalizedSearch))) {
+            matchedContacts.set(authUser.id, { value, method: usesPhone ? 'phone' : authUser.email ? 'email' : authUser.phone ? 'phone' : null });
+          }
         }
       }
-      if (data.users.length < PAGE_SIZE) break;
+      if (pages.some(({ data }) => data.users.length < PAGE_SIZE)) break;
     }
 
     const profileIds = new Set<string>();
