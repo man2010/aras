@@ -3,8 +3,11 @@
 import React from 'react';
 import { Mail, Send, Clock, CheckCircle2 } from 'lucide-react';
 import { FormEvent, useState } from 'react';
+import { WhatsAppIcon } from '@/components/whatsapp-icon';
 
 export default function ContactPage() {
+  const supportPhone = process.env.NEXT_PUBLIC_SUPPORT_PHONE?.trim();
+  const supportWhatsApp = supportPhone?.replace(/\D/g, '');
   const [status, setStatus] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle');
   const [message, setMessage] = useState('');
   const formRef = React.useRef<HTMLFormElement>(null);
@@ -30,6 +33,7 @@ export default function ContactPage() {
         <p className="mt-5 max-w-[420px] text-[15px] leading-7 text-[#756960]">Une question, besoin d’aide ou de signaler un problème ? L’équipe ARAS est à votre écoute.</p>
         <div className="mt-9 space-y-4">
           <a href="mailto:contact@aras.sn" className="flex items-center gap-4 rounded-2xl bg-white p-5 shadow-[0_6px_22px_rgba(83,46,32,.05)] transition hover:-translate-y-0.5"><Mail className="text-[#ec3b78]" /><span><span className="block text-xs font-bold uppercase tracking-wider text-[#9a8b82]">E-mail</span><span className="mt-1 block font-bold text-[#241c18]">contact@aras.sn</span></span></a>
+          {supportPhone && supportWhatsApp && <a href={`https://wa.me/${supportWhatsApp}`} target="_blank" rel="noopener noreferrer" aria-label={`Contacter ARAS sur WhatsApp au ${supportPhone}`} className="flex items-center gap-4 rounded-2xl bg-white p-5 shadow-[0_6px_22px_rgba(83,46,32,.05)] transition hover:-translate-y-0.5"><WhatsAppIcon className="h-6 w-6 text-[#25d366]"/><span><span className="block text-xs font-bold uppercase tracking-wider text-[#9a8b82]">WhatsApp</span><span className="mt-1 block font-bold text-[#241c18]">{supportPhone}</span></span></a>}
           <div className="flex items-center gap-4 rounded-2xl bg-[#f8f9fd] p-5"><Clock className="text-[#c88a27]" /><span className="text-sm leading-6 text-[#756960]">Réponse habituelle sous <strong className="text-[#241c18]">24 à 48 heures ouvrées</strong>.</span></div>
         </div>
       </section>
