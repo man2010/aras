@@ -27,8 +27,8 @@ function authorizePhotoAuditCron(request: Request) {
   const expected = process.env.PHOTO_AUDIT_CRON_SECRET;
   const provided = request.headers.get('x-aras-photo-audit-secret') ?? '';
   if (!expected || !provided) return false;
-  const expectedBuffer = Buffer.from(expected);
-  const providedBuffer = Buffer.from(provided);
+  const expectedBuffer = new Uint8Array(Buffer.from(expected));
+  const providedBuffer = new Uint8Array(Buffer.from(provided));
   return expectedBuffer.length === providedBuffer.length && timingSafeEqual(expectedBuffer, providedBuffer);
 }
 
@@ -83,11 +83,12 @@ export async function POST(request: Request) {
     const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
     const [{ data: recentAudits, error: recentAuditError }, { data: existingAudits, error: existingAuditError }] = profileIds.length && dueUrlSet.length
       ? await Promise.all([
-          admin.from('profile_photo_audits').select('profile_id,photo_url,scanned_at').in('profile_id', profileIds).in('photo_url', dueUrlSet).gte('scanned_at', twentyFourHoursAgo),
-          admin.from('profile_photo_audits').select('profile_id,photo_url,review_status').in('profile_id', profileIds).in('photo_url', dueUrlSet),
+          admin.from('profile_photo_audits').select('profile_id,photo_url,scanned_at').in('profile_id', profileIds).gte('scanned_at', twentyFourHoursAgo),
+          admin.from('profile_photo_audits').select('profile_id,photo_url,review_status').in('profile_id', profileIds),
         ])
       : [{ data: [], error: null }, { data: [], error: null }];
     if (recentAuditError || existingAuditError) {
+      console.error('[admin/fake-profiles] audits lookup failed:', recentAuditError?.message, existingAuditError?.message);
       await admin.from('profile_photo_audit_runs').update({ status: 'failed', finished_at: new Date().toISOString(), error_count: 1 }).eq('id', run.id);
       return NextResponse.json({ error: 'Impossible de vérifier les dates de dernière analyse.' }, { status: 503 });
     }
