@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
@@ -107,8 +107,16 @@ export default function AdminPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
   const [totalProfiles, setTotalProfiles] = useState(0);
+  const [userSearchTerm, setUserSearchTerm] = useState('');
+  const [debouncedUserSearchTerm, setDebouncedUserSearchTerm] = useState('');
   const [genderFilter, setGenderFilter] = useState('all');
   const [planFilter, setPlanFilter] = useState('all');
+  const profileRequestId = useRef(0);
+
+  useEffect(() => {
+    const timeout = window.setTimeout(() => setDebouncedUserSearchTerm(userSearchTerm.trim()), 400);
+    return () => window.clearTimeout(timeout);
+  }, [userSearchTerm]);
 
   const checkAdminStatus = useCallback(async () => {
     if (!user) { setAdminStatusLoading(false); return; }
@@ -126,11 +134,59 @@ export default function AdminPage() {
   }, [router, user]);
 
   const loadProfiles = useCallback(async () => {
+    const requestId = ++profileRequestId.current;
     setProfileLoadError('');
+    setProfilesLoaded(false);
+    const search = debouncedUserSearchTerm.trim();
+    if (search.length >= 2) {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData.session?.access_token;
+      if (!accessToken) {
+        if (requestId === profileRequestId.current) {
+          setProfileLoadError('Session administrateur introuvable. Reconnecte-toi puis réessaie.');
+          setProfilesLoaded(true);
+        }
+        return totalProfiles;
+      }
+      const params = new URLSearchParams({ q: search, gender: genderFilter, page: String(currentPage) });
+      const response = await fetch(`/api/admin/users/search?${params}`, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+        cache: 'no-store',
+      }).catch(() => null);
+      const result = await response?.json().catch(() => null) as { error?: string; profiles?: (ProfileRow & { location_label?: string | null; authContact?: string | null; authContactMethod?: 'email' | 'phone' | null })[]; total?: number } | null;
+      if (requestId !== profileRequestId.current) return totalProfiles;
+      if (!response?.ok || !result?.profiles) {
+        setProfileLoadError(result?.error || 'La recherche globale des profils a échoué.');
+        setProfilesLoaded(true);
+        return totalProfiles;
+      }
+      const mappedProfiles = result.profiles.map((row) => ({
+        ...toProfile(row),
+        adminLocation: row.city || row.location_label || row.zone || null,
+        authContact: row.authContact ?? null,
+        authContactMethod: row.authContactMethod ?? null,
+      })) as AdminProfile[];
+      const { data: subscriptionRows } = mappedProfiles.length
+        ? await supabase.from('user_subscriptions').select('user_id,plan_code,status,ends_at').in('user_id', mappedProfiles.map((profile) => profile.id)).in('status', ['active', 'pending']).order('created_at', { ascending: false })
+        : { data: [] };
+      const currentPlans = new Map<string, string>();
+      for (const subscription of subscriptionRows ?? []) {
+        if (subscription.status !== 'active' || (subscription.ends_at && new Date(subscription.ends_at) <= new Date())) continue;
+        if (!currentPlans.has(subscription.user_id)) currentPlans.set(subscription.user_id, subscription.plan_code);
+      }
+      for (const profile of mappedProfiles) profile.adminPlan = currentPlans.get(profile.id) ?? 'discovery';
+      if (requestId === profileRequestId.current) {
+        setProfiles(mappedProfiles);
+        setTotalProfiles(result.total ?? 0);
+        setProfilesLoaded(true);
+      }
+      return result.total ?? 0;
+    }
+
     let query = supabase.from('profiles').select('*', { count: 'exact' });
     if (genderFilter !== 'all') query = query.eq('gender', genderFilter);
     const { data, count, error } = await query.order('created_at', { ascending: false }).range((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage - 1);
-    if (error) { setProfileLoadError(error.message); return totalProfiles; }
+    if (error) { if (requestId === profileRequestId.current) { setProfileLoadError(error.message); setProfilesLoaded(true); } return totalProfiles; }
     if (data) {
       const mappedProfiles = (data as (ProfileRow & { location_label?: string | null })[]).map((row) => ({
         ...toProfile(row),
@@ -159,11 +215,13 @@ export default function AdminPage() {
           }
         }
       }
-      setProfiles(mappedProfiles);
-      setProfilesLoaded(true);
+      if (requestId === profileRequestId.current) {
+        setProfiles(mappedProfiles);
+        setProfilesLoaded(true);
+      }
     }
     return count || 0;
-  }, [currentPage, genderFilter, itemsPerPage, totalProfiles]);
+  }, [currentPage, debouncedUserSearchTerm, genderFilter, itemsPerPage, totalProfiles]);
 
   useEffect(() => {
     if (!authLoading && !user) router.push('/connexion');
@@ -178,7 +236,7 @@ export default function AdminPage() {
 
   useEffect(() => {
     if (isAdmin && tabPreferenceReady && tab === 'users') void loadProfiles().then((count) => setTotalProfiles(count));
-  }, [isAdmin, tabPreferenceReady, tab, currentPage, genderFilter]);
+  }, [isAdmin, tabPreferenceReady, tab, currentPage, genderFilter, debouncedUserSearchTerm, loadProfiles]);
 
   useEffect(() => { if (isAdmin && tabPreferenceReady && tab === 'reports') void loadReports(); }, [isAdmin, tabPreferenceReady, tab]);
   useEffect(() => { if (isAdmin && tabPreferenceReady && tab === 'events') void loadEvents(); }, [isAdmin, tabPreferenceReady, tab]);
@@ -468,6 +526,8 @@ export default function AdminPage() {
       <div hidden={tab !== 'users'}>
         <AdminUsers
           profiles={profiles}
+          searchTerm={userSearchTerm}
+          onSearchTermChange={(search) => { setUserSearchTerm(search); setCurrentPage(1); }}
           genderFilter={genderFilter}
           onGenderFilterChange={(gender) => { setGenderFilter(gender); setCurrentPage(1); }}
           planFilter={planFilter}

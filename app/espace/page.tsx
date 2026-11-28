@@ -10,7 +10,7 @@ import { useAuth } from '@/lib/auth-context';
 import type { Profile, Conversation, Message, Story } from '@/lib/types';
 import { toConversation, toEvent, toMessage, toProfile, toStory, type EventRow, type MatchRow, type MessageRow, type ProfileRow, type StoryRow } from '@/lib/adapters';
 import { AppSidebar, type EspaceTab } from '@/components/app-sidebar';
-import { OnboardingSpaceTour } from '@/components/onboarding-space-tour';
+import { OnboardingSpaceTour, type TourDestination } from '@/components/onboarding-space-tour';
 import { Slider } from '@/components/ui/slider';
 
 type Tab = EspaceTab;
@@ -1930,7 +1930,16 @@ export default function EspacePage() {
 
   return (
     <main className="aras-espace min-h-screen bg-[#f8f9fd] pt-[60px] transition-colors dark:bg-[#101014]">
-      {user && profile && <OnboardingSpaceTour userId={user.id} displayName={profile.display_name} />}
+      {user && profile && <OnboardingSpaceTour userId={user.id} displayName={profile.display_name} onNavigate={(destination: TourDestination) => {
+        if (destination.tab === 'profile') {
+          setProfileSection('profile');
+          setProfileSettingsOpen(false);
+          setProfileEditOpen(false);
+        }
+        setTab(destination.tab);
+        if (destination.likesView) setLikesView(destination.likesView);
+        if (destination.likesView === 'visitors') void loadProfileVisitors();
+      }} />}
       <div className="flex min-h-[calc(100vh-60px)] w-full items-stretch">
         <AppSidebar
           active={tab}
@@ -1990,6 +1999,7 @@ export default function EspacePage() {
                 {mobileDiscoveryProfile && (
                   <section className="mx-auto flex h-full min-h-0 w-full max-w-[560px] flex-col lg:contents" aria-label="Profils à découvrir">
                     <article
+                      data-tour={discoveryLoading ? undefined : 'discovery-content'}
                       key={mobileDiscoveryProfile.id}
                       onMouseEnter={() => { if (window.matchMedia('(min-width: 1024px)').matches) void recordProfileVisit(mobileDiscoveryProfile.id); }}
                       onClick={(event) => {
@@ -2098,12 +2108,12 @@ export default function EspacePage() {
                     </div>
                   </section>
                 )}
-                <section className="hidden h-full min-h-0 w-full lg:grid lg:grid-cols-[minmax(340px,480px)_minmax(260px,340px)] lg:justify-center lg:gap-8 lg:overflow-hidden" aria-label="Découverte de profils">
+                <section data-tour="discovery-desktop-shell" className="hidden h-full min-h-0 w-full lg:grid lg:grid-cols-[minmax(340px,480px)_minmax(260px,340px)] lg:justify-center lg:gap-8 lg:overflow-hidden" aria-label="Découverte de profils">
                   {desktopDiscoveryProfile ? <div className="flex min-h-0 flex-col">
                     <header className="mb-3 flex shrink-0 items-center justify-between gap-4">
                       <div><h2 className="font-display text-2xl font-bold text-[#241c18] dark:text-white">Découvrir</h2><p className="mt-0.5 flex items-center gap-1.5 text-sm text-[#756960] dark:text-white/60"><MapPin size={14} className="text-[#ec1689]" />{profile?.city || 'Sénégal'}</p></div>
                     </header>
-                    <article className="relative min-h-0 flex-1 overflow-hidden rounded-[30px] border border-white/15 bg-[#202027] shadow-[0_22px_60px_rgba(0,0,0,.18)]">
+                    <article data-tour="discovery-content" className="relative min-h-0 flex-1 overflow-hidden rounded-[30px] border border-white/15 bg-[#202027] shadow-[0_22px_60px_rgba(0,0,0,.18)]">
                       {desktopDiscoveryPhotos.length ? <img src={desktopDiscoveryPhotos[discoveryPhotoIndexes[desktopDiscoveryProfile.id] ?? 0] ?? desktopDiscoveryPhotos[0]} alt={`Photo de ${desktopDiscoveryProfile.display_name}`} className="absolute inset-0 h-full w-full object-cover" /> : <div className="absolute inset-0 flex items-center justify-center bg-[#292832] text-7xl font-black text-white/70">{desktopDiscoveryProfile.display_name.charAt(0).toUpperCase()}</div>}
                       <div className="absolute inset-0 bg-gradient-to-b from-black/25 via-transparent to-black/85" />
                       <div className="absolute left-4 top-4 flex flex-wrap gap-2">
@@ -2214,7 +2224,7 @@ export default function EspacePage() {
             <div className="mx-auto max-w-6xl space-y-6">
               {profileSection !== 'profile' && <header className="flex items-center gap-4"><button type="button" onClick={() => { setProfileSection('profile'); setProfileEditOpen(false); }} aria-label="Retour au profil" className="flex h-10 w-10 items-center justify-center rounded-full bg-white text-[#282832] shadow-sm dark:bg-[#202027] dark:text-white"><ArrowLeft size={21} /></button><h1 className="font-display text-2xl font-bold text-[#241c18] dark:text-white">{profileSection === 'privacy' ? 'Confidentialité' : profileSection === 'security' ? 'Sécurité du compte' : profileSection === 'subscription' ? 'Abonnement' : profileSection === 'blocks' ? 'Blocages & signalements' : 'Centre d’aide'}</h1></header>}
 
-              {profileSection === 'profile' && !profileEditOpen && !profileSettingsOpen && <section className="space-y-6">
+              {profileSection === 'profile' && !profileEditOpen && !profileSettingsOpen && <section data-tour="profile-content" className="space-y-6">
                 <header className="flex items-center justify-between"><h1 className="font-display text-3xl font-bold text-[#241c18] dark:text-white sm:text-4xl">Mon Profil</h1><button type="button" onClick={() => setProfileSettingsOpen(true)} aria-label="Ouvrir les paramètres" className="flex h-12 w-12 items-center justify-center rounded-full bg-white text-[#262733] shadow-sm transition hover:text-[#ec3b78] dark:bg-[#242424] dark:text-white"><Settings size={23} /></button></header>
                 <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
                   <article className="rounded-[30px] bg-white p-6 text-center shadow-[0_12px_38px_rgba(20,20,30,.06)] dark:bg-[#1d1d1d] sm:p-8">
@@ -2380,7 +2390,7 @@ export default function EspacePage() {
 
           {/* MESSAGES TAB */}
           {tab === 'messages' && (
-            <div>
+            <div data-tour="messages-content">
               {activeModeratorAnnouncement ? (
                 <section className="flex h-[calc(100dvh-180px)] min-h-[420px] flex-col overflow-hidden rounded-[26px] border border-[#dfd2c6] bg-white p-4 shadow-[0_8px_30px_rgba(83,46,32,.05)] sm:p-6">
                   <header className="mb-4 flex items-center gap-3 border-b border-[#eadfd5] pb-4">
@@ -2587,17 +2597,17 @@ export default function EspacePage() {
                           : `${profileVisitorCount} personne${profileVisitorCount === 1 ? ' a visité' : 's ont visité'} votre profil`}
                   </p>
                 </div>
-                <div role="group" aria-label="Choisir les profils à afficher" className="flex shrink-0 items-center gap-1 rounded-full border border-[#eadfd5] bg-white p-1 shadow-sm dark:border-white/10 dark:bg-[#1c1b21]">
-                  <button type="button" aria-label={`Likes reçus, ${receivedLikes.length}`} aria-pressed={likesView === 'received'} onClick={() => setLikesView('received')} className={`flex h-10 w-10 items-center justify-center rounded-full transition sm:h-11 sm:w-11 ${likesView === 'received' ? 'bg-[#ec3b78] text-white shadow-md' : 'text-[#756960] hover:bg-[#f8f9fd] dark:text-white/70 dark:hover:bg-white/10'}`}>
+              <div role="group" aria-label="Choisir les profils à afficher" className="flex shrink-0 items-center gap-1 rounded-full border border-[#eadfd5] bg-white p-1 shadow-sm dark:border-white/10 dark:bg-[#1c1b21]">
+                  <button data-tour={likesView === 'received' ? 'likes-received' : undefined} type="button" aria-label={`Likes reçus, ${receivedLikes.length}`} aria-pressed={likesView === 'received'} onClick={() => setLikesView('received')} className={`flex h-10 w-10 items-center justify-center rounded-full transition sm:h-11 sm:w-11 ${likesView === 'received' ? 'bg-[#ec3b78] text-white shadow-md' : 'text-[#756960] hover:bg-[#f8f9fd] dark:text-white/70 dark:hover:bg-white/10'}`}>
                     <ArrowDownLeft size={20} />
                   </button>
-                  <button type="button" aria-label={`Likes envoyés, ${likedProfiles.length}`} aria-pressed={likesView === 'sent'} onClick={() => setLikesView('sent')} className={`flex h-10 w-10 items-center justify-center rounded-full transition sm:h-11 sm:w-11 ${likesView === 'sent' ? 'bg-[#ec3b78] text-white shadow-md' : 'text-[#756960] hover:bg-[#f8f9fd] dark:text-white/70 dark:hover:bg-white/10'}`}>
+                  <button data-tour={likesView === 'sent' ? 'likes-sent' : undefined} type="button" aria-label={`Likes envoyés, ${likedProfiles.length}`} aria-pressed={likesView === 'sent'} onClick={() => setLikesView('sent')} className={`flex h-10 w-10 items-center justify-center rounded-full transition sm:h-11 sm:w-11 ${likesView === 'sent' ? 'bg-[#ec3b78] text-white shadow-md' : 'text-[#756960] hover:bg-[#f8f9fd] dark:text-white/70 dark:hover:bg-white/10'}`}>
                     <ArrowUpRight size={20} />
                   </button>
-                  <button type="button" aria-label={`Matches, ${matches.length}`} aria-pressed={likesView === 'matches'} onClick={() => setLikesView('matches')} className={`flex h-10 w-10 items-center justify-center rounded-full transition sm:h-11 sm:w-11 ${likesView === 'matches' ? 'bg-[#ec3b78] text-white shadow-md' : 'text-[#756960] hover:bg-[#f8f9fd] dark:text-white/70 dark:hover:bg-white/10'}`}>
+                  <button data-tour={likesView === 'matches' ? 'likes-matches' : undefined} type="button" aria-label={`Matches, ${matches.length}`} aria-pressed={likesView === 'matches'} onClick={() => setLikesView('matches')} className={`flex h-10 w-10 items-center justify-center rounded-full transition sm:h-11 sm:w-11 ${likesView === 'matches' ? 'bg-[#ec3b78] text-white shadow-md' : 'text-[#756960] hover:bg-[#f8f9fd] dark:text-white/70 dark:hover:bg-white/10'}`}>
                     <ArrowLeftRight size={20} />
                   </button>
-                  <button type="button" aria-label={`Visiteurs, ${profileVisitorCount}`} aria-pressed={likesView === 'visitors'} onClick={() => { setLikesView('visitors'); void loadProfileVisitors(); }} className={`flex h-10 w-10 items-center justify-center rounded-full transition sm:h-11 sm:w-11 ${likesView === 'visitors' ? 'bg-[#ec3b78] text-white shadow-md' : 'text-[#756960] hover:bg-[#f8f9fd] dark:text-white/70 dark:hover:bg-white/10'}`}>
+                  <button data-tour={likesView === 'visitors' ? 'likes-visitors' : undefined} type="button" aria-label={`Visiteurs, ${profileVisitorCount}`} aria-pressed={likesView === 'visitors'} onClick={() => { setLikesView('visitors'); void loadProfileVisitors(); }} className={`flex h-10 w-10 items-center justify-center rounded-full transition sm:h-11 sm:w-11 ${likesView === 'visitors' ? 'bg-[#ec3b78] text-white shadow-md' : 'text-[#756960] hover:bg-[#f8f9fd] dark:text-white/70 dark:hover:bg-white/10'}`}>
                     <Eye size={20} />
                   </button>
                 </div>
@@ -2693,7 +2703,7 @@ export default function EspacePage() {
 
           {/* EVENTS TAB */}
           {tab === 'events' && (
-            <div className="space-y-5">
+            <div data-tour="events-content" className="space-y-5">
               <header className="space-y-4">
                 <h1 className="font-display text-3xl text-[#241c18] dark:text-white sm:text-4xl">Événements</h1>
                 <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto]">

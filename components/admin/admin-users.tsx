@@ -9,6 +9,8 @@ type AdminProfile = Profile & { adminLocation?: string | null; adminPlan?: strin
 
 interface AdminUsersProps {
   profiles: AdminProfile[];
+  searchTerm: string;
+  onSearchTermChange: (search: string) => void;
   genderFilter: string;
   onGenderFilterChange: (gender: string) => void;
   planFilter: string;
@@ -21,8 +23,7 @@ interface AdminUsersProps {
   loaded?: boolean;
 }
 
-export function AdminUsers({ profiles, genderFilter, onGenderFilterChange, planFilter, onPlanFilterChange, currentPage, totalPages, onPageChange, onToggleBlocked, loadError = '', loaded = true }: AdminUsersProps) {
-  const [searchTerm, setSearchTerm] = useState('');
+export function AdminUsers({ profiles, searchTerm, onSearchTermChange, genderFilter, onGenderFilterChange, planFilter, onPlanFilterChange, currentPage, totalPages, onPageChange, onToggleBlocked, loadError = '', loaded = true }: AdminUsersProps) {
   const [filterCity, setFilterCity] = useState('');
   const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'blocked' | 'incomplete'>('all');
   const [filterVerified, setFilterVerified] = useState<'all' | 'verified' | 'unverified'>('all');
@@ -35,7 +36,6 @@ export function AdminUsers({ profiles, genderFilter, onGenderFilterChange, planF
   const [messageFeedback, setMessageFeedback] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   const filteredProfiles = profiles.filter((p) => {
-    const matchesSearch = `${p.display_name} ${p.authContact ?? ''}`.toLocaleLowerCase('fr').includes(searchTerm.trim().toLocaleLowerCase('fr'));
     const matchesCity = !filterCity || (p.adminLocation || p.city) === filterCity;
     const matchesVerified = filterVerified === 'all' ||
                          (filterVerified === 'verified' && p.is_verified) ||
@@ -43,7 +43,7 @@ export function AdminUsers({ profiles, genderFilter, onGenderFilterChange, planF
     const matchesPlan = planFilter === 'all' || (p.adminPlan ?? 'discovery') === planFilter;
     const incomplete = p.onboarding_completed === false || p.profile_status === 'pending';
     const matchesStatus = filterStatus === 'all' || (filterStatus === 'blocked' ? p.is_active === false : filterStatus === 'incomplete' ? incomplete : p.is_active !== false && !incomplete);
-    return matchesSearch && matchesCity && matchesVerified && matchesPlan && matchesStatus;
+    return matchesCity && matchesVerified && matchesPlan && matchesStatus;
   });
 
   const cities = Array.from(new Set(profiles.map((p) => p.adminLocation || p.city)));
@@ -108,7 +108,7 @@ export function AdminUsers({ profiles, genderFilter, onGenderFilterChange, planF
                   type="text"
                   placeholder="Pseudo, téléphone, e-mail…"
                   value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
+                  onChange={(e) => onSearchTermChange(e.target.value)}
                   className="w-full rounded-xl border border-[#dfd2c6] bg-[#f8f9fd] pl-10 pr-4 py-2.5 text-sm outline-none focus:border-[#ec3b78]"
                 />
               </div></label>
