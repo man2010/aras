@@ -6,6 +6,7 @@ import { timingSafeEqual } from 'node:crypto';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? process.env.SUPABASE_URL ?? '';
 const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? process.env.SUPABASE_ANON_KEY ?? '';
+type FakeProfileQueueRow = { id: string; profile_id: string; photo_url: string; scan_status: string; review_status: string; reason: string | null; celebrity_names: string[]; findings: unknown; scanned_at: string; reviewed_at: string | null; profile: Record<string, unknown>; total_count: number | string };
 export const runtime = 'nodejs';
 export const maxDuration = 300;
 
@@ -37,23 +38,22 @@ export async function GET(request: Request) {
   if (!auth.ok) return auth.response;
   const admin = getSupabaseAdmin();
   if (!admin) return NextResponse.json({ error: 'Service de modération indisponible.' }, { status: 503 });
+  const page = Math.max(1, Number(new URL(request.url).searchParams.get('page')) || 1);
+  const pageSize = 12;
+  const status = new URL(request.url).searchParams.get('status') === 'treated' ? 'treated' : 'pending';
   const [{ data: audits, error }, { data: latestRun }] = await Promise.all([
-    admin.from('profile_photo_audits').select('id,profile_id,photo_url,scan_status,review_status,reason,celebrity_names,findings,scanned_at,reviewed_at').eq('scan_status', 'flagged').order('scanned_at', { ascending: false }).limit(300),
+    admin.rpc('admin_fake_profile_queue', { p_review_status: status, p_page: page, p_page_size: pageSize }),
     admin.from('profile_photo_audit_runs').select('id,status,profiles_scanned,photos_scanned,flagged_count,error_count,started_at,finished_at').order('started_at', { ascending: false }).limit(1).maybeSingle(),
   ]);
   if (error) return NextResponse.json({ error: 'File des profils suspects indisponible. Applique la migration SQL dédiée.' }, { status: 503 });
-  const ids = Array.from(new Set((audits ?? []).map((row) => row.profile_id as string)));
-  const { data: profiles, error: profileError } = ids.length
-    ? await admin.from('profiles').select('id,full_name,city,avatar_urls,is_active,onboarding_completed,profile_status').in('id', ids)
-    : { data: [], error: null };
-  if (profileError) return NextResponse.json({ error: 'Informations des profils indisponibles.' }, { status: 503 });
-  const profileMap = new Map((profiles ?? []).map((profile) => [profile.id, profile]));
-  const items = (audits ?? []).map((audit) => ({ ...audit, profile: profileMap.get(audit.profile_id) ?? null }));
-  return NextResponse.json({ items, latestRun: latestRun ?? null }, { headers: { 'Cache-Control': 'private, no-store' } });
+  const rows = (audits ?? []) as FakeProfileQueueRow[];
+  const total = Number(rows[0]?.total_count ?? 0);
+  const items = rows.map(({ total_count: _totalCount, ...audit }) => audit);
+  return NextResponse.json({ items, page, pageSize, total, totalPages: Math.max(1, Math.ceil(total / pageSize)), latestRun: latestRun ?? null }, { headers: { 'Cache-Control': 'private, no-store' } });
 }
 
 export async function POST(request: Request) {
-  let payload: { action?: unknown; auditId?: unknown; profileOffset?: unknown; photoOffset?: unknown };
+  let payload: { action?: unknown; auditId?: unknown; profileOffset?: unknown; photoOffset?: unknown; title?: unknown; body?: unknown };
   try { payload = await request.json(); } catch { return NextResponse.json({ error: 'Requête invalide.' }, { status: 400 }); }
   const cronAuthorized = payload.action === 'scan' && authorizePhotoAuditCron(request);
   const auth = cronAuthorized ? null : await authorizeAdmin(request);
@@ -159,16 +159,39 @@ export async function POST(request: Request) {
   if (typeof payload.auditId !== 'string' || !/^[0-9a-f-]{36}$/i.test(payload.auditId)) {
     return NextResponse.json({ error: 'Profil à traiter invalide.' }, { status: 400 });
   }
-  const { data: audit, error: auditError } = await admin.from('profile_photo_audits').select('id,profile_id,scan_status').eq('id', payload.auditId).maybeSingle();
+  const { data: audit, error: auditError } = await admin.from('profile_photo_audits').select('id,profile_id,scan_status,review_status').eq('id', payload.auditId).maybeSingle();
   if (auditError || !audit || audit.scan_status !== 'flagged') return NextResponse.json({ error: 'Analyse introuvable ou déjà mise à jour.' }, { status: 404 });
+  if (audit.review_status !== 'pending') return NextResponse.json({ error: 'Ce cas a déjà été traité.' }, { status: 409 });
+  if (payload.action === 'warn') {
+    const title = typeof payload.title === 'string' ? payload.title.trim() : '';
+    const body = typeof payload.body === 'string' ? payload.body.trim() : '';
+    if (!title || title.length > 120 || !body || body.length > 2000) return NextResponse.json({ error: 'Le titre et le message sont obligatoires (120 et 2000 caractères maximum).' }, { status: 400 });
+    const { data: profile, error: profileError } = await admin.from('profiles').select('id,onboarding_completed,profile_status,is_active').eq('id', audit.profile_id).maybeSingle();
+    if (profileError || !profile) return NextResponse.json({ error: 'Profil destinataire introuvable.' }, { status: 404 });
+    if (profile.onboarding_completed !== true || profile.profile_status !== 'completed') {
+      return NextResponse.json({ error: 'Ce compte n’a pas terminé son onboarding et ne peut pas recevoir de notification dans son espace.' }, { status: 409 });
+    }
+    const { data: announcement, error: announcementError } = await admin.from('moderator_announcements').insert({ sender_id: auth?.ok ? auth.userId : null, recipient_id: audit.profile_id, recipient_ids: [audit.profile_id], target_incomplete_only: false, title, body, recipient_count: 1 }).select('id').single();
+    if (announcementError || !announcement) return NextResponse.json({ error: 'Impossible d’enregistrer l’avertissement.' }, { status: 503 });
+    const { error: notificationError } = await admin.from('user_notifications').insert({ user_id: audit.profile_id, actor_id: auth?.ok ? auth.userId : null, kind: 'moderator_announcement', title, body });
+    if (notificationError) {
+      await admin.from('moderator_announcements').delete().eq('id', announcement.id);
+      return NextResponse.json({ error: 'Impossible de remettre la notification dans l’espace du membre.' }, { status: 503 });
+    }
+  }
   if (payload.action === 'block') {
-    const { error: blockError } = await admin.from('profiles').update({ is_active: false }).eq('id', audit.profile_id);
+    const { error: blockError } = await admin.from('profiles').update({ is_active: false, is_online: false }).eq('id', audit.profile_id);
     if (blockError) return NextResponse.json({ error: 'Le compte n’a pas pu être bloqué.' }, { status: 503 });
+    await admin.from('account_sessions').delete().eq('user_id', audit.profile_id);
   } else if (payload.action !== 'warn' && payload.action !== 'clear') {
     return NextResponse.json({ error: 'Action inconnue.' }, { status: 400 });
   }
   const reviewStatus = payload.action === 'block' ? 'blocked' : payload.action === 'warn' ? 'warned' : 'cleared';
   const { error: updateError } = await admin.from('profile_photo_audits').update({ review_status: reviewStatus, reviewed_at: new Date().toISOString(), reviewed_by: auth?.ok ? auth.userId : null }).eq('id', audit.id);
   if (updateError) return NextResponse.json({ error: 'La décision n’a pas pu être enregistrée.' }, { status: 503 });
+  if (payload.action === 'block') {
+    const { error: banError } = await admin.auth.admin.updateUserById(audit.profile_id, { ban_duration: '876000h' });
+    if (banError) return NextResponse.json({ error: 'Le profil est désactivé, mais la fermeture des sessions a échoué. Réessaie le blocage.' }, { status: 503 });
+  }
   return NextResponse.json({ ok: true, reviewStatus });
 }
