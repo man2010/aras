@@ -2581,7 +2581,7 @@ export default function EspacePage() {
 
           {/* LIKES TAB */}
           {tab === 'likes' && (
-            <section>
+            <section data-tour={`likes-content-${likesView}`}>
               <header className="mb-6 flex items-center justify-between gap-3 sm:mb-8">
                 <div className="min-w-0">
                   <h1 className="font-display text-2xl font-bold leading-tight text-[#241c18] dark:text-white sm:text-3xl">
