@@ -7,6 +7,15 @@ import { timingSafeEqual } from 'node:crypto';
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? process.env.SUPABASE_URL ?? '';
 const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? process.env.SUPABASE_ANON_KEY ?? '';
 type FakeProfileQueueRow = { id: string; profile_id: string; photo_url: string; scan_status: string; review_status: string; reason: string | null; celebrity_names: string[]; findings: unknown; scanned_at: string; reviewed_at: string | null; profile: Record<string, unknown>; total_count: number | string };
+type OverdueProfileQueueRow = { case_id: string; audit_id: string; profile_id: string; photo_url: string; reason: string | null; celebrity_names: string[]; findings: unknown; warning_count: number; warning_hours: number; warned_at: string; deadline_at: string; profile: Record<string, unknown>; total_count: number | string };
+const allowedWarningHours = new Set([24, 48, 72, 96, 168, 336, 504, 720]);
+function warningDeadlinePhrase(hours: number) {
+  if (hours === 168) return '1 semaine';
+  if (hours === 336) return '2 semaines';
+  if (hours === 504) return '3 semaines';
+  if (hours === 720) return '1 mois (30 jours)';
+  return `${hours} heures`;
+}
 export const runtime = 'nodejs';
 export const maxDuration = 300;
 
@@ -40,9 +49,24 @@ export async function GET(request: Request) {
   if (!admin) return NextResponse.json({ error: 'Service de modération indisponible.' }, { status: 503 });
   const page = Math.max(1, Number(new URL(request.url).searchParams.get('page')) || 1);
   const pageSize = 12;
-  const status = new URL(request.url).searchParams.get('status') === 'treated' ? 'treated' : 'pending';
+  const searchParams = new URL(request.url).searchParams;
+  const status = searchParams.get('status') === 'treated' ? 'treated' : searchParams.get('status') === 'overdue' ? 'overdue' : 'pending';
+  if (status === 'overdue') {
+    const warningHoursValue = Number(searchParams.get('warningHours'));
+    const warningHours = allowedWarningHours.has(warningHoursValue) ? warningHoursValue : null;
+    const [{ data: overdue, error }, { data: latestRun }] = await Promise.all([
+      admin.rpc('admin_fake_profile_overdue_queue', { p_warning_hours: warningHours, p_page: page, p_page_size: pageSize }),
+      admin.from('profile_photo_audit_runs').select('id,status,profiles_scanned,photos_scanned,flagged_count,error_count,started_at,finished_at').order('started_at', { ascending: false }).limit(1).maybeSingle(),
+    ]);
+    if (error) return NextResponse.json({ error: 'File des avertissements échus indisponible. Applique la migration de suivi des photos.' }, { status: 503 });
+    const rows = (overdue ?? []) as OverdueProfileQueueRow[];
+    const total = Number(rows[0]?.total_count ?? 0);
+    const items = rows.map((row) => ({ id: row.audit_id, profile_id: row.profile_id, photo_url: row.photo_url, scan_status: 'flagged', review_status: 'warned', reason: row.reason, celebrity_names: row.celebrity_names, findings: row.findings, scanned_at: row.warned_at, reviewed_at: row.warned_at, profile: row.profile, case_id: row.case_id, warning_count: row.warning_count, warning_hours: row.warning_hours, warned_at: row.warned_at, deadline_at: row.deadline_at }));
+    return NextResponse.json({ items, page, pageSize, total, totalPages: Math.max(1, Math.ceil(total / pageSize)), latestRun: latestRun ?? null }, { headers: { 'Cache-Control': 'private, no-store' } });
+  }
+  const statusKey = status;
   const [{ data: audits, error }, { data: latestRun }] = await Promise.all([
-    admin.rpc('admin_fake_profile_queue', { p_review_status: status, p_page: page, p_page_size: pageSize }),
+    admin.rpc('admin_fake_profile_queue', { p_review_status: statusKey, p_page: page, p_page_size: pageSize }),
     admin.from('profile_photo_audit_runs').select('id,status,profiles_scanned,photos_scanned,flagged_count,error_count,started_at,finished_at').order('started_at', { ascending: false }).limit(1).maybeSingle(),
   ]);
   if (error) return NextResponse.json({ error: 'File des profils suspects indisponible. Applique la migration SQL dédiée.' }, { status: 503 });
@@ -53,7 +77,7 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  let payload: { action?: unknown; auditId?: unknown; profileOffset?: unknown; photoOffset?: unknown; title?: unknown; body?: unknown };
+  let payload: { action?: unknown; auditId?: unknown; caseId?: unknown; profileOffset?: unknown; photoOffset?: unknown; title?: unknown; body?: unknown; warningHours?: unknown };
   try { payload = await request.json(); } catch { return NextResponse.json({ error: 'Requête invalide.' }, { status: 400 }); }
   const cronAuthorized = payload.action === 'scan' && authorizePhotoAuditCron(request);
   const auth = cronAuthorized ? null : await authorizeAdmin(request);
@@ -156,27 +180,79 @@ export async function POST(request: Request) {
     if (updateRunError) console.error('[admin/fake-profiles] Could not finish scan run:', updateRunError.message);
     return NextResponse.json({ ok: true, profilesScanned: profiles?.length ?? 0, photosScanned, flaggedCount, errorCount, hasMore: hasMoreInBatch || hasMoreProfiles, profileOffset: nextProfileOffset, photoOffset: 0 });
   }
+  if (payload.action === 'warn_again' || payload.action === 'block_case') {
+    if (typeof payload.caseId !== 'string' || !/^[0-9a-f-]{36}$/i.test(payload.caseId)) return NextResponse.json({ error: 'Dossier de suivi invalide.' }, { status: 400 });
+    const { data: enforcementCase, error: caseError } = await admin.from('profile_photo_enforcement_cases').select('id,audit_id,profile_id,photo_url,warning_count,warning_hours,deadline_at,status').eq('id', payload.caseId).maybeSingle();
+    if (caseError || !enforcementCase || enforcementCase.status !== 'active') return NextResponse.json({ error: 'Ce dossier de suivi est introuvable ou déjà clôturé.' }, { status: 404 });
+    if (new Date(enforcementCase.deadline_at).getTime() > Date.now()) return NextResponse.json({ error: 'Le délai accordé n’est pas encore écoulé.' }, { status: 409 });
+    const { data: profile, error: profileError } = await admin.from('profiles').select('id,full_name,onboarding_completed,profile_status,is_active,photo_url,avatar_urls').eq('id', enforcementCase.profile_id).maybeSingle();
+    if (profileError || !profile) return NextResponse.json({ error: 'Profil destinataire introuvable.' }, { status: 404 });
+    const photoStillPresent = profile.photo_url === enforcementCase.photo_url || (Array.isArray(profile.avatar_urls) && profile.avatar_urls.includes(enforcementCase.photo_url));
+    if (!photoStillPresent) {
+      await admin.from('profile_photo_enforcement_cases').update({ status: 'resolved', resolved_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq('id', enforcementCase.id);
+      return NextResponse.json({ error: 'Le membre a déjà retiré la photo signalée; le dossier vient d’être clôturé.' }, { status: 409 });
+    }
+    if (payload.action === 'warn_again') {
+      if (enforcementCase.warning_count >= 2) return NextResponse.json({ error: 'Le second avertissement a déjà été envoyé. Tu peux maintenant bloquer le compte.' }, { status: 409 });
+      if (profile.onboarding_completed !== true || profile.profile_status !== 'completed') return NextResponse.json({ error: 'Ce profil n’est pas éligible à une notification dans son espace.' }, { status: 409 });
+      const title = typeof payload.title === 'string' ? payload.title.trim() : '';
+      const body = typeof payload.body === 'string' ? payload.body.trim() : '';
+      const warningHours = Number(payload.warningHours);
+      if (!title || title.length > 120 || !body || body.length > 2000 || !allowedWarningHours.has(warningHours)) return NextResponse.json({ error: 'Le titre, le message ou le délai est invalide.' }, { status: 400 });
+      const finalBody = `${body}\n\nMerci de remplacer cette photo dans les prochaines ${warningDeadlinePhrase(warningHours)}.`;
+      const { data: announcement, error: announcementError } = await admin.from('moderator_announcements').insert({ sender_id: auth?.ok ? auth.userId : null, recipient_id: enforcementCase.profile_id, recipient_ids: [enforcementCase.profile_id], target_incomplete_only: false, title, body: finalBody, recipient_count: 1 }).select('id').single();
+      if (announcementError || !announcement) return NextResponse.json({ error: 'Impossible d’enregistrer le second avertissement.' }, { status: 503 });
+      const { data: notification, error: notificationError } = await admin.from('user_notifications').insert({ user_id: enforcementCase.profile_id, actor_id: auth?.ok ? auth.userId : null, kind: 'moderator_announcement', title, body: finalBody }).select('id').single();
+      if (notificationError || !notification) {
+        await admin.from('moderator_announcements').delete().eq('id', announcement.id);
+        return NextResponse.json({ error: 'Impossible d’envoyer la notification au membre.' }, { status: 503 });
+      }
+      const warnedAt = new Date();
+      const { error: updateCaseError } = await admin.from('profile_photo_enforcement_cases').update({ warning_count: 2, warning_hours: warningHours, warned_at: warnedAt.toISOString(), deadline_at: new Date(warnedAt.getTime() + warningHours * 60 * 60 * 1000).toISOString(), updated_at: warnedAt.toISOString() }).eq('id', enforcementCase.id);
+      if (updateCaseError) return NextResponse.json({ error: 'Le second avertissement est envoyé, mais le délai n’a pas pu être enregistré. Contacte un administrateur.' }, { status: 503 });
+      return NextResponse.json({ ok: true, reviewStatus: 'warned', warningCount: 2 });
+    }
+    const { error: blockError } = await admin.from('profiles').update({ is_active: false, is_online: false }).eq('id', enforcementCase.profile_id);
+    if (blockError) return NextResponse.json({ error: 'Le compte n’a pas pu être bloqué.' }, { status: 503 });
+    await admin.from('account_sessions').delete().eq('user_id', enforcementCase.profile_id);
+    const { error: banError } = await admin.auth.admin.updateUserById(enforcementCase.profile_id, { ban_duration: '876000h' });
+    if (banError) return NextResponse.json({ error: 'Le profil est désactivé, mais la fermeture des sessions a échoué. Réessaie le blocage.' }, { status: 503 });
+    await admin.from('profile_photo_audits').update({ review_status: 'blocked', reviewed_at: new Date().toISOString(), reviewed_by: auth?.ok ? auth.userId : null }).eq('id', enforcementCase.audit_id);
+    const { error: updateCaseError } = await admin.from('profile_photo_enforcement_cases').update({ status: 'blocked', updated_at: new Date().toISOString() }).eq('id', enforcementCase.id);
+    if (updateCaseError) return NextResponse.json({ error: 'Le compte est bloqué, mais le dossier de suivi n’a pas pu être clôturé.' }, { status: 503 });
+    return NextResponse.json({ ok: true, reviewStatus: 'blocked' });
+  }
   if (typeof payload.auditId !== 'string' || !/^[0-9a-f-]{36}$/i.test(payload.auditId)) {
     return NextResponse.json({ error: 'Profil à traiter invalide.' }, { status: 400 });
   }
-  const { data: audit, error: auditError } = await admin.from('profile_photo_audits').select('id,profile_id,scan_status,review_status').eq('id', payload.auditId).maybeSingle();
+  const { data: audit, error: auditError } = await admin.from('profile_photo_audits').select('id,profile_id,photo_url,scan_status,review_status').eq('id', payload.auditId).maybeSingle();
   if (auditError || !audit || audit.scan_status !== 'flagged') return NextResponse.json({ error: 'Analyse introuvable ou déjà mise à jour.' }, { status: 404 });
   if (audit.review_status !== 'pending') return NextResponse.json({ error: 'Ce cas a déjà été traité.' }, { status: 409 });
   if (payload.action === 'warn') {
     const title = typeof payload.title === 'string' ? payload.title.trim() : '';
     const body = typeof payload.body === 'string' ? payload.body.trim() : '';
-    if (!title || title.length > 120 || !body || body.length > 2000) return NextResponse.json({ error: 'Le titre et le message sont obligatoires (120 et 2000 caractères maximum).' }, { status: 400 });
-    const { data: profile, error: profileError } = await admin.from('profiles').select('id,onboarding_completed,profile_status,is_active').eq('id', audit.profile_id).maybeSingle();
+    const warningHours = Number(payload.warningHours);
+    if (!title || title.length > 120 || !body || body.length > 2000 || !allowedWarningHours.has(warningHours)) return NextResponse.json({ error: 'Le titre, le message ou le délai est invalide.' }, { status: 400 });
+    const { data: profile, error: profileError } = await admin.from('profiles').select('id,onboarding_completed,profile_status,is_active,photo_url,avatar_urls').eq('id', audit.profile_id).maybeSingle();
     if (profileError || !profile) return NextResponse.json({ error: 'Profil destinataire introuvable.' }, { status: 404 });
     if (profile.onboarding_completed !== true || profile.profile_status !== 'completed') {
       return NextResponse.json({ error: 'Ce compte n’a pas terminé son onboarding et ne peut pas recevoir de notification dans son espace.' }, { status: 409 });
     }
-    const { data: announcement, error: announcementError } = await admin.from('moderator_announcements').insert({ sender_id: auth?.ok ? auth.userId : null, recipient_id: audit.profile_id, recipient_ids: [audit.profile_id], target_incomplete_only: false, title, body, recipient_count: 1 }).select('id').single();
+    const photoStillPresent = profile.photo_url === audit.photo_url || (Array.isArray(profile.avatar_urls) && profile.avatar_urls.includes(audit.photo_url));
+    if (!photoStillPresent) return NextResponse.json({ error: 'Le membre a déjà retiré cette photo. Classe le signalement comme conforme.' }, { status: 409 });
+    const finalBody = `${body}\n\nMerci de remplacer cette photo dans les prochaines ${warningDeadlinePhrase(warningHours)}.`;
+    const { data: announcement, error: announcementError } = await admin.from('moderator_announcements').insert({ sender_id: auth?.ok ? auth.userId : null, recipient_id: audit.profile_id, recipient_ids: [audit.profile_id], target_incomplete_only: false, title, body: finalBody, recipient_count: 1 }).select('id').single();
     if (announcementError || !announcement) return NextResponse.json({ error: 'Impossible d’enregistrer l’avertissement.' }, { status: 503 });
-    const { error: notificationError } = await admin.from('user_notifications').insert({ user_id: audit.profile_id, actor_id: auth?.ok ? auth.userId : null, kind: 'moderator_announcement', title, body });
-    if (notificationError) {
+    const { data: notification, error: notificationError } = await admin.from('user_notifications').insert({ user_id: audit.profile_id, actor_id: auth?.ok ? auth.userId : null, kind: 'moderator_announcement', title, body: finalBody }).select('id').single();
+    if (notificationError || !notification) {
       await admin.from('moderator_announcements').delete().eq('id', announcement.id);
       return NextResponse.json({ error: 'Impossible de remettre la notification dans l’espace du membre.' }, { status: 503 });
+    }
+    const warnedAt = new Date();
+    const { error: caseInsertError } = await admin.from('profile_photo_enforcement_cases').insert({ audit_id: audit.id, profile_id: audit.profile_id, photo_url: audit.photo_url, warning_count: 1, warning_hours: warningHours, warned_at: warnedAt.toISOString(), deadline_at: new Date(warnedAt.getTime() + warningHours * 60 * 60 * 1000).toISOString(), status: 'active', created_by: auth?.ok ? auth.userId : null });
+    if (caseInsertError) {
+      await Promise.all([admin.from('user_notifications').delete().eq('id', notification.id), admin.from('moderator_announcements').delete().eq('id', announcement.id)]);
+      return NextResponse.json({ error: 'Impossible de créer le suivi du délai. Applique la migration des dossiers de suivi.' }, { status: 503 });
     }
   }
   if (payload.action === 'block') {
