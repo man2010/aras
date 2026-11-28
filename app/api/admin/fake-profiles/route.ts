@@ -8,6 +8,7 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? process.env.SUPABASE
 const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? process.env.SUPABASE_ANON_KEY ?? '';
 type FakeProfileQueueRow = { id: string; profile_id: string; photo_url: string; scan_status: string; review_status: string; reason: string | null; celebrity_names: string[]; findings: unknown; scanned_at: string; reviewed_at: string | null; profile: Record<string, unknown>; total_count: number | string };
 type OverdueProfileQueueRow = { case_id: string; audit_id: string; profile_id: string; photo_url: string; reason: string | null; celebrity_names: string[]; findings: unknown; warning_count: number; warning_hours: number; warned_at: string; deadline_at: string; profile: Record<string, unknown>; total_count: number | string };
+type WaitingProfileQueueRow = OverdueProfileQueueRow;
 const allowedWarningHours = new Set([24, 48, 72, 96, 168, 336, 504, 720]);
 function warningDeadlinePhrase(hours: number) {
   if (hours === 168) return '1 semaine';
@@ -15,6 +16,22 @@ function warningDeadlinePhrase(hours: number) {
   if (hours === 504) return '3 semaines';
   if (hours === 720) return '1 mois (30 jours)';
   return `${hours} heures`;
+}
+async function attachAuthContacts(admin: NonNullable<ReturnType<typeof getSupabaseAdmin>>, items: Array<Record<string, unknown>>) {
+  const profileIds = Array.from(new Set(items.map((item) => String(item.profile_id ?? '')).filter(Boolean)));
+  const contacts = new Map<string, { email: string | null; phone: string | null }>();
+  for (let offset = 0; offset < profileIds.length; offset += 8) {
+    const batch = await Promise.all(profileIds.slice(offset, offset + 8).map(async (id) => {
+      const { data, error } = await admin.auth.admin.getUserById(id);
+      return error || !data.user ? null : [id, { email: data.user.email ?? null, phone: data.user.phone ?? null }] as const;
+    }));
+    for (const contact of batch) if (contact) contacts.set(contact[0], contact[1]);
+  }
+  return items.map((item) => {
+    const profile = (item.profile ?? {}) as Record<string, unknown>;
+    const contact = contacts.get(String(item.profile_id ?? ''));
+    return { ...item, profile: { ...profile, authEmail: contact?.email ?? null, authPhone: contact?.phone ?? null } };
+  });
 }
 export const runtime = 'nodejs';
 export const maxDuration = 300;
@@ -50,18 +67,70 @@ export async function GET(request: Request) {
   const page = Math.max(1, Number(new URL(request.url).searchParams.get('page')) || 1);
   const pageSize = 12;
   const searchParams = new URL(request.url).searchParams;
-  const status = searchParams.get('status') === 'treated' ? 'treated' : searchParams.get('status') === 'overdue' ? 'overdue' : 'pending';
-  if (status === 'overdue') {
+  const status = ['treated', 'overdue', 'waiting'].includes(searchParams.get('status') ?? '') ? searchParams.get('status')! : 'pending';
+  const search = (searchParams.get('q') ?? '').trim().slice(0, 100).toLocaleLowerCase('fr');
+  if (search.length >= 2) {
+    const queueRpc = status === 'overdue' ? 'admin_fake_profile_overdue_queue' : status === 'waiting' ? 'admin_fake_profile_waiting_queue' : 'admin_fake_profile_queue';
+    const queueRows: Array<Record<string, unknown>> = [];
+    for (let offsetPage = 1; offsetPage <= 200; offsetPage += 1) {
+      const { data, error } = status === 'pending' || status === 'treated'
+        ? await admin.rpc(queueRpc, { p_review_status: status, p_page: offsetPage, p_page_size: 50 })
+        : await admin.rpc(queueRpc, { p_warning_hours: null, p_page: offsetPage, p_page_size: 50 });
+      if (error) return NextResponse.json({ error: 'Recherche dans la file de modération impossible.' }, { status: 503 });
+      const batch = (data ?? []) as Array<Record<string, unknown>>;
+      queueRows.push(...batch);
+      if (batch.length < 50) break;
+    }
+    const isEnforcement = status === 'overdue' || status === 'waiting';
+    const profileIdOf = (row: Record<string, unknown>) => String(row.profile_id ?? '');
+    const profileIds = new Set(queueRows.map(profileIdOf).filter(Boolean));
+    const matchedContacts = new Map<string, { email: string | null; phone: string | null }>();
+    try {
+      const ids = Array.from(profileIds);
+      for (let offset = 0; offset < ids.length; offset += 8) {
+        const batch = await Promise.all(ids.slice(offset, offset + 8).map(async (id) => {
+          const { data, error } = await admin.auth.admin.getUserById(id);
+          return error || !data.user ? null : [id, { email: data.user.email ?? null, phone: data.user.phone ?? null }] as const;
+        }));
+        for (const contact of batch) if (contact) matchedContacts.set(contact[0], contact[1]);
+      }
+    } catch {
+      return NextResponse.json({ error: 'Recherche des contacts impossible.' }, { status: 502 });
+    }
+    const normalizedSearch = search.replace(/[\s()+.-]/g, '');
+    const matches = queueRows.filter((row) => {
+      const profile = (row.profile ?? {}) as Record<string, unknown>;
+      const contact = matchedContacts.get(profileIdOf(row));
+      const contactText = `${contact?.email ?? ''} ${contact?.phone ?? ''}`;
+      const text = `${String(profile.full_name ?? '')} ${contactText}`.toLocaleLowerCase('fr');
+      return text.includes(search) || (normalizedSearch.length >= 4 && contactText.replace(/[\s()+.-]/g, '').includes(normalizedSearch));
+    });
+    const total = matches.length;
+    const start = (page - 1) * pageSize;
+    const pageRows = matches.slice(start, start + pageSize);
+    const items = pageRows.map((row) => {
+      const id = String(isEnforcement ? row.audit_id : row.id);
+      const profileId = profileIdOf(row);
+      const contact = matchedContacts.get(profileId);
+      const profile = { ...((row.profile ?? {}) as Record<string, unknown>), authEmail: contact?.email ?? null, authPhone: contact?.phone ?? null };
+      return isEnforcement
+        ? { id, profile_id: profileId, photo_url: row.photo_url, scan_status: 'flagged', review_status: 'warned', reason: row.reason, celebrity_names: row.celebrity_names, findings: row.findings, scanned_at: row.warned_at, reviewed_at: row.warned_at, profile, case_id: row.case_id, warning_count: row.warning_count, warning_hours: row.warning_hours, warned_at: row.warned_at, deadline_at: row.deadline_at }
+        : { ...row, profile };
+    });
+    const { data: latestRun } = await admin.from('profile_photo_audit_runs').select('id,status,profiles_scanned,photos_scanned,flagged_count,error_count,started_at,finished_at').order('started_at', { ascending: false }).limit(1).maybeSingle();
+    return NextResponse.json({ items, page, pageSize, total, totalPages: Math.max(1, Math.ceil(total / pageSize)), latestRun: latestRun ?? null }, { headers: { 'Cache-Control': 'private, no-store' } });
+  }
+  if (status === 'overdue' || status === 'waiting') {
     const warningHoursValue = Number(searchParams.get('warningHours'));
     const warningHours = allowedWarningHours.has(warningHoursValue) ? warningHoursValue : null;
     const [{ data: overdue, error }, { data: latestRun }] = await Promise.all([
-      admin.rpc('admin_fake_profile_overdue_queue', { p_warning_hours: warningHours, p_page: page, p_page_size: pageSize }),
+      admin.rpc(status === 'overdue' ? 'admin_fake_profile_overdue_queue' : 'admin_fake_profile_waiting_queue', { p_warning_hours: warningHours, p_page: page, p_page_size: pageSize }),
       admin.from('profile_photo_audit_runs').select('id,status,profiles_scanned,photos_scanned,flagged_count,error_count,started_at,finished_at').order('started_at', { ascending: false }).limit(1).maybeSingle(),
     ]);
-    if (error) return NextResponse.json({ error: 'File des avertissements échus indisponible. Applique la migration de suivi des photos.' }, { status: 503 });
-    const rows = (overdue ?? []) as OverdueProfileQueueRow[];
+    if (error) return NextResponse.json({ error: status === 'overdue' ? 'File des avertissements échus indisponible. Applique la migration de suivi des photos.' : 'File des membres en attente indisponible. Applique la migration de suivi des photos.' }, { status: 503 });
+    const rows = (overdue ?? []) as (OverdueProfileQueueRow | WaitingProfileQueueRow)[];
     const total = Number(rows[0]?.total_count ?? 0);
-    const items = rows.map((row) => ({ id: row.audit_id, profile_id: row.profile_id, photo_url: row.photo_url, scan_status: 'flagged', review_status: 'warned', reason: row.reason, celebrity_names: row.celebrity_names, findings: row.findings, scanned_at: row.warned_at, reviewed_at: row.warned_at, profile: row.profile, case_id: row.case_id, warning_count: row.warning_count, warning_hours: row.warning_hours, warned_at: row.warned_at, deadline_at: row.deadline_at }));
+    const items = await attachAuthContacts(admin, rows.map((row) => ({ id: row.audit_id, profile_id: row.profile_id, photo_url: row.photo_url, scan_status: 'flagged', review_status: 'warned', reason: row.reason, celebrity_names: row.celebrity_names, findings: row.findings, scanned_at: row.warned_at, reviewed_at: row.warned_at, profile: row.profile, case_id: row.case_id, warning_count: row.warning_count, warning_hours: row.warning_hours, warned_at: row.warned_at, deadline_at: row.deadline_at })));
     return NextResponse.json({ items, page, pageSize, total, totalPages: Math.max(1, Math.ceil(total / pageSize)), latestRun: latestRun ?? null }, { headers: { 'Cache-Control': 'private, no-store' } });
   }
   const statusKey = status;
@@ -72,7 +141,7 @@ export async function GET(request: Request) {
   if (error) return NextResponse.json({ error: 'File des profils suspects indisponible. Applique la migration SQL dédiée.' }, { status: 503 });
   const rows = (audits ?? []) as FakeProfileQueueRow[];
   const total = Number(rows[0]?.total_count ?? 0);
-  const items = rows.map(({ total_count: _totalCount, ...audit }) => audit);
+  const items = await attachAuthContacts(admin, rows.map(({ total_count: _totalCount, ...audit }) => audit));
   return NextResponse.json({ items, page, pageSize, total, totalPages: Math.max(1, Math.ceil(total / pageSize)), latestRun: latestRun ?? null }, { headers: { 'Cache-Control': 'private, no-store' } });
 }
 

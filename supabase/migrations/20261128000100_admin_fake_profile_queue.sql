@@ -50,7 +50,7 @@ AS $$
       AND p.profile_status = 'completed'
       AND (
         (p_review_status = 'pending' AND a.review_status = 'pending')
-        OR (p_review_status = 'treated' AND a.review_status IN ('warned', 'blocked', 'cleared'))
+        OR (p_review_status = 'treated' AND a.review_status IN ('blocked', 'cleared'))
       )
   )
   SELECT visible.*, count(*) OVER () AS total_count
