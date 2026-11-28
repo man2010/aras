@@ -8,6 +8,7 @@ on:
 jobs:
   audit:
     runs-on: ubuntu-latest
+    environment: ARAS_APPLICATION_URL
     timeout-minutes: 360
     steps:
       - uses: actions/checkout@v4
