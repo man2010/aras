@@ -666,7 +666,9 @@ export function Footer() {
             <div className="mt-5 flex flex-col gap-3 text-sm text-white/60">
               <Link href="/inscription" className="hover:text-white">Créer un compte</Link>
               <Link href="/connexion" className="hover:text-white">Se connecter</Link>
-              <Link href="/#how-it-works" className="hover:text-white">Sécurité & respect</Link>
+              <Link href="/cgu#conduite" className="hover:text-white">Sécurité & respect</Link>
+              <Link href="/cgu" className="hover:text-white">Conditions générales d&apos;utilisation</Link>
+              <Link href="/politique-confidentialite" className="hover:text-white">Politique de confidentialité</Link>
             </div>
           </div>
           <div>
@@ -679,11 +681,6 @@ export function Footer() {
         </div>
         <div className="flex flex-col justify-between gap-4 border-t border-white/10 pt-6 text-[11px] text-white/35 sm:flex-row sm:items-center">
           <span>© 2026 ARAS. Tous droits réservés.</span>
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-white/50">
-            <Link href="/cgu" className="transition hover:text-white">
-              Conditions générales d&apos;utilisation
-            </Link>
-          </div>
         </div>
       </div>
     </footer>

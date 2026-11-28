@@ -64,6 +64,15 @@ function ageFromBirthdate(value: string) {
   return age;
 }
 
+function isValidFullName(value: string) {
+  const normalized = value.trim().replace(/\s+/g, ' ');
+  return /^\p{L}[\p{L}\p{M}]*(?:\s+\p{L}[\p{L}\p{M}]*)+$/u.test(normalized);
+}
+
+function keepNameCharacters(value: string) {
+  return value.replace(/[^\p{L}\p{M}\s]/gu, '').replace(/ {2,}/g, ' ');
+}
+
 function ChoiceGroup({ label, options, selected, onToggle }: { label: string; options: string[]; selected: string[]; onToggle: (value: string) => void }) {
   return (
     <div>
@@ -239,7 +248,7 @@ export default function OnboardingPage() {
   const isAdult = useMemo(() => age >= 18, [age]);
 
   const stepReady = useMemo(() => {
-    if (step === 0) return Boolean(name.trim() && gender && birthdate && isAdult);
+    if (step === 0) return Boolean(isValidFullName(name) && gender && birthdate && isAdult);
     if (step === 1) {
       return locationMode === 'automatic'
         ? Boolean(locationLabel.trim() && cityName.trim() && lat !== null && lng !== null)
@@ -427,6 +436,10 @@ export default function OnboardingPage() {
 
   const saveProfile = async () => {
     if (!user) return;
+    if (!isValidFullName(name)) {
+      setMessage('Saisis ton prénom et ton nom, avec des lettres uniquement.');
+      return;
+    }
     if (!isAdult) {
       setMessage('Vous devez avoir au moins 18 ans pour continuer.');
       return;
@@ -483,6 +496,11 @@ export default function OnboardingPage() {
   const nextStep = () => {
     if (step === 5) {
       saveProfile();
+      return;
+    }
+
+    if (step === 0 && !isValidFullName(name)) {
+      setMessage('Saisis ton prénom et ton nom, avec des lettres uniquement.');
       return;
     }
 
@@ -565,10 +583,16 @@ export default function OnboardingPage() {
                   Comment t’appelles-tu ?
                   <input
                     value={name}
-                    onChange={(event) => setName(event.target.value)}
+                    onChange={(event) => { setName(keepNameCharacters(event.target.value)); setMessage(''); }}
+                    autoComplete="name"
+                    required
+                    maxLength={80}
+                    aria-invalid={Boolean(name.trim()) && !isValidFullName(name)}
                     className="mt-2 w-full min-w-0 rounded-2xl border border-[#dfd2c6] bg-[#f8f9fd] px-4 py-3.5 text-base text-[#241c18] outline-none transition placeholder:text-[#9a8b82] focus:border-[#ec3b78] dark:border-white/10 dark:bg-[#1d1f24] dark:text-white dark:placeholder:text-white/35 dark:focus:border-[#ff7ab3]"
-                    placeholder="Ton prénom"
+                    placeholder="Prénom Nom"
                   />
+                  <span className="mt-1.5 block text-xs font-normal text-[#8a7d75] dark:text-white/55">Indique ton prénom et ton nom. Les chiffres et caractères spéciaux ne sont pas acceptés.</span>
+                  {Boolean(name.trim()) && !isValidFullName(name) && <span className="mt-1 block text-xs font-semibold text-rose-600" role="alert">Saisis au moins deux noms composés de lettres.</span>}
                 </label>
 
                 <div className="block text-sm font-bold text-[#625852] dark:text-white/80">
