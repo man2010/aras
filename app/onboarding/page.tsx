@@ -137,6 +137,7 @@ export default function OnboardingPage() {
   const hiddenFileInputRef = useRef<HTMLInputElement | null>(null);
   const [step, setStep] = useState<Step>(0);
   const [draftLoadedForUser, setDraftLoadedForUser] = useState<string | null>(null);
+  const [draftLoadError, setDraftLoadError] = useState(false);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [name, setName] = useState('');
@@ -199,10 +200,19 @@ export default function OnboardingPage() {
 
     const draftKey = `aras:onboarding-draft:${user.id}`;
     let cancelled = false;
+    setDraftLoadError(false);
     void (async () => {
       let draft: Partial<OnboardingDraft> | null = null;
-      const { data } = await supabase.from('profiles').select('onboarding_draft').eq('id', user.id).maybeSingle();
+      const { data, error } = await supabase.from('profiles').select('onboarding_draft,onboarding_completed,profile_status').eq('id', user.id).maybeSingle();
       if (cancelled) return;
+      if (error) {
+        setDraftLoadError(true);
+        return;
+      }
+      if (data?.onboarding_completed === true && data.profile_status === 'completed') {
+        router.replace('/espace');
+        return;
+      }
       if (data?.onboarding_draft && typeof data.onboarding_draft === 'object') {
         draft = data.onboarding_draft as Partial<OnboardingDraft>;
       }
@@ -219,7 +229,7 @@ export default function OnboardingPage() {
       setDraftLoadedForUser(user.id);
     })();
     return () => { cancelled = true; };
-  }, [user, applyDraft]);
+  }, [user, applyDraft, router]);
 
   useEffect(() => {
     if (!user || draftLoadedForUser !== user.id) return;
@@ -526,6 +536,26 @@ export default function OnboardingPage() {
   };
 
   if (!user) return null;
+
+  if (draftLoadError) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-[#f8f9fd] px-5 text-[#241c18] dark:bg-[#0d0d10] dark:text-white">
+        <section className="w-full max-w-md rounded-3xl border border-[#eadfd5] bg-white p-7 text-center shadow-xl dark:border-white/10 dark:bg-[#17181b]">
+          <h1 className="font-display text-2xl">Impossible de vérifier ton profil</h1>
+          <p className="mt-3 text-sm leading-6 text-[#756960] dark:text-white/65">Réessaie dans un instant. Ton avancement ne sera pas réinitialisé.</p>
+          <button type="button" onClick={() => window.location.reload()} className="mt-6 min-h-12 w-full rounded-full bg-[#ed3479] px-5 py-3 font-bold text-white">Réessayer</button>
+        </section>
+      </main>
+    );
+  }
+
+  if (draftLoadedForUser !== user.id) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-[#f8f9fd] px-5 text-[#241c18] dark:bg-[#0d0d10] dark:text-white">
+        <p className="rounded-full bg-white px-5 py-3 text-sm font-semibold shadow dark:bg-[#17181b]">Vérification de ton profil…</p>
+      </main>
+    );
+  }
 
   return (
     <main className="min-h-screen overflow-x-hidden bg-[#f8f9fd] px-3 py-5 text-[#241c18] transition-colors dark:bg-[#0d0d10] dark:text-white sm:px-6 sm:py-10 lg:px-10">

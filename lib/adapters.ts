@@ -27,6 +27,7 @@ export type ProfileRow = {
   show_age: boolean | null;
   show_online_status: boolean | null;
   show_distance: boolean | null;
+  blur_profile_photo?: boolean | null;
   created_at: string;
   height: number | null;
   profession: string | null;
@@ -128,6 +129,7 @@ export function toProfile(row: ProfileRow): Profile {
     show_age: row.show_age !== false,
     show_online_status: row.show_online_status !== false,
     show_distance: row.show_distance !== false,
+    blur_profile_photo: Boolean(row.blur_profile_photo),
     is_premium: Boolean(row.is_premium),
     last_seen_at: row.last_seen_at,
     height: row.height,

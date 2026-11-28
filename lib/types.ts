@@ -20,6 +20,7 @@ export type Profile = {
   show_age?: boolean;
   show_online_status?: boolean;
   show_distance?: boolean;
+  blur_profile_photo?: boolean;
   is_premium?: boolean;
   last_seen_at?: string | null;
   height?: number | null;
