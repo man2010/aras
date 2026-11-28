@@ -1,5 +1,5 @@
 const CACHE_PREFIX = 'aras-pwa-';
-const CACHE_VERSION = `${CACHE_PREFIX}v1`;
+const CACHE_VERSION = `${CACHE_PREFIX}v2`;
 const APP_SHELL = [
   '/offline.html',
   '/manifest.webmanifest',
@@ -39,14 +39,11 @@ self.addEventListener('fetch', (event) => {
     || url.pathname === '/aras-logo.jpeg';
   if (!isSafeStaticAsset) return;
 
-  event.respondWith(caches.match(request).then((cached) => {
-    if (cached) return cached;
-    return fetch(request).then((response) => {
-      if (response.ok && response.type === 'basic') {
-        const copy = response.clone();
-        void caches.open(CACHE_VERSION).then((cache) => cache.put(request, copy));
-      }
-      return response;
-    });
-  }));
+  event.respondWith(fetch(request).then((response) => {
+    if (response.ok && response.type === 'basic') {
+      const copy = response.clone();
+      void caches.open(CACHE_VERSION).then((cache) => cache.put(request, copy));
+    }
+    return response;
+  }).catch(async () => (await caches.match(request)) || Response.error()));
 });
