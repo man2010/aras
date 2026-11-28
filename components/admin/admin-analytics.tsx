@@ -20,12 +20,17 @@ interface AdminAnalyticsProps {
 
 export function AdminAnalytics({ analytics, loading = false, loaded = true, error = '', onRefresh, onRangeChange }: AdminAnalyticsProps) {
   const [timeRange, setTimeRange] = useState<'7d' | '30d' | '90d'>('30d');
+  const [selectedPoint, setSelectedPoint] = useState<{ chart: string; label: string; value: number; unit: string } | null>(null);
   const days = Number.parseInt(timeRange, 10);
   const dailySignups = analytics.dailySignups.slice(-days);
   const dailyMessages = analytics.dailyMessages.slice(-days);
   const dailyMatches = analytics.dailyMatches.slice(-days);
   const total = (items: { count: number }[]) => items.reduce((sum, item) => sum + item.count, 0);
   const barHeight = (count: number, items: { count: number }[]) => count === 0 ? 0 : Math.max(8, (count / Math.max(1, ...items.map((item) => item.count))) * 100);
+  const selectPoint = (chart: string, label: string, value: number, unit: string) => setSelectedPoint((current) => current?.chart === chart && current.label === label ? null : { chart, label, value, unit });
+  const pointDetails = (chart: string) => selectedPoint?.chart === chart
+    ? <p role="status" className="mt-3 rounded-xl bg-[#f8f9fd] px-3 py-2 text-xs font-semibold text-[#625852]">{selectedPoint.label} · {selectedPoint.value} {selectedPoint.unit}</p>
+    : null;
 
   if (!loaded) return <div className="space-y-5"><div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="font-display text-2xl">Analytics</h2><p className="mt-1 text-sm text-[#9a8b82]">Chargement des données agrégées…</p></div><button type="button" onClick={onRefresh} disabled={loading} className="rounded-full border bg-white px-4 py-2 text-sm font-bold disabled:opacity-50">{loading ? 'Chargement…' : 'Réessayer'}</button></div>{error && <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800">{error} Vérifie que la migration des snapshots Analytics est appliquée dans Supabase.</p>}<div className="grid gap-6 lg:grid-cols-2">{Array.from({ length: 5 }, (_, index) => <div key={index} className="h-72 animate-pulse rounded-[26px] bg-white shadow-sm" />)}</div></div>;
 
@@ -83,6 +88,7 @@ export function AdminAnalytics({ analytics, loading = false, loaded = true, erro
 
       {/* Charts Grid */}
       <div className="grid gap-6 lg:grid-cols-2">
+        <p className="-mb-3 text-xs text-[#9a8b82] sm:hidden">Touchez une barre pour afficher sa valeur.</p>
         {/* Daily Signups */}
         <div className="min-w-0 rounded-[26px] bg-white p-4 shadow-[0_8px_30pxrgba(83,46,32,.05)] sm:p-6">
           <div className="mb-4 flex items-center justify-between">
@@ -93,16 +99,20 @@ export function AdminAnalytics({ analytics, loading = false, loaded = true, erro
             {dailySignups.slice(-Math.min(days, 14)).map((item, index) => (
               <div key={index} className="flex h-full flex-1 flex-col items-center justify-end gap-2">
                 <div className="flex h-[220px] w-full items-end">
-                  <div
-                    className="w-full rounded-t-lg bg-[#ec3b78] transition hover:bg-[#c92e63]"
-                    style={{ height: `${(barHeight(item.count, dailySignups) / 100) * 220}px` }}
+                  <button
+                    type="button"
+                    aria-label={`${item.count} inscription${item.count === 1 ? '' : 's'} le ${new Date(item.date).toLocaleDateString('fr-FR')}`}
+                    aria-pressed={selectedPoint?.chart === 'signups' && selectedPoint.label === new Date(item.date).toLocaleDateString('fr-FR')}
+                    onClick={() => selectPoint('signups', new Date(item.date).toLocaleDateString('fr-FR'), item.count, item.count === 1 ? 'inscription' : 'inscriptions')}
+                    className="flex h-full w-full items-end focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#ec3b78]"
                     title={`${item.count} inscription${item.count === 1 ? '' : 's'}`}
-                  />
+                  ><span className={`w-full rounded-t-lg bg-[#ec3b78] transition hover:bg-[#c92e63] ${selectedPoint?.chart === 'signups' && selectedPoint.label === new Date(item.date).toLocaleDateString('fr-FR') ? 'ring-2 ring-[#241c18]' : ''}`} style={{ height: `${(barHeight(item.count, dailySignups) / 100) * 220}px` }}/></button>
                 </div>
                 <p className="text-[10px] text-[#9a8b82]">{new Date(item.date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}</p>
               </div>
             ))}
           </div>
+          {pointDetails('signups')}
         </div>
 
         {/* Daily Messages */}
@@ -115,16 +125,20 @@ export function AdminAnalytics({ analytics, loading = false, loaded = true, erro
             {dailyMessages.slice(-Math.min(days, 14)).map((item, index) => (
               <div key={index} className="flex h-full flex-1 flex-col items-center justify-end gap-2">
                 <div className="flex h-[220px] w-full items-end">
-                  <div
-                    className="w-full rounded-t-lg bg-[#1a6b68] transition hover:bg-[#125552]"
-                    style={{ height: `${(barHeight(item.count, dailyMessages) / 100) * 220}px` }}
+                  <button
+                    type="button"
+                    aria-label={`${item.count} message${item.count === 1 ? '' : 's'} le ${new Date(item.date).toLocaleDateString('fr-FR')}`}
+                    aria-pressed={selectedPoint?.chart === 'messages' && selectedPoint.label === new Date(item.date).toLocaleDateString('fr-FR')}
+                    onClick={() => selectPoint('messages', new Date(item.date).toLocaleDateString('fr-FR'), item.count, item.count === 1 ? 'message' : 'messages')}
+                    className="flex h-full w-full items-end focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1a6b68]"
                     title={`${item.count} message${item.count === 1 ? '' : 's'}`}
-                  />
+                  ><span className={`w-full rounded-t-lg bg-[#1a6b68] transition hover:bg-[#125552] ${selectedPoint?.chart === 'messages' && selectedPoint.label === new Date(item.date).toLocaleDateString('fr-FR') ? 'ring-2 ring-[#241c18]' : ''}`} style={{ height: `${(barHeight(item.count, dailyMessages) / 100) * 220}px` }}/></button>
                 </div>
                 <p className="text-[10px] text-[#9a8b82]">{new Date(item.date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}</p>
               </div>
             ))}
           </div>
+          {pointDetails('messages')}
         </div>
 
         {/* Daily Matches */}
@@ -137,16 +151,20 @@ export function AdminAnalytics({ analytics, loading = false, loaded = true, erro
             {dailyMatches.slice(-Math.min(days, 14)).map((item, index) => (
               <div key={index} className="flex h-full flex-1 flex-col items-center justify-end gap-2">
                 <div className="flex h-[220px] w-full items-end">
-                  <div
-                    className="w-full rounded-t-lg bg-[#d89b52] transition hover:bg-[#c08040]"
-                    style={{ height: `${(barHeight(item.count, dailyMatches) / 100) * 220}px` }}
+                  <button
+                    type="button"
+                    aria-label={`${item.count} match${item.count === 1 ? '' : 'es'} le ${new Date(item.date).toLocaleDateString('fr-FR')}`}
+                    aria-pressed={selectedPoint?.chart === 'matches' && selectedPoint.label === new Date(item.date).toLocaleDateString('fr-FR')}
+                    onClick={() => selectPoint('matches', new Date(item.date).toLocaleDateString('fr-FR'), item.count, item.count === 1 ? 'match' : 'matches')}
+                    className="flex h-full w-full items-end focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#d89b52]"
                     title={`${item.count} match${item.count === 1 ? '' : 'es'}`}
-                  />
+                  ><span className={`w-full rounded-t-lg bg-[#d89b52] transition hover:bg-[#c08040] ${selectedPoint?.chart === 'matches' && selectedPoint.label === new Date(item.date).toLocaleDateString('fr-FR') ? 'ring-2 ring-[#241c18]' : ''}`} style={{ height: `${(barHeight(item.count, dailyMatches) / 100) * 220}px` }}/></button>
                 </div>
                 <p className="text-[10px] text-[#9a8b82]">{new Date(item.date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}</p>
               </div>
             ))}
           </div>
+          {pointDetails('matches')}
         </div>
 
         {/* User Demographics */}
@@ -159,16 +177,17 @@ export function AdminAnalytics({ analytics, loading = false, loaded = true, erro
             {analytics.userDemographics.slice(0, 6).map((item, index) => (
               <div key={index} className="flex items-center gap-3">
                 <p className="w-20 shrink-0 truncate text-xs text-[#756960] sm:w-24 sm:text-sm" title={item.city}>{item.city}</p>
-                <div className="flex-1 h-4 rounded-full bg-[#f8f9fd]">
-                  <div
-                    className="h-full rounded-full bg-[#ec3b78] transition hover:bg-[#c92e63]"
+                  <button type="button" aria-label={`${item.city} : ${item.count} profil${item.count === 1 ? '' : 's'}`} aria-pressed={selectedPoint?.chart === 'cities' && selectedPoint.label === item.city} onClick={() => selectPoint('cities', item.city, item.count, item.count === 1 ? 'profil' : 'profils')} title={`${item.city} · ${item.count} profil${item.count === 1 ? '' : 's'}`} className="flex-1 h-4 rounded-full bg-[#f8f9fd] text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#ec3b78]">
+                  <span
+                    className={`block h-full rounded-full bg-[#ec3b78] transition hover:bg-[#c92e63] ${selectedPoint?.chart === 'cities' && selectedPoint.label === item.city ? 'ring-2 ring-[#241c18]' : ''}`}
                     style={{ width: `${(item.count / Math.max(...analytics.userDemographics.map(d => d.count))) * 100}%` }}
                   />
-                </div>
+                </button>
                 <p className="w-12 text-sm font-bold text-[#241c18]">{item.count}</p>
               </div>
             ))}
           </div>
+          {pointDetails('cities')}
           {analytics.userDemographics.length === 0 && <p className="py-8 text-center text-sm text-[#9a8b82]">Aucune donnée de ville disponible.</p>}
         </div>
       </div>
