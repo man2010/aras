@@ -5,7 +5,7 @@ import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Menu, X, Heart, LogOut, LayoutDashboard, Bell, Moon, Sun, MessageCircle, CalendarDays, ChevronRight, Settings, User, SlidersHorizontal, MapPin, Megaphone, Phone } from 'lucide-react';
+import { Menu, X, Heart, LogOut, LayoutDashboard, Bell, Moon, Sun, MessageCircle, CalendarDays, ChevronRight, Settings, User, SlidersHorizontal, MapPin, Megaphone } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
@@ -627,10 +627,16 @@ export function Navbar({ isAdminMode = false, isModeratorMode = false }: { isAdm
   );
 }
 
+function WhatsAppIcon() {
+  return <svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4 shrink-0 fill-current">
+    <path d="M20.52 3.48A11.83 11.83 0 0 0 12.1 0C5.55 0 .22 5.33.22 11.88c0 2.09.55 4.13 1.59 5.93L.12 24l6.34-1.66a11.88 11.88 0 0 0 5.64 1.43h.01c6.55 0 11.88-5.33 11.88-11.88 0-3.17-1.23-6.15-3.47-8.41ZM12.1 21.75a9.88 9.88 0 0 1-5.03-1.37l-.36-.21-3.76.99 1-3.67-.24-.38a9.85 9.85 0 0 1-1.51-5.23c0-5.45 4.44-9.89 9.9-9.89a9.82 9.82 0 0 1 7 2.9 9.82 9.82 0 0 1 2.89 7c0 5.46-4.44 9.9-9.89 9.9Zm5.43-7.41c-.3-.15-1.77-.87-2.04-.97-.27-.1-.47-.15-.66.15-.2.3-.76.97-.93 1.17-.17.2-.34.22-.64.07-.3-.15-1.26-.46-2.4-1.47-.89-.8-1.49-1.78-1.66-2.08-.17-.3-.02-.47.13-.62.13-.13.3-.35.45-.52.15-.17.2-.3.3-.5.1-.2.05-.37-.03-.52-.08-.15-.66-1.6-.9-2.19-.24-.57-.48-.49-.66-.5h-.56c-.2 0-.52.08-.8.37-.27.3-1.04 1.02-1.04 2.48s1.07 2.88 1.22 3.08c.15.2 2.1 3.2 5.08 4.49.71.3 1.26.49 1.69.63.71.23 1.36.2 1.87.12.57-.08 1.77-.72 2.02-1.42.25-.7.25-1.29.17-1.42-.07-.13-.27-.2-.57-.35Z"/>
+  </svg>;
+}
+
 export function Footer() {
   const { user } = useAuth();
   const supportPhone = process.env.NEXT_PUBLIC_SUPPORT_PHONE?.trim();
-  const supportTel = supportPhone?.replace(/[^\d+]/g, '');
+  const supportWhatsApp = supportPhone?.replace(/\D/g, '');
 
   if (user) return null;
 
@@ -668,7 +674,7 @@ export function Footer() {
             <p className="mt-5 text-sm leading-6 text-white/60">Notre équipe est là pour vous accompagner avec attention.</p>
             <Link href="/contact" className="mt-4 inline-block text-sm font-bold text-white hover:text-[#f4c27a]">Nous contacter</Link>
             <a href="mailto:contact@aras.sn" className="mt-2 block text-sm font-bold text-white hover:text-[#f4c27a]">contact@aras.sn</a>
-            {supportPhone && supportTel && <a href={`tel:${supportTel}`} className="mt-2 inline-flex items-center gap-2 text-sm font-bold text-white hover:text-[#f4c27a]"><Phone size={15}/>{supportPhone}</a>}
+            {supportPhone && supportWhatsApp && <a href={`https://wa.me/${supportWhatsApp}`} target="_blank" rel="noopener noreferrer" aria-label={`Contacter le support ARAS sur WhatsApp au ${supportPhone}`} className="mt-2 inline-flex items-center gap-2 text-sm font-bold text-white hover:text-[#f4c27a]"><WhatsAppIcon/>{supportPhone}</a>}
           </div>
         </div>
         <div className="flex flex-col justify-between gap-4 border-t border-white/10 pt-6 text-[11px] text-white/35 sm:flex-row sm:items-center">
